@@ -1,0 +1,49 @@
+name: _deploy-loadtest-infra-aws
+
+on:
+  workflow_call:
+    secrets:
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_SECRET_KEY:
+        required: true
+      CLUSTER_PREFIX:
+        required: true
+
+env:
+  AWS_REGION: us-east-1 # Add your cluster zone here.
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Configure Kubeconfig w/ EKS"
+        run: aws eks update-kubeconfig --name ${{ secrets.CLUSTER_PREFIX }}-prod --region ${{ env.AWS_REGION }}
+
+      - name: Deploy InfluxDB and Grafana
+        run: |
+          helm repo add influxdata https://helm.influxdata.com/
+          helm upgrade --install influxdb influxdata/influxdb --namespace monitoring --create-namespace --values ./deploy/influxdb/values.yaml
+
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm upgrade --install grafana grafana/grafana --namespace monitoring --values ./deploy/grafana/values.yaml
+
+      - name: Deploy K6 Operator
+        run: |
+          helm upgrade k6 \
+          --atomic \
+          --install \
+          ./deploy/k6 \
+          --values ./deploy/k6/values.yaml
+
+      - name: Deploy load test scripts
+        run: |
+          helm upgrade --install tests ./deploy/tests

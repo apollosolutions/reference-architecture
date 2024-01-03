@@ -1,0 +1,50 @@
+name: Deploy Router
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - prod
+      dry-run:
+        type: boolean
+        description: "Run a dry run with helm"
+        required: false
+        default: false
+      debug:
+        type: boolean
+        description: "Run helm in debug mode"
+        required: false
+        default: false
+
+jobs:
+  determine_cloud_provider:
+    uses: ./.github/workflows/_determine-provider.yaml
+    secrets: inherit
+
+  deploy_gcp:
+    if: needs.determine_cloud_provider.outputs.gcp == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_deploy-router-gke.yaml
+    secrets: inherit
+    with:
+      dry-run: ${{ inputs.dry-run }}
+      debug: ${{ inputs.debug }}
+      variant: ${{ inputs.environment }}
+      environment: ${{ inputs.environment }}
+
+  deploy_aws:
+    if: needs.determine_cloud_provider.outputs.aws == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_deploy-router-aws.yaml
+    secrets: inherit
+    with:
+      dry-run: ${{ inputs.dry-run }}
+      debug: ${{ inputs.debug }}
+      variant: ${{ inputs.environment }}
+      environment: ${{ inputs.environment }}

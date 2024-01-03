@@ -1,0 +1,77 @@
+name: _run-loadtest-gcp
+
+on:
+  workflow_call:
+    inputs:
+      test:
+        description: Test to Run
+        type: string
+        required: true
+      parallelism:
+        description: Number of workers
+        type: string
+        default: "1"
+        required: true
+    secrets:
+      GCP_CREDENTIALS:
+        required: true
+      CLUSTER_PREFIX:
+        required: true
+      APOLLO_GRAPH_ID:
+        required: true
+env:
+  GKE_ZONE: us-east1 # Add your cluster zone here.
+  CLUSTER_PREFIX: ${{ secrets.CLUSTER_PREFIX }}
+  APOLLO_GRAPH_ID: ${{ secrets.APOLLO_GRAPH_ID }}
+
+jobs:
+  deploy:
+    name: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v0
+
+      - name: "Use gcloud CLI"
+        run: gcloud info
+
+      # Configure Docker to use the gcloud command-line tool as a credential
+      # helper for authentication
+      - run: |-
+          gcloud --quiet auth configure-docker
+
+      # Get the GKE credentials so we can deploy to the cluster
+      - uses: google-github-actions/get-gke-credentials@fb08709ba27618c31c09e014e1d8364b02e5042e
+        with:
+          cluster_name: ${{ env.CLUSTER_PREFIX }}-prod
+          location: ${{ env.GKE_ZONE }}
+
+      - name: "Apply K6"
+        env:
+          RUN_NAME: run-${{ inputs.test }}-${{ github.run_id }}
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: k6.io/v1alpha1
+          kind: K6
+          metadata:
+            name: ${RUN_NAME}
+          spec:
+            parallelism: ${{ inputs.parallelism }}
+            arguments: "--out influxdb=http://influxdb.monitoring:8086/db"
+            script:
+              configMap:
+                name: tests
+                file: ${{ inputs.test }}.js
+          EOF
+
+          echo "To delete load test resources, run:"
+          echo "kubectl delete k6/$RUN_NAME"

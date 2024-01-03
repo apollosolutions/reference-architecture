@@ -1,0 +1,28 @@
+name: Deploy Load Test
+
+# Started from GH Docs
+# https://docs.github.com/en/actions/deployment/deploying-to-your-cloud-provider/deploying-to-google-kubernetes-engine
+
+# REQUIRED REPO SECRETS
+#   - GCP_CREDENTIALS
+#   - CLUSTER_PREFIX
+
+on:
+  workflow_dispatch:
+
+jobs:
+  determine_cloud_provider:
+    uses: ./.github/workflows/_determine-provider.yaml
+    secrets: inherit
+
+  deploy_gcp:
+    if: needs.determine_cloud_provider.outputs.gcp == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_deploy-loadtest-infra-gke.yaml
+    secrets: inherit
+
+  deploy_aws:
+    if: needs.determine_cloud_provider.outputs.aws == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_deploy-loadtest-infra-aws.yaml
+    secrets: inherit

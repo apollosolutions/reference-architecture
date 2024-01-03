@@ -1,0 +1,44 @@
+name: Run Load Test
+
+# REQUIRED REPO SECRETS
+#   - GCP_CREDENTIALS
+#   - CLUSTER_PREFIX
+
+on:
+  workflow_dispatch:
+    inputs:
+      test:
+        description: Test to Run
+        type: choice
+        required: true
+        options:
+          - short
+          - long
+      parallelism:
+        description: Number of workers
+        type: string
+        default: "1"
+        required: true
+
+jobs:
+  determine_cloud_provider:
+    uses: ./.github/workflows/_determine-provider.yaml
+    secrets: inherit
+
+  deploy_gcp:
+    if: needs.determine_cloud_provider.outputs.gcp == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_run-loadtest-gke.yaml
+    secrets: inherit
+    with:
+      test: ${{ inputs.test }}
+      parallelism: ${{ inputs.parallelism }}
+
+  deploy_aws:
+    if: needs.determine_cloud_provider.outputs.aws == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_run-loadtest-aws.yaml
+    secrets: inherit
+    with:
+      test: ${{ inputs.test }}
+      parallelism: ${{ inputs.parallelism }}

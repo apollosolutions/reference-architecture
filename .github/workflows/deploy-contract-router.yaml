@@ -1,0 +1,60 @@
+name: Deploy Contract Router
+
+# This file is identical to deploy-router-gke.yaml except:
+# - It has a "variant" input
+# - The router is deployed to a ${{ variant }}-router namespace
+# - The graph ref for fetching the supergraph uses the variant (intended to be a contract variant)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - prod
+      variant:
+        description: "Contract variant name"
+        type: string
+        required: true
+        default: contract
+      dry-run:
+        type: boolean
+        description: "Run a dry run with helm"
+        required: false
+        default: false
+      debug:
+        type: boolean
+        description: "Run helm in debug mode"
+        required: false
+        default: false
+
+jobs:
+  determine_cloud_provider:
+    uses: ./.github/workflows/_determine-provider.yaml
+    secrets: inherit
+
+  deploy_gcp:
+    if: needs.determine_cloud_provider.outputs.gcp == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_deploy-router-gke.yaml
+    secrets: inherit
+    with:
+      dry-run: ${{ inputs.dry-run }}
+      debug: ${{ inputs.debug }}
+      variant: ${{ inputs.variant }}
+      environment: ${{ inputs.environment }}
+
+  deploy_aws:
+    if: needs.determine_cloud_provider.outputs.aws == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_deploy-router-aws.yaml
+    secrets: inherit
+    with:
+      dry-run: ${{ inputs.dry-run }}
+      debug: ${{ inputs.debug }}
+      variant: ${{ inputs.variant }}
+      environment: ${{ inputs.environment }}
