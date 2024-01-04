@@ -1,0 +1,42 @@
+name: Uninstall Router
+
+# REQUIRED REPO SECRETS
+#   - GCP_CREDENTIALS
+#   - CLUSTER_PREFIX
+
+on:
+  workflow_dispatch:
+
+jobs:
+  determine_cloud_provider:
+    uses: ./.github/workflows/_determine-provider.yaml
+    secrets: inherit
+
+  uninstall_dev_gcp:
+    if: needs.determine_cloud_provider.outputs.gcp == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_uninstall-router-gke.yaml
+    secrets: inherit
+    with:
+      environment: dev 
+  uninstall_prod_gcp:
+    if: needs.determine_cloud_provider.outputs.gcp == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_uninstall-router-gke.yaml
+    secrets: inherit
+    with:
+      environment: prod 
+  uninstall_dev_aws:
+    if: needs.determine_cloud_provider.outputs.aws == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_uninstall-router-aws.yaml
+    secrets: inherit
+    with:
+      environment: dev 
+  uninstall_prod_aws:
+    if: needs.determine_cloud_provider.outputs.aws == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/_uninstall-router-aws.yaml
+    secrets: inherit
+    with:
+      environment: prod  

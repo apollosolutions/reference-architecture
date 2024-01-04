@@ -1,0 +1,59 @@
+name: _run-loadtest-aws
+
+on:
+  workflow_call:
+    inputs:
+      test:
+        description: Test to Run
+        type: string
+        required: true
+      parallelism:
+        description: Number of workers
+        type: string
+        default: "1"
+        required: true
+    secrets:
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_SECRET_KEY:
+        required: true
+      CLUSTER_PREFIX:
+        required: true
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+  AWS_REGION: us-east-1
+  CLUSTER_PREFIX: ${{ secrets.CLUSTER_PREFIX }}
+
+jobs:
+  deploy:
+    name: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Configure Kubeconfig w/ EKS"
+        run: aws eks update-kubeconfig --name ${{ secrets.CLUSTER_PREFIX }}-prod --region ${{ env.AWS_REGION }}
+
+      - name: "Apply K6"
+        env:
+          RUN_NAME: run-${{ inputs.test }}-${{ github.run_id }}
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: k6.io/v1alpha1
+          kind: K6
+          metadata:
+            name: ${RUN_NAME}
+          spec:
+            parallelism: ${{ inputs.parallelism }}
+            arguments: "--out influxdb=http://influxdb.monitoring:8086/db"
+            script:
+              configMap:
+                name: tests
+                file: ${{ inputs.test }}.js
+          EOF
+
+          echo "To delete load test resources, run:"
+          echo "kubectl delete k6/$RUN_NAME"

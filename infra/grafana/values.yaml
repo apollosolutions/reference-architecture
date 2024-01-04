@@ -1,0 +1,28 @@
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: InfluxDB
+        type: influxdb
+        access: proxy
+        url: http://influxdb.monitoring:8086
+        database: db
+        isDefault: true
+        version: 1
+        editable: false
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: default # this has to match the key in `dashboards`
+        orgId: 1
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+dashboards:
+  default: # this has to match the name of a provider
+    k6-results:
+      url: https://grafana.com/api/dashboards/2587/revisions/3/download
+      datasource: InfluxDB

@@ -1,0 +1,38 @@
+name: _uninstall-router-aws
+
+on:
+  workflow_call:
+    inputs:
+      environment: 
+        type: string
+        default: dev
+        required: true
+    secrets:
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_SECRET_KEY:
+        required: true
+      CLUSTER_PREFIX:
+        required: true
+
+env:
+  AWS_REGION: us-east-1 # Add your cluster zone here.
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Configure Kubeconfig w/ EKS"
+        run: aws eks update-kubeconfig --name ${{ secrets.CLUSTER_PREFIX }}-${{ inputs.environment }} --region ${{ env.AWS_REGION }}
+
+      - name: Helm Uninstall
+        run: |
+          helm uninstall router --namespace router || true

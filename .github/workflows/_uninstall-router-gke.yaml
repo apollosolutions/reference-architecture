@@ -1,0 +1,58 @@
+name: _uninstall-router-gcp
+
+# REQUIRED REPO SECRETS
+#   - GCP_CREDENTIALS
+#   - CLUSTER_PREFIX
+
+on:
+  workflow_call:
+    inputs:
+      environment: 
+        type: string
+        default: dev
+        required: true
+    secrets:
+      GCP_CREDENTIALS:
+        required: true
+      CLUSTER_PREFIX:
+        required: true
+env:
+  GKE_ZONE: us-east1 # Add your cluster zone here.
+  CLUSTER_PREFIX: ${{ secrets.CLUSTER_PREFIX }}
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v0
+
+      - name: "Use gcloud CLI"
+        run: gcloud info
+
+      # Configure Docker to use the gcloud command-line tool as a credential
+      # helper for authentication
+      - run: |-
+          gcloud --quiet auth configure-docker
+
+      # Get the GKE credentials so we can deploy to the cluster
+      - uses: google-github-actions/get-gke-credentials@fb08709ba27618c31c09e014e1d8364b02e5042e
+        with:
+          cluster_name: ${{ env.CLUSTER_PREFIX }}-${{ inputs.environment }}
+          location: ${{ env.GKE_ZONE }}
+
+      - name: Helm Uninstall
+        run: |
+          helm uninstall router --namespace router || true
+

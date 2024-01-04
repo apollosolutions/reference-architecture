@@ -1,0 +1,116 @@
+name: _deploy-router-aws
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Target variant"
+        type: string
+        required: true
+        default: dev
+      variant:
+        description: "Target variant"
+        type: string
+        required: true
+        default: dev
+      dry-run:
+        type: boolean
+        description: "Run a dry run with helm"
+        required: false
+        default: false
+      debug:
+        type: boolean
+        description: "Run helm in debug mode"
+        required: false
+        default: false
+    secrets:
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_SECRET_KEY:
+        required: true
+      CLUSTER_PREFIX:
+        required: true
+      APOLLO_GRAPH_ID:
+        required: true
+      APOLLO_KEY:
+        required: true
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+  AWS_REGION: us-east-1
+  CLUSTER_PREFIX: ${{ secrets.CLUSTER_PREFIX }}
+  APOLLO_GRAPH_ID: ${{ secrets.APOLLO_GRAPH_ID }}
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Configure Kubeconfig w/ EKS"
+        run: aws eks update-kubeconfig --name ${{ secrets.CLUSTER_PREFIX }}-${{ inputs.environment }} --region ${{ env.AWS_REGION }}
+
+      - name: Helm dependency update
+        run: |
+          helm dependency update ./deploy/router
+          
+      # Deploy the Docker image to the GKE cluster with dry run
+      - name: Helm dry-run
+        if: ${{ inputs.dry-run }}
+        run: |
+          helm upgrade router \
+          --create-namespace \
+          --namespace router \
+          --set router.managedFederation.graphRef=$APOLLO_GRAPH_ID@${{ inputs.variant }} \
+          --set router.managedFederation.apiKey=${{ secrets.APOLLO_KEY }} \
+          --set ingress.annotations."kubernetes\.io/ingress\.class"=alb \
+          --set ingress.annotations."alb\.ingress\.kubernetes\.io/target-type"=ip \
+          --set ingress.annotations."alb\.ingress\.kubernetes\.io/scheme"=internet-facing \
+          --set ingress.gcp=false \
+          --dry-run \
+          --atomic \
+          --install \
+          ./deploy/router \
+          --values ./deploy/router/values.yaml \
+          -f ./deploy/router/environments/${{ inputs.environment }}.yaml
+
+      # Deploy the Docker image to the GKE cluster for real with debug
+      - name: Deploy
+        if: ${{ !inputs.dry-run && inputs.debug }}
+        run: |
+          helm upgrade router \
+          --create-namespace \
+          --namespace router \
+          --set router.managedFederation.graphRef=$APOLLO_GRAPH_ID@${{ inputs.variant }} \
+          --set router.managedFederation.apiKey=${{ secrets.APOLLO_KEY }} \
+          --set ingress.annotations."kubernetes\.io/ingress\.class"=alb \
+          --set ingress.annotations."alb\.ingress\.kubernetes\.io/target-type"=ip \
+          --set ingress.annotations."alb\.ingress\.kubernetes\.io/scheme"=internet-facing \
+          --set ingress.gcp=false \
+          --atomic \
+          --install \
+          --debug \
+          ./deploy/router \
+          --values ./deploy/router/values.yaml \
+          -f ./deploy/router/environments/${{ inputs.environment }}.yaml
+
+      # Deploy the Docker image to the GKE cluster for real
+      - name: Deploy
+        if: ${{ !inputs.dry-run }}
+        run: |
+          helm upgrade router \
+          --create-namespace \
+          --namespace router \
+          --set router.managedFederation.graphRef=$APOLLO_GRAPH_ID@${{ inputs.variant }} \
+          --set router.managedFederation.apiKey=${{ secrets.APOLLO_KEY }} \
+          --set ingress.annotations."kubernetes\.io/ingress\.class"=alb \
+          --set ingress.annotations."alb\.ingress\.kubernetes\.io/target-type"=ip \
+          --set ingress.annotations."alb\.ingress\.kubernetes\.io/scheme"=internet-facing \
+          --set ingress.gcp=false \
+          --atomic \
+          --install \
+          ./deploy/router \
+          --values ./deploy/router/values.yaml \
+          -f ./deploy/router/environments/${{ inputs.environment }}.yaml
