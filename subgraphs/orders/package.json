@@ -1,0 +1,54 @@
+{
+  "name": "orders",
+  "private": true,
+  "description": "A template for TypeScript projects with pre-configured tooling",
+  "version": "0.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/apollographql/subgraph-template-typescript-apollo-server"
+  },
+  "homepage": "https://github.com/apollographql/subgraph-template-typescript-apollo-server#readme",
+  "bugs": {
+    "url": "https://github.com/apollographql/subgraph-template-typescript-apollo-server/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=18.0"
+  },
+  "scripts": {
+    "prebuild": "npx genversion --esm --property name src/lib.ts",
+    "build": "npm run codegen && tsc",
+    "codegen": "graphql-codegen",
+    "start": "node dist/index.js",
+    "dev": "nodemon --watch \"src/**\" --ext \"ts,json,graphql\" --exec \"npm run build && npm run start\" --ignore ./src/__generated__/ --ignore ./src/lib.ts"
+  },
+  "dependencies": {
+    "@apollo/server": "^4.3.3",
+    "@apollo/subgraph": "^2.3.1",
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.40.3",
+    "@opentelemetry/core": "1.19.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.46.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.46.0",
+    "@opentelemetry/resources": "1.19.0",
+    "@opentelemetry/sdk-trace-base": "1.19.0",
+    "@opentelemetry/sdk-trace-node": "1.19.0",
+    "env-var": "^7.1.1",
+    "graphql": "latest",
+    "graphql-tag": "latest"
+  },
+  "devDependencies": {
+    "@graphql-codegen/add": "^5.0.0",
+    "@graphql-codegen/cli": "^5.0.0",
+    "@graphql-codegen/typescript": "^4.0.0",
+    "@graphql-codegen/typescript-resolvers": "^4.0.0",
+    "@types/node": "^20.0.0",
+    "genversion": "^3.2.0",
+    "nodemon": "^3.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.0",
+    "utility-types": "^3.10.0"
+  }
+}

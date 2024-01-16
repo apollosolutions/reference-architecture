@@ -14,17 +14,17 @@ on:
 
 jobs:
   determine_cloud_provider:
-    uses: ./.github/workflows/_determine-provider.yaml
+    uses: ./.github/workflows/modules/_determine-provider.yaml
     secrets: inherit
 
   deploy_gcp:
     if: needs.determine_cloud_provider.outputs.gcp == 'true'
     needs: [determine_cloud_provider]
-    uses: ./.github/workflows/_deploy-otel-collector-gke.yaml
+    uses: ./.github/workflows/modules/_deploy-otel-collector-gke.yaml
     secrets: inherit
 
   deploy_aws:
     if: needs.determine_cloud_provider.outputs.aws == 'true'
     needs: [determine_cloud_provider]
-    uses: ./.github/workflows/_deploy-otel-collector-aws.yaml
+    uses: ./.github/workflows/modules/_deploy-otel-collector-aws.yaml
     secrets: inherit

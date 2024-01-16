@@ -1,0 +1,43 @@
+name: _rover-subgraph-publish
+
+on:
+  workflow_call:
+    inputs:
+      subgraph_name:
+        description: Subgraph name in Studio
+        type: string
+        required: true
+      variant:
+        description: Apollo Studio variant
+        type: string
+        required: true
+    secrets:
+      APOLLO_KEY:
+        required: true
+      APOLLO_GRAPH_ID:
+        required: true
+
+env:
+  APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
+  APOLLO_VCS_COMMIT: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  publish:
+    name: Rover Subgraph Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rover
+        run: |
+          curl -sSL https://rover.apollo.dev/nix/v0.8.1 | sh
+          echo "$HOME/.rover/bin" >> $GITHUB_PATH
+
+      - name: Rover Subgraph Publish
+        run: |
+          rover subgraph publish ${{ secrets.APOLLO_GRAPH_ID }}@${{ inputs.variant }} \
+            --name ${{ inputs.subgraph_name }} \
+            --routing-url http://graphql.${{ inputs.subgraph_name }}.svc.cluster.local:4000 \
+            --schema ./src/schema.graphql

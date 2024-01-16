@@ -1,0 +1,71 @@
+name: _deploy-loadtest-infra-gcp
+
+# Started from GH Docs
+# https://docs.github.com/en/actions/deployment/deploying-to-your-cloud-provider/deploying-to-google-kubernetes-engine
+
+# REQUIRED REPO SECRETS
+#   - GCP_CREDENTIALS
+#   - CLUSTER_PREFIX
+
+on:
+  workflow_call:
+    secrets:
+      GCP_CREDENTIALS:
+        required: true
+      CLUSTER_PREFIX:
+        required: true
+env:
+  GKE_ZONE: us-east1 # Add your cluster zone here.
+  CLUSTER_PREFIX: ${{ secrets.CLUSTER_PREFIX }}
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v0
+
+      - name: "Use gcloud CLI"
+        run: gcloud info
+
+      # Configure Docker to use the gcloud command-line tool as a credential
+      # helper for authentication
+      - run: |-
+          gcloud --quiet auth configure-docker
+
+      # Get the GKE credentials so we can deploy to the cluster
+      - uses: google-github-actions/get-gke-credentials@fb08709ba27618c31c09e014e1d8364b02e5042e
+        with:
+          cluster_name: ${{ env.CLUSTER_PREFIX }}-prod
+          location: ${{ env.GKE_ZONE }}
+
+      - name: Deploy InfluxDB and Grafana
+        run: |
+          helm repo add influxdata https://helm.influxdata.com/
+          helm upgrade --install influxdb influxdata/influxdb --namespace monitoring --create-namespace --values ./deploy/influxdb/values.yaml
+
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm upgrade --install grafana grafana/grafana --namespace monitoring --values ./deploy/grafana/values.yaml
+
+      - name: Deploy K6 Operator
+        run: |
+          helm upgrade k6 \
+          --atomic \
+          --install \
+          ./deploy/k6 \
+          --values ./deploy/k6/values.yaml
+
+      - name: Deploy load test scripts
+        run: |
+          helm upgrade --install tests ./deploy/tests

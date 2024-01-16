@@ -34,13 +34,14 @@ on:
 
 jobs:
   determine_cloud_provider:
-    uses: ./.github/workflows/_determine-provider.yaml
+    uses: ./.github/workflows/modules/_determine-provider.yaml
     secrets: inherit
 
   deploy_gcp:
     if: needs.determine_cloud_provider.outputs.gcp == 'true'
     needs: [determine_cloud_provider]
-    uses: ./.github/workflows/_deploy-router-gke.yaml
+    uses: ./.github/workflows/modules/_deploy-router-gke.yaml
+
     secrets: inherit
     with:
       dry-run: ${{ inputs.dry-run }}
@@ -51,7 +52,7 @@ jobs:
   deploy_aws:
     if: needs.determine_cloud_provider.outputs.aws == 'true'
     needs: [determine_cloud_provider]
-    uses: ./.github/workflows/_deploy-router-aws.yaml
+    uses: ./.github/workflows/modules/_deploy-router-aws.yaml
     secrets: inherit
     with:
       dry-run: ${{ inputs.dry-run }}

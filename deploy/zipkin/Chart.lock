@@ -1,0 +1,6 @@
+dependencies:
+- name: zipkin
+  repository: https://openzipkin.github.io/zipkin
+  version: 0.3.0
+digest: sha256:680fbd54e0e6d16fa1f1ec16bce4dcde89e8d60a25888d37ff10036e6304c5f0
+generated: "2023-01-13T13:16:32.378945-05:00"
