@@ -10,7 +10,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 jobs:
   determine_cloud_provider:
-    uses: ./.github/workflows/modules/_determine-provider.yaml
+    uses: ./.github/workflows/_determine-provider.yaml
     secrets: inherit
 
   build-and-push-image:
@@ -53,7 +53,7 @@ jobs:
   deploy_gcp:
     if: needs.determine_cloud_provider.outputs.gcp == 'true'
     needs: [determine_cloud_provider, build-and-push-image]
-    uses: ./.github/workflows/modules/_deploy-gke.yaml
+    uses: ./.github/workflows/_deploy-gke.yaml
     secrets: inherit
     with:
       version: main
@@ -63,7 +63,7 @@ jobs:
   deploy_aws:
     if: needs.determine_cloud_provider.outputs.aws == 'true'
     needs: [determine_cloud_provider, build-and-push-image]
-    uses: ./.github/workflows/modules/_deploy-aws.yaml
+    uses: ./.github/workflows/_deploy-aws.yaml
     secrets: inherit
     with:
       version: main
