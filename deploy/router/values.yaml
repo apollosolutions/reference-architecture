@@ -1,0 +1,29 @@
+# Default values for router.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+router:
+  router:
+    configuration:
+      # duplicated in environments/prod.yaml
+      health_check:
+        listen: 0.0.0.0:8080
+      sandbox:
+        enabled: true
+      homepage:
+        enabled: false
+      supergraph:
+        introspection: true
+      include_subgraph_errors:
+        all: true
+      plugins:
+        experimental.expose_query_plan: true
+  ingress:
+    enabled: false
+  service:
+    annotations:
+      cloud.google.com/backend-config: '{"default": "http-hc-config"}'
+ingress:
+  enabled: true
+  gcp: true
+  name: router

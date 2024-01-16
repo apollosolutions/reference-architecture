@@ -1,0 +1,92 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+
+type Query {
+  """
+  Get the current user from our fake "auth" headers
+  Set the "x-user-id" header to the user id.
+  """
+  user(id: ID!): User
+  me: User
+}
+
+type Mutation {
+  login(
+    username: String
+    password: String
+    scopes: [String!]! = []
+  ): LoginResponse
+}
+
+union LoginResponse = LoginSuccessful | LoginFailed
+
+type LoginSuccessful {
+  token: String!
+  scopes: [String!]!
+  user: User!
+}
+
+type LoginFailed {
+  reason: String!
+}
+
+"An user account in our system"
+type User @key(fields: "id") {
+  id: ID!
+
+  """
+  The users login username
+  """
+  username: String!
+
+  """
+  The users email address
+  """
+  email: String!
+
+  """
+  Get the list of last session id of user activity
+  """
+  previousSessions: [ID!]
+
+  "Total saved loyalty points and rewards"
+  loyaltyPoints: Int
+
+  """
+  Saved payment methods that can be used to submit orders
+  """
+  paymentMethods: [PaymentMethod]
+
+  """
+  The users previous purchases
+  """
+  orders: [Order]
+
+  """
+  The users current saved shipping address
+  """
+  shippingAddress: String
+}
+
+"""
+A saved payment option for an user
+"""
+type PaymentMethod {
+  id: ID!
+  name: String
+  description: String
+  type: PaymentType!
+}
+
+"""
+A fix set of payment types that we accept
+"""
+enum PaymentType {
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_ACCOUNT
+}
+
+type Order @key(fields: "id", resolvable: false) {
+  id: ID!
+}

@@ -18,7 +18,7 @@ This repository contains the demos for the "Build a Supergraph" series. All you 
 ## Contents
 
 - ⏱ estimated time: 1 hour 15 minutes
-- 💰 estimated cost: $10
+- 💰 estimated cost (if using a cloud provider): $10-$15
 
 ### [Setup](/docs/setup.md)
 
@@ -29,9 +29,3 @@ This repository contains the demos for the "Build a Supergraph" series. All you 
 ### [Cleanup](/docs/cleanup.md)
 
 - Part A: Automated cleanup
-
-### [🌟 _Bonus_ 🌟 Step 7: Contracts](/07-contracts)
-
-- Part A: Tag your subgraphs
-- Part B: Create a contract variant
-- Part C: Deploy a contract router

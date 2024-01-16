@@ -1,0 +1,6 @@
+env:
+  - name: OTEL_HTTP_ENDPOINT
+    value: http://collector.monitoring:4318/v1/traces
+requests:
+  cpu: 500m
+  memory: 512Mi

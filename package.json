@@ -1,0 +1,21 @@
+{
+  "name": "@apollosolutions/reference-architecture",
+  "license": "MIT",
+  "workspaces": [
+    "subgraphs/*"
+  ],
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:*",
+    "dev:checkout": "PORT=4001 npm run dev -w subgraphs/checkout",
+    "dev:discovery": "PORT=4002 npm run dev -w subgraphs/discovery",
+    "dev:inventory": "PORT=4003 npm run dev -w subgraphs/inventory",
+    "dev:orders": "PORT=4004 npm run dev -w subgraphs/orders",
+    "dev:products": "PORT=4005 npm run dev -w subgraphs/products",
+    "dev:reviews": "PORT=4006 npm run dev -w subgraphs/reviews",
+    "dev:shipping": "PORT=4007 npm run dev -w subgraphs/shipping",
+    "dev:users": "PORT=4008 npm run dev -w subgraphs/users"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
+}

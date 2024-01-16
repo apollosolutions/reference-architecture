@@ -1,0 +1,73 @@
+name: Manual Deploy - Subgraphs
+
+# Started from GH Docs
+# https://docs.github.com/en/actions/deployment/deploying-to-your-cloud-provider/deploying-to-google-kubernetes-engine
+
+# REQUIRED REPO SECRETS
+#   - GCP_CREDENTIALS or AWS_ACCESS_KEY/SECRET
+#   - CLUSTER_PREFIX
+#   - APOLLO_KEY
+#   - APOLLO_GRAPH_ID
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Git ref to deploy"
+        type: string
+        required: true
+        default: main
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - prod
+      dry-run:
+        type: boolean
+        description: "Run a dry run with helm"
+        required: false
+        default: false
+      debug:
+        type: boolean
+        description: "Run helm in debug mode"
+        required: false
+        default: false
+
+jobs:
+  determine_cloud_provider:
+    uses: ./.github/workflows/modules/_determine-provider.yaml
+    secrets: inherit
+
+  deploy_gcp:
+    if: needs.determine_cloud_provider.outputs.gcp == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/modules/_deploy-gke.yaml
+    secrets: inherit
+    strategy:
+      matrix:
+        subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
+    with:
+      version: ${{ inputs.version }}
+      app_name: ${{ matrix.subgraph }}
+      cluster_suffix: ${{ inputs.environment }}
+      dry-run: ${{ inputs.dry-run }}
+      debug: ${{ inputs.debug }}
+
+  deploy_aws:
+    if: needs.determine_cloud_provider.outputs.aws == 'true'
+    needs: [determine_cloud_provider]
+    uses: ./.github/workflows/modules/_deploy-aws.yaml
+    secrets: inherit
+    strategy:
+      matrix:
+        subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
+    with:
+      version: ${{ inputs.version }}
+      app_name: ${{ matrix.subgraph }}
+      cluster_suffix: ${{ inputs.environment }}
+      dry-run: ${{ inputs.dry-run }}
+      debug: ${{ inputs.debug }}
+

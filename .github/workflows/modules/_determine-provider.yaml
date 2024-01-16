@@ -1,0 +1,29 @@
+name: _determine-provider
+
+on:
+  workflow_call:
+    secrets:
+      AWS_ACCESS_KEY:
+        required: false
+      GCP_CREDENTIALS:
+        required: false
+    outputs:
+      gcp:
+        value: ${{ jobs.provider.outputs.gcp}}
+      aws:
+        value: ${{ jobs.provider.outputs.aws}}
+
+jobs:
+  provider:
+    env:
+      GCP: ${{ secrets.GCP_CREDENTIALS }}
+      AWS: ${{ secrets.AWS_ACCESS_KEY }}
+    runs-on: ubuntu-latest
+    outputs:
+      gcp: ${{ steps.gcp.outputs.gcp}}
+      aws: ${{ steps.aws.outputs.aws}}
+    steps:
+      - id: gcp
+        run: if [ -n "$GCP" ]; then echo "gcp=true" >> $GITHUB_OUTPUT ; else echo "gcp=false" >> $GITHUB_OUTPUT ; fi
+      - id: aws
+        run: if [ -n "$AWS" ]; then echo "aws=true" >> $GITHUB_OUTPUT ; else echo "aws=false" >> $GITHUB_OUTPUT ; fi

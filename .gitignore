@@ -34,3 +34,5 @@ v2_4_4*
 
 # Editor/IDE files
 .idea
+
+node_modules

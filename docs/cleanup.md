@@ -28,16 +28,14 @@ kubectl delete daemonsets,replicasets,services,deployments,pods,rc,ingress --all
 
 #### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
 
-In order to ensure the load balancers are properly removed, and the iamservice roles are removed, please run:
+In order to ensure the load balancers are properly removed, and the IAM service roles are removed, please run:
 
 ```
 gh workflow run "Uninstall Router" --repo $GITHUB_ORG/apollo-supergraph-k8s-infra
 open https://github.com/$GITHUB_ORG/apollo-supergraph-k8s-infra/actions/workflows/uninstall-router.yaml
 ``` 
 
-And wait for the action to complete on the opened screen. 
-
-Once finished, run the following, replacing `apollo-supergraph-k8s` with the appropriate cluster prefix if modified: 
+Wait for the action to complete on the opened screen, and once finished, run the following, replacing `apollo-supergraph-k8s` with the appropriate cluster prefix if modified: 
 
 ```sh
 # dev
@@ -58,7 +56,7 @@ Then you can destroy all the provisioned resources (Kubernetes clusters, GitHub 
 
 ```sh
 cd terraform/<cloud_provider>
-terraform destroy # takes 10 minutes
+terraform destroy # takes roughly 10 minutes
 ```
 
 Lastly, you can remove the contexts from your `kubectl`:
