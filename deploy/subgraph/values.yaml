@@ -19,7 +19,7 @@ podSecurityContext: {}
 
 service:
   type: ClusterIP
-  port: 4000
+  port: 4001
 
 ingress:
   enabled: false

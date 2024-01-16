@@ -85,6 +85,7 @@ jobs:
           --dry-run \
           --atomic \
           --install \
+          --timeout 30s \
           ./deploy/${{ inputs.app_name }} \
           --values ./deploy/subgraph/values.yaml \
           -f ./deploy/subgraph/environments/${{ inputs.cluster_suffix }}.yaml
@@ -104,6 +105,7 @@ jobs:
           --atomic \
           --install \
           --debug \
+          --timeout 30s \
           ./deploy/${{ inputs.app_name }} \
           --values ./deploy/subgraph/values.yaml \
           -f ./deploy/subgraph/environments/${{ inputs.cluster_suffix }}.yaml
@@ -122,6 +124,7 @@ jobs:
           --set "ingress.hosts[0].host=${{ inputs.app_name }}.local,ingress.hosts[0].paths[0].path=/" \
           --atomic \
           --install \
+          --timeout 30s \
           ./deploy/${{ inputs.app_name }} \
           --values ./deploy/subgraph/values.yaml \
           -f ./deploy/subgraph/environments/${{ inputs.cluster_suffix }}.yaml
