@@ -1,4 +1,4 @@
-name: Pull Request Check Deploy
+name: Pull Request Check Deploy on Subgraph Chart
 
 on:
   pull_request:
@@ -15,4 +15,4 @@ jobs:
 
       - name: Helm lint
         id: list-changed
-        run: helm lint ./deploy/subgraph-a
+        run: helm lint ./deploy/subgraph

@@ -1,7 +1,9 @@
 name: Pull Request Check Code
 
-on: pull_request
-
+on:
+  pull_request:
+    paths:
+      - "subgraphs/**"
 jobs:
   npm-build:
     runs-on: ubuntu-latest

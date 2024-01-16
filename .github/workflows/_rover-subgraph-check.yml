@@ -39,4 +39,4 @@ jobs:
         run: |
           rover subgraph check ${{ secrets.APOLLO_GRAPH_ID }}@${{ inputs.variant }} \
             --name ${{ inputs.subgraph_name }} \
-            --schema ./src/schema.graphql
+            --schema ./subgraphs/${{inputs.subgraph_name}}/schema.graphql

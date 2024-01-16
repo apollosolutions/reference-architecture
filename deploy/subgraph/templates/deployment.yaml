@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "subgraph-a.fullname" . }}
+  name: {{ include "subgraph.fullname" . }}
   labels:
-    {{- include "subgraph-a.labels" . | nindent 4 }}
+    {{- include "subgraph.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "subgraph-a.selectorLabels" . | nindent 6 }}
+      {{- include "subgraph.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,13 +18,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "subgraph-a.selectorLabels" . | nindent 8 }}
+        {{- include "subgraph.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "subgraph-a.serviceAccountName" . }}
+      serviceAccountName: {{ include "subgraph.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:

@@ -32,12 +32,12 @@ jobs:
 
       - name: Install Rover
         run: |
-          curl -sSL https://rover.apollo.dev/nix/v0.8.1 | sh
+          curl -sSL https://rover.apollo.dev/nix/latest | sh
           echo "$HOME/.rover/bin" >> $GITHUB_PATH
 
       - name: Rover Subgraph Publish
         run: |
           rover subgraph publish ${{ secrets.APOLLO_GRAPH_ID }}@${{ inputs.variant }} \
             --name ${{ inputs.subgraph_name }} \
-            --routing-url http://graphql.${{ inputs.subgraph_name }}.svc.cluster.local:4000 \
-            --schema ./src/schema.graphql
+            --routing-url http://graphql.${{ inputs.subgraph_name }}.svc.cluster.local:4001 \
+            --schema ./subgraphs/${{inputs.subgraph_name}}/schema.graphql

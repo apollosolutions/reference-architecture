@@ -56,9 +56,12 @@ jobs:
     needs: [determine_cloud_provider, build-and-push-image]
     uses: ./.github/workflows/_deploy-gke.yaml
     secrets: inherit
+    strategy:
+      matrix:
+        subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
     with:
       version: main
-      app_name: subgraph-a
+      app_name: ${{ matrix.subgraph }}
       cluster_suffix: dev
 
   deploy_aws:
@@ -66,9 +69,25 @@ jobs:
     needs: [determine_cloud_provider, build-and-push-image]
     uses: ./.github/workflows/_deploy-aws.yaml
     secrets: inherit
+    strategy:
+      matrix:
+        subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
     with:
       version: main
-      app_name: subgraph-a
+      app_name: ${{ matrix.subgraph }}
       cluster_suffix: dev
       region: us-east-1
 
+  publish:
+    needs: [deploy_aws, deploy_gcp]
+    strategy:
+      matrix:
+        subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
+    if: always() &&
+      (needs.deploy_aws.result == 'success' || needs.deploy_aws.result == 'skipped') &&
+      (needs.deploy_gcp.result == 'success' || needs.deploy_gcp.result == 'skipped')
+    uses: ./.github/workflows/_rover-subgraph-publish.yml
+    secrets: inherit
+    with:
+      subgraph_name: ${{ matrix.subgraph }} # change to subgraph-b in that repo
+      variant: dev

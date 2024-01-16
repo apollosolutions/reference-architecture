@@ -18,18 +18,21 @@ router:
       telemetry:
         apollo:
           field_level_instrumentation_sampler: 0.5
-        tracing:
-          otlp:
-            endpoint: http://collector.monitoring:4317
-            protocol: grpc
-          trace_config:
-            sampler: 0.5
-            service_name: "router"
-            service_namespace: "router"
-        metrics:
-          otlp:
-            endpoint: http://collector.monitoring:4317
-            protocol: grpc
+        exporters:      
+          tracing:
+            otlp:
+              endpoint: http://collector.monitoring:4317
+              protocol: grpc
+              enabled: true
+            common:
+              sampler: 0.5
+              service_name: "router"
+              service_namespace: "router"
+          metrics:
+            otlp:
+              endpoint: http://collector.monitoring:4317
+              protocol: grpc
+              enabled: true
   resources:
     requests:
       cpu: 500m
