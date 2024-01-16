@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jwks-configmap
+  labels:
+    {{- include "router.labels" . | nindent 4 }}
+data:
+  jwks.json: |
+    {
+      "keys": [
+        {
+          "kty": "EC",
+          "crv": "P-256",
+          "kid": "1",
+          "use": "sig",
+          "x": "Ku7NHl_Biej1FB0GMBrN2NRxrUBj2PbBeFPj_OnZPyo",
+          "y": "HZUWbmSA7PjVskGPGh7NAmKx3AOLLVpbCgg07jvTVV8"
+        }
+      ]
+    }

@@ -41,6 +41,7 @@ jobs:
     if: needs.determine_cloud_provider.outputs.gcp == 'true'
     needs: [determine_cloud_provider]
     uses: ./.github/workflows/modules/_deploy-router-gke.yaml
+
     secrets: inherit
     with:
       dry-run: ${{ inputs.dry-run }}

@@ -1,0 +1,58 @@
+# Default values for router.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+router:
+  router:
+    configuration:
+      # duplicated in environments/prod.yaml
+      health_check:
+        listen: 0.0.0.0:8080
+      sandbox:
+        enabled: true
+      homepage:
+        enabled: false
+      supergraph:
+        introspection: true
+      include_subgraph_errors:
+        all: true
+      plugins:
+        experimental.expose_query_plan: true
+      rhai:
+        scripts: /dist/rhai
+        main: main.rhai
+      authentication:
+        router:
+          jwt:
+            jwks:
+              - url: file:///router/jwks.json
+      authorization:
+        preview_directives:
+          enabled: true
+  extraVolumeMounts:
+    - name: jwks-configmap-volume
+      mountPath: /router
+      readOnly: true
+    - name: rhai-volume
+      mountPath: /dist/rhai
+      readOnly: true
+  extraVolumes:
+    - name: jwks-configmap-volume
+      configMap:
+        # Provide the name of the ConfigMap containing the files you want
+        # to add to the container
+        name: jwks-configmap
+    - name: rhai-volume
+      configMap:
+        # Provide the name of the ConfigMap containing the files you want
+        # to add to the container
+        name: rhai-config
+  ingress:
+    enabled: false
+  service:
+    annotations:
+      cloud.google.com/backend-config: '{"default": "http-hc-config"}'
+ingress:
+  enabled: true
+  gcp: true
+  name: router
