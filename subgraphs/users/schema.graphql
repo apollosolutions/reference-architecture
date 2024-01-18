@@ -1,5 +1,5 @@
 extend schema
-  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@authenticated", "@requiresScopes"])
 
 type Query {
   """
@@ -7,21 +7,17 @@ type Query {
   Set the "x-user-id" header to the user id.
   """
   user(id: ID!): User
-  me: User
+  me: User @authenticated
 }
 
 type Mutation {
-  login(
-    username: String
-    password: String
-    scopes: [String!]! = []
-  ): LoginResponse
+  login(username: String!, password: String!, scopes: [String!]! = []): LoginResponse
 }
 
 union LoginResponse = LoginSuccessful | LoginFailed
 
 type LoginSuccessful {
-  token: String!
+  token: String! 
   scopes: [String!]!
   user: User!
 }
@@ -40,9 +36,9 @@ type User @key(fields: "id") {
   username: String!
 
   """
-  The users email address
+  The user's email address
   """
-  email: String!
+  email: String @requiresScopes(scopes: [["user:read:email"]])
 
   """
   Get the list of last session id of user activity

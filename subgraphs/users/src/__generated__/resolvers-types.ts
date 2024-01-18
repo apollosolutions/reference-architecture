@@ -40,9 +40,9 @@ export type Mutation = {
 
 
 export type MutationLoginArgs = {
-  password?: InputMaybe<Scalars['String']['input']>;
+  password: Scalars['String']['input'];
   scopes?: Array<Scalars['String']['input']>;
-  username?: InputMaybe<Scalars['String']['input']>;
+  username: Scalars['String']['input'];
 };
 
 export type Order = {
@@ -84,8 +84,8 @@ export type QueryUserArgs = {
 /** An user account in our system */
 export type User = {
   __typename?: 'User';
-  /** The users email address */
-  email: Scalars['String']['output'];
+  /** The user's email address */
+  email?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   /** Total saved loyalty points and rewards */
   loyaltyPoints?: Maybe<Scalars['Int']['output']>;
@@ -236,7 +236,7 @@ export type LoginSuccessfulResolvers<ContextType = DataSourceContext, ParentType
 }>;
 
 export type MutationResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = ResolversObject<{
-  login?: Resolver<Maybe<ResolversTypes['LoginResponse']>, ParentType, ContextType, RequireFields<MutationLoginArgs, 'scopes'>>;
+  login?: Resolver<Maybe<ResolversTypes['LoginResponse']>, ParentType, ContextType, RequireFields<MutationLoginArgs, 'password' | 'scopes' | 'username'>>;
 }>;
 
 export type OrderResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = ResolversObject<{
@@ -260,7 +260,7 @@ export type QueryResolvers<ContextType = DataSourceContext, ParentType extends R
 
 export type UserResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = ResolversObject<{
   __resolveReference?: ReferenceResolver<Maybe<ResolversTypes['User']>, { __typename: 'User' } & GraphQLRecursivePick<ParentType, {"id":true}>, ContextType>;
-  email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  email?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   loyaltyPoints?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   orders?: Resolver<Maybe<Array<Maybe<ResolversTypes['Order']>>>, ParentType, ContextType>;

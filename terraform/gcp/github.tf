@@ -5,8 +5,8 @@ provider "github" {
 # Infra repo for Router, Otel, load testing
 resource "github_repository" "repo" {
   name        = "${var.demo_name}"
-  description = "Apollo K8s Supergraph infrastructure repository"
-  visibility  = "private"
+  description = "Apollo supergraph reference architecture repository"
+  visibility  = "public"
   depends_on = [
     module.gke
   ]

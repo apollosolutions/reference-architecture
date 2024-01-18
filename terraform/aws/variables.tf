@@ -52,21 +52,3 @@ variable "demo_stages" {
   }
 }
 
-variable "subgraphs" {
-  default = [
-    {
-      name : "subgraph-a",
-      template_repo : {
-        owner : "apollosolutions"
-        repository : "build-a-supergraph-subgraph-a"
-      }
-    },
-    {
-      name : "subgraph-b",
-      template_repo : {
-        owner : "apollosolutions"
-        repository : "build-a-supergraph-subgraph-b"
-      }
-    }
-  ]
-}
