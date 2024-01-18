@@ -16,18 +16,93 @@ const BASE_URL = "http://router.router.svc.cluster.local/";
 
 const loginMutation = `
 mutation Login {
-  login(username: "LOAD_TEST"){
-    token
+  login(username: "user1", password: "password", scopes: []){
+    ... on LoginSuccessful {
+      token
+    }
   }
 }
 `
 
 const query = `
-query Locations {
-  locations {
-    name
-    reviewsForLocation {
-      rating
+query ProductById{
+  product(id: "product:1") {
+    id
+    recommendedProducts {
+      id
+      upc
+      title
+      description
+      mediaUrl
+      releaseDate
+    }
+    upc
+    title
+    description
+    mediaUrl
+    releaseDate
+    variants {
+      id
+      price
+      inventory {
+        inStock
+        inventory
+      }
+      product {
+        id
+        upc
+        title
+        description
+        mediaUrl
+        releaseDate
+      }
+      colorway
+      size
+      dimensions
+      weight
+    }
+    reviews {
+      id
+      body
+      author
+      user {
+        id
+        cart {
+          userId
+          items {
+            id
+            price
+            colorway
+            size
+            dimensions
+            weight
+          }
+          subtotal
+        }
+        shippingAddress
+        username
+        email
+        previousSessions
+        loyaltyPoints
+        paymentMethods {
+          id
+          name
+          description
+          type
+        }
+        orders {
+          id
+          buyer {
+            id
+            shippingAddress
+            username
+            email
+            previousSessions
+            loyaltyPoints
+          }
+          shippingCost
+        }
+      }
     }
   }
 }
@@ -35,8 +110,8 @@ query Locations {
 
 const headers = {
   "Content-Type": "application/json",
-  "apollographql-client-name": "apollo-client",
-  "apollographql-client-version": "1"
+  "apollographql-client-name": "apollo-loadtest",
+  "apollographql-client-version": "long"
 };
 
 export default () => {

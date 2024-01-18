@@ -36,3 +36,7 @@ v2_4_4*
 .idea
 
 node_modules
+supergraph.graphql
+
+router
+router.exe

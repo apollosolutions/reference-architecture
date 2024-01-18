@@ -6,6 +6,7 @@
   ],
   "scripts": {
     "dev": "npm-run-all --parallel dev:*",
+    "dev:router": "./dev/dev.sh",
     "dev:checkout": "PORT=4001 npm run dev -w subgraphs/checkout",
     "dev:discovery": "PORT=4002 npm run dev -w subgraphs/discovery",
     "dev:inventory": "PORT=4003 npm run dev -w subgraphs/inventory",
