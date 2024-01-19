@@ -39,4 +39,5 @@ node_modules
 supergraph.graphql
 
 router
+!router/
 router.exe
