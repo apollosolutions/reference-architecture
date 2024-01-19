@@ -85,7 +85,8 @@ jobs:
         subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
     if: always() &&
       (needs.deploy_aws.result == 'success' || needs.deploy_aws.result == 'skipped') &&
-      (needs.deploy_gcp.result == 'success' || needs.deploy_gcp.result == 'skipped')
+      (needs.deploy_gcp.result == 'success' || needs.deploy_gcp.result == 'skipped') &&
+      (secrets.APOLLO_KEY != "")
     uses: ./.github/workflows/_rover-subgraph-publish.yml
     secrets: inherit
     with:
