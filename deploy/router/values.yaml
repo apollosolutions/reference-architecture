@@ -26,7 +26,17 @@ router:
       authorization:
         preview_directives:
           enabled: true
-  ingress:
+  extraVolumeMounts:
+    - name: rhai-volume
+      mountPath: /dist/rhai
+      readOnly: true
+  extraVolumes:
+    - name: rhai-volume
+      configMap:
+        # Provide the name of the ConfigMap containing the files you want
+        # to add to the container
+        name: rhai-config
+  ngress:
     enabled: false
   service:
     annotations:
