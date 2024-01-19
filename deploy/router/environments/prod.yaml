@@ -14,6 +14,14 @@ router:
         all: true
       plugins:
         experimental.expose_query_plan: true
+      authentication:
+        router:
+          jwt:
+            jwks:
+              - url: http://graphql.users.svc.cluster.local:4001/.well-known/jwks.json
+      authorization:
+        preview_directives:
+          enabled: true
       # end duplication
       telemetry:
         apollo:
