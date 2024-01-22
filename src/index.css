@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.screen-aware-full-height {
+  min-height: calc(100vh - 345px);
+}
