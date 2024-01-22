@@ -68,7 +68,7 @@ const LoginForm = () => {
         resetForm()
 
         // Set application wide user-data
-        login(data)
+        login(data.login)
       }
     },
   });

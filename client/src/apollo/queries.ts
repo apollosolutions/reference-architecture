@@ -23,7 +23,7 @@ const SEARCH_PRODUCTS = gql`
 
 const USER_PROFILE = gql`
   query UserProfile {
-    user {
+    me {
       id
       shippingAddress
       username

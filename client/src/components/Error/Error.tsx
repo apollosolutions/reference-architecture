@@ -1,7 +1,9 @@
 import { useRouteError } from 'react-router-dom'
 
 export default function Error() {
-  const error = useRouteError()
+  // disabling for now as react-router-dom annotates it as unknown, although it is not
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const error: any = useRouteError()
   console.error(error)
 
   return (

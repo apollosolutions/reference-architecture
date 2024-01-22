@@ -7,8 +7,11 @@ dns.setDefaultResultOrder('verbatim')
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'process.env': {},
+  },
   server: {
-    host: 'localhost',
+    host: true,
     port: 3000,
     watch: {
       usePolling: true,

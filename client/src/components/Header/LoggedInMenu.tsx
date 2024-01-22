@@ -16,6 +16,7 @@ import {
 } from '@chakra-ui/react'
 import { AtSignIcon, AddIcon, SunIcon, MoonIcon } from '@chakra-ui/icons'
 import { ShoppingCart } from '../Icons/ShoppingCart'
+import { useAuth } from '../../hooks/useAuth'
 
 const ColorModeToggle = () => {
   const { colorMode, toggleColorMode } = useColorMode()
@@ -32,6 +33,7 @@ const ColorModeToggle = () => {
 }
 
 export default function LoggedInMenu() {
+  const { logout } = useAuth();
   return (
     <Flex
       alignItems={'center'}
@@ -60,7 +62,7 @@ export default function LoggedInMenu() {
             <MenuItem icon={<AtSignIcon />}>Profile</MenuItem>
           </Link>
           <MenuDivider />
-          <MenuItem>Logout</MenuItem>
+          <MenuItem onClick={() => logout()}>Logout</MenuItem>
         </MenuList>
       </Menu>
       <Spacer />

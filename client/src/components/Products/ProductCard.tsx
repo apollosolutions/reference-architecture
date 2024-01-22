@@ -52,9 +52,6 @@ export default function ProductCard(props: ProductCardProps) {
           less="Show less"
           className="ml-0 m-4"
           anchorClass="show-more-less-clickable"
-          onClick={(isExpanded) => {
-            console.log(isExpanded)
-          }}
           expanded={false}
           width={700}
           truncatedEndingComponent={"... "}

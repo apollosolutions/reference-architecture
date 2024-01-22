@@ -32,7 +32,7 @@ export default function UserProfile(props: Props) {
         <Heading lineHeight={1.1} fontSize={{ base: '2xl', sm: '3xl' }}>
           User Profile Edit
         </Heading>
-        <UserProfileForm />
+        <UserProfileForm user={user} />
       </Stack>
       <Stack
         spacing={4}

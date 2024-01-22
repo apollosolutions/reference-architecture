@@ -1,7 +1,7 @@
 import { ApolloClient, InMemoryCache } from '@apollo/client'
 import { fragmentRegistry } from './fragmentRegistry'
 
-const ROUTER_LINK = 'http://127.0.0.1:4000/'
+const ROUTER_LINK = process.env.BACKEND_URL ?? 'http://127.0.0.1:4000/'
 
 export default new ApolloClient({
   uri: ROUTER_LINK,

@@ -17,3 +17,6 @@ authentication:
 authorization:
   directives:
     enabled: true
+
+cors:
+  allow_any_origin: true

@@ -1,5 +1,5 @@
 {
-  "name": "graphos-feature-template-client",
+  "name": "client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -33,8 +33,10 @@
     "sort-by": "^0.0.2"
   },
   "devDependencies": {
+    "@types/node": "^20.11.5",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
+    "@types/react-show-more-text": "^1.4.5",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vitejs/plugin-react-swc": "^3.3.2",

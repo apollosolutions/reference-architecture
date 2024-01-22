@@ -7,7 +7,7 @@ export interface User {
   id: string
   name: string
   email: string
-  authToken?: string
+  token?: string
 }
 
 export const useAuth = () => {

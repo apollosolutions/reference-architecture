@@ -15,16 +15,31 @@ import {
 } from '@chakra-ui/react'
 import { SmallCloseIcon } from '@chakra-ui/icons'
 import { QUERIES } from '../../apollo/queries'
+import { User } from '../../hooks/useAuth'
 
-export default function UserProfileForm() {
+type Props = {
+  user?: User
+}
+type Headers = {
+  [key: string]: string
+}
+export default function UserProfileForm({ user }: Props) {
+  // it is being added to so const won't work, but eslint doesn't seem to recognize that
+  // eslint-disable-next-line prefer-const
+  let headers: Headers = {
+    "x-user-id": "user:1",
+  }
+  if (user && user.token) {
+    headers.authorization = `Bearer ${user.token}`
+  }
+
   const { loading, error, data } = useQuery(QUERIES.USER_PROFILE, {
     context: {
-      headers: {
-        "x-user-id": "user:1"
-      }
+      headers
     },
     variables: {},
     errorPolicy: "all",
+    skip: !user || !user.token
   })
 
   if (loading) <Spinner />
@@ -32,10 +47,16 @@ export default function UserProfileForm() {
     return (
       <Alert status='error' color="navy.400">
         <AlertIcon />
-        There was an error processing your request
       </Alert>
     )
   }
+  if (!data) return (
+    <Alert status='error' color="navy.400">
+      <AlertIcon />
+      No data found
+    </Alert>
+  )
+
   return (
     <>
       <FormControl id="userName">
