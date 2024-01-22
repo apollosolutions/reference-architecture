@@ -44,7 +44,7 @@ jobs:
   deploy_gcp:
     if: needs.determine_cloud_provider.outputs.gcp == 'true'
     needs: [determine_cloud_provider]
-    uses: ./.github/workflows/_deploy-gke.yaml
+    uses: ./.github/workflows/_deploy-subgraphs-gke.yaml
     secrets: inherit
     strategy:
       matrix:
@@ -59,7 +59,7 @@ jobs:
   deploy_aws:
     if: needs.determine_cloud_provider.outputs.aws == 'true'
     needs: [determine_cloud_provider]
-    uses: ./.github/workflows/_deploy-aws.yaml
+    uses: ./.github/workflows/_deploy-subgraphs-aws.yaml
     secrets: inherit
     strategy:
       matrix:

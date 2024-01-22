@@ -1,4 +1,4 @@
-name: _deploy-gke
+name: _deploy-subgraphs-gke
 
 # Started from GH Docs
 # https://docs.github.com/en/actions/deployment/deploying-to-your-cloud-provider/deploying-to-google-kubernetes-engine

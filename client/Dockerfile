@@ -1,6 +1,8 @@
 FROM node:alpine as build
+ARG BACKEND_URL
 WORKDIR /usr/app
 COPY . /usr/app
+ENV VITE_BACKEND_URL=$BACKEND_URL
 RUN npm i
 RUN npm run build
 
