@@ -83,7 +83,6 @@ jobs:
           --timeout 60s \
           ./deploy/client \
           --values ./deploy/client/values.yaml \
-          -f ./deploy/client/environments/${{ inputs.cluster_suffix }}.yaml
 
       # Deploy the Docker image to the GKE cluster for real with debug
       - name: Deploy
@@ -102,7 +101,6 @@ jobs:
           --debug \
           ./deploy/client \
           --values ./deploy/client/values.yaml \
-          -f ./deploy/client/environments/${{ inputs.cluster_suffix }}.yaml
 
       # Deploy the Docker image to the GKE cluster for real
       - name: Deploy
@@ -120,4 +118,3 @@ jobs:
           --timeout 60s \
           ./deploy/client \
           --values ./deploy/client/values.yaml \
-          -f ./deploy/client/environments/${{ inputs.cluster_suffix }}.yaml
