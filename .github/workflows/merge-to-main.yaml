@@ -33,7 +33,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4.0.1
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.subgraph }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/client
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,enable=true,priority=600,prefix=,suffix=,event=branch
