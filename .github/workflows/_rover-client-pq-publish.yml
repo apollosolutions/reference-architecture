@@ -1,0 +1,62 @@
+name: _rover-client-pq-publish
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Target variant"
+        type: string
+        required: true
+        default: dev
+    secrets:
+      APOLLO_KEY:
+        required: true
+      APOLLO_GRAPH_ID:
+        required: true
+      APOLLO_PQ_DEV_ID:
+        required: true
+      APOLLO_PQ_PROD_ID:
+        required: true
+
+env:
+  APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
+  APOLLO_GRAPH_REF: ${{ secrets.APOLLO_GRAPH_ID }}
+  APOLLO_VCS_COMMIT: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  check:
+    name: Rover PQ Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rover
+        run: |
+          curl -sSL https://rover.apollo.dev/nix/latest | sh
+          echo "$HOME/.rover/bin" >> $GITHUB_PATH
+
+      - name: Generate PQ manifest
+        run: |
+          cd ./client/
+          npm install --save-dev @apollo/generate-persisted-query-manifest
+          npx generate-persisted-query-manifest 
+          
+      - name: Publish to dev
+        if: inputs.environment == 'dev'
+        run: |
+          cd client
+          rover persisted-queries publish \
+          --graph-id ${{ secrets.APOLLO_GRAPH_ID }} \
+          --list-id ${{ secrets.APOLLO_PQ_DEV_ID }} \
+          --manifest ./persisted-query-manifest.json 
+        
+      - name: Publish to prod
+        if: inputs.environment == 'prod'
+        run: |
+          cd client
+          rover persisted-queries publish \
+          --graph-id ${{ secrets.APOLLO_GRAPH_ID }} \
+          --list-id ${{ secrets.APOLLO_PQ_PROD_ID }} \
+          --manifest ./persisted-query-manifest.json 

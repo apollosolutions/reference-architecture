@@ -20,3 +20,10 @@ authorization:
 
 cors:
   allow_any_origin: true
+
+persisted_queries:
+  enabled: true
+  log_unknown: true
+  safelist:
+    enabled: false
+    require_id: false
