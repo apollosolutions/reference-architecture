@@ -14,6 +14,9 @@ router:
         all: true
       plugins:
         experimental.expose_query_plan: true
+      rhai:
+        scripts: /dist/rhai
+        main: main.rhai
       authentication:
         router:
           jwt:
