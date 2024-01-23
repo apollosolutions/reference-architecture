@@ -179,10 +179,6 @@ if [[ "$IS_SUCCESS" == "null" ]]; then
   exit 1
 fi
 
-
-echo $DEV_PQ_ID
-echo $PROD_PQ_ID
-
 echo ''
 echo "Adding Apollo credentials as Terraform variables in .env..."
 echo '' >> .env
