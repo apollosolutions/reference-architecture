@@ -41,3 +41,4 @@ supergraph.graphql
 router
 !router/
 router.exe
+.repo.env

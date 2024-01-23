@@ -16,6 +16,14 @@ variable "apollo_graph_id" {
   description = "Apollo graph ID for checks, publishes, and Router Uplink"
 }
 
+variable "pq_dev_id" {
+  description = "Apollo PQ ID for the dev variant"
+}
+
+variable "pq_prod_id" {
+  description = "Apollo PQ ID for the prod variant"
+}
+
 # Variables you can override if you know what you're doing
 
 variable "demo_name" {

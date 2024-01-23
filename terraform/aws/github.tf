@@ -30,6 +30,16 @@ resource "github_actions_secret" "apollo_key" {
   secret_name     = "APOLLO_KEY"
   plaintext_value = var.apollo_key
 }
+resource "github_actions_secret" "pq_dev_id" {
+  repository      = github_repository.repo.name
+  secret_name     = "APOLLO_PQ_DEV_ID"
+  plaintext_value = var.pq_dev_id
+}
+resource "github_actions_secret" "pq_prod_id" {
+  repository      = github_repository.repo.name
+  secret_name     = "APOLLO_PQ_PROD_ID"
+  plaintext_value = var.pq_prod_id
+}
 resource "github_actions_secret" "cluster_prefix" {
   repository      = github_repository.repo.name
   secret_name     = "CLUSTER_PREFIX"
