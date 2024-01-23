@@ -7,6 +7,8 @@ on:
         required: false
       GCP_CREDENTIALS:
         required: false
+      APOLLO_KEY: 
+        required: false
     outputs:
       gcp:
         value: ${{ jobs.provider.outputs.gcp}}
@@ -22,6 +24,7 @@ jobs:
     outputs:
       gcp: ${{ steps.gcp.outputs.gcp}}
       aws: ${{ steps.aws.outputs.aws}}
+      apollo_key: ${{ secrets.APOLLO_KEY }}
     steps:
       - id: gcp
         run: if [ -n "$GCP" ]; then echo "gcp=true" >> $GITHUB_OUTPUT ; else echo "gcp=false" >> $GITHUB_OUTPUT ; fi
