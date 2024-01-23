@@ -1,4 +1,7 @@
-name: _deploy-aws
+name: _deploy-subgraphs-gke
+
+# Started from GH Docs
+# https://docs.github.com/en/actions/deployment/deploying-to-your-cloud-provider/deploying-to-google-kubernetes-engine
 
 on:
   workflow_call:
@@ -12,7 +15,7 @@ on:
         type: string
         required: true
       cluster_suffix:
-        description: Target AWS cluster suffix
+        description: Target GKE cluster suffix
         type: string
         required: true
       dry-run:
@@ -25,25 +28,16 @@ on:
         description: Run helm in debug mode
         required: false
         default: false
-      region:
-        description: AWS target region
-        type: string
-        default: us-east-1
-        required: false
     secrets:
-      AWS_ACCESS_KEY:
-        required: true
-      AWS_SECRET_KEY:
+      GCP_CREDENTIALS:
         required: true
       CLUSTER_PREFIX:
         required: true
 
 env:
   IMAGE: ${{ github.repository }}/${{ inputs.app_name }}
+  GKE_ZONE: us-east1
   REGISTRY: ghcr.io
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
-  AWS_REGION: ${{ inputs.region }}
 
 jobs:
   deploy:
@@ -54,10 +48,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: "Configure Kubeconfig w/ EKS"
-        run: aws eks update-kubeconfig --name ${{ secrets.CLUSTER_PREFIX }}-${{ inputs.cluster_suffix }} --region ${{ env.AWS_REGION }}
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v0
+
+      - name: "Use gcloud CLI"
+        run: gcloud info
+
+      # Configure Docker to use the gcloud command-line tool as a credential
+      # helper for authentication
+      - run: |-
+          gcloud --quiet auth configure-docker
+
+      # Get the GKE credentials so we can deploy to the cluster
+      - uses: google-github-actions/get-gke-credentials@fb08709ba27618c31c09e014e1d8364b02e5042e
+        with:
+          cluster_name: ${{ secrets.CLUSTER_PREFIX }}-${{ inputs.cluster_suffix }}
+          location: ${{ env.GKE_ZONE }}
 
       # Deploy the Docker image to the GKE cluster with dry run
+     # Deploy the Docker image to the GKE cluster with dry run
       - name: Helm dry-run
         if: ${{ inputs.dry-run }}
         run: |
@@ -115,4 +129,3 @@ jobs:
           ./deploy/subgraph \
           --values ./deploy/subgraph/values.yaml \
           -f ./deploy/subgraph/environments/${{ inputs.cluster_suffix }}.yaml
-

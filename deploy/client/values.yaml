@@ -1,0 +1,39 @@
+replicaCount: 3
+
+image:
+  repository: ghcr.io/apollosolutions/reference-architecture/client
+  pullPolicy: Always
+  tag: main
+
+nameOverride: web
+fullnameOverride: web
+
+serviceAccount:
+  create: false
+
+podAnnotations: {}
+
+securityContext: {}
+
+podSecurityContext: {}
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  hosts:
+    - host: client.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  targetCPUUtilizationPercentage: 80
+  minReplicas: 1
+  maxReplicas: 5

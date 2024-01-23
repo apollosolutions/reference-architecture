@@ -13,7 +13,42 @@ jobs:
     uses: ./.github/workflows/_determine-provider.yaml
     secrets: inherit
 
-  build-and-push-image:
+  build-and-push-client-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4.0.1
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.subgraph }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,enable=true,priority=600,prefix=,suffix=,event=branch
+            type=sha,format=long
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  build-and-push-subgraph-image:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -53,8 +88,8 @@ jobs:
 
   deploy_gcp:
     if: needs.determine_cloud_provider.outputs.gcp == 'true'
-    needs: [determine_cloud_provider, build-and-push-image]
-    uses: ./.github/workflows/_deploy-gke.yaml
+    needs: [determine_cloud_provider, build-and-push-subgraph-image, build-and-push-client-image]
+    uses: ./.github/workflows/_deploy-subgraphs-gke.yaml
     secrets: inherit
     strategy:
       matrix:
@@ -66,8 +101,8 @@ jobs:
 
   deploy_aws:
     if: needs.determine_cloud_provider.outputs.aws == 'true'
-    needs: [determine_cloud_provider, build-and-push-image]
-    uses: ./.github/workflows/_deploy-aws.yaml
+    needs: [determine_cloud_provider, build-and-push-subgraph-image, build-and-push-client-image]
+    uses: ./.github/workflows/_deploy-subgraphs-aws.yaml
     secrets: inherit
     strategy:
       matrix:
@@ -86,7 +121,7 @@ jobs:
     if: always() &&
       (needs.deploy_aws.result == 'success' || needs.deploy_aws.result == 'skipped') &&
       (needs.deploy_gcp.result == 'success' || needs.deploy_gcp.result == 'skipped') &&
-      (secrets.APOLLO_KEY != "")
+      (${{ secrets.APOLLO_KEY }} != "")
     uses: ./.github/workflows/_rover-subgraph-publish.yml
     secrets: inherit
     with:
