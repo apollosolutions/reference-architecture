@@ -48,6 +48,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BACKEND_URL=${{ vars.BACKEND_URL }}
 
   build-and-push-subgraph-image:
     runs-on: ubuntu-latest

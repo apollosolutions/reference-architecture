@@ -9,7 +9,6 @@
       - [Minimum required dependencies](#minimum-required-dependencies)
       - [GCP](#gcp)
       - [AWS](#aws)
-      - [Minikube](#minikube)
     - [Gather accounts](#gather-accounts)
     - [Gather credentials](#gather-credentials)
       - [ GCP](#-gcp)
@@ -18,7 +17,6 @@
     - [Run setup commands](#run-setup-commands)
       - [ GCP](#-gcp-1)
       - [ AWS](#-aws-1)
-      - [Minikube](#minikube-1)
       - [General](#general)
   - [Part B: Provision resources](#part-b-provision-resources)
     - [Create Kubernetes clusters, basic infrastructure, and Github repositories](#create-kubernetes-clusters-basic-infrastructure-and-github-repositories)
@@ -29,17 +27,19 @@
     - [Deploy the router](#deploy-the-router)
       - [ GCP](#-gcp-2)
       - [ AWS](#-aws-2)
-    - [Client](#client)
+    - [Deploy the client](#deploy-the-client)
       - [ GCP](#-gcp-3)
       - [ AWS](#-aws-3)
+      - [ GCP](#-gcp-4)
+      - [ AWS](#-aws-4)
 
 ## Part A: Gather accounts and credentials
 
 ### Clone this repo
 
 ```
-git clone https://github.com/apollosolutions/build-a-supergraph.git
-cd build-a-supergraph
+git clone https://github.com/apollosolutions/reference-architecture.git
+cd reference-architecture
 git pull
 ```
 
@@ -65,15 +65,15 @@ git pull
 - Optional: [Helm](https://helm.sh/docs/intro/install/)
 
 
-#### Minikube
+<!-- #### Minikube
 
 - [Minikube](https://minikube.sigs.k8s.io/docs/start/) configured according to the link
-- [Helm](https://helm.sh/docs/intro/install/)
+- [Helm](https://helm.sh/docs/intro/install/) -->
 
 ### Gather accounts
 
 - [Github](https://github.com/signup)
-- [Apollo GraphOS](https://studio.apollographql.com/signup?referrer=build-a-supergraph)
+- [Apollo GraphOS](https://studio.apollographql.com/signup?referrer=reference-architecture)
 - If using a cloud provider: 
   - [Google Cloud](https://console.cloud.google.com/freetrial)
     - Must have a project [with billing enabled](https://cloud.google.com/resource-manager/docs/creating-managing-projects#gcloud)
@@ -113,19 +113,19 @@ git pull
 
 ### Export all necessary variables
 
-First, change directories in the cloud provider you wish to use (or minikube). All terraform is within the `terraform` root level folder, with each provider having a subfolder within. For the below examples, we'll assume GCP, however the others will use the same commands. 
+First, change directories in the cloud provider you wish to use. All Terraform is within the `terraform` root level folder, with each provider having a subfolder within. For the below examples, we'll assume GCP, however the others will use the same commands. 
 
 Next, make a copy of `.env.sample` called `.env` to keep track of these values. You can run `source .env` to reload all environment variables in a new terminal session.
 
 ```sh
-# in either terraform/aws, terraform/gcp, or terraform/minikube
+# in either terraform/aws or terraform/gcp
 cp .env.sample .env
 ```
 
 Edit the new `.env` file:
 
 ```sh
-export PROJECT_ID="<your google cloud project id>" # if using AWS or minikube, you will not see this line and can omit this
+export PROJECT_ID="<your google cloud project id>" # if using AWS, you will not see this line and can omit this
 export APOLLO_KEY="<your apollo personal api key>"
 export GITHUB_ORG="<your github account name or organization name>"
 export TF_VAR_github_token="<your github personal access token>"
@@ -171,11 +171,11 @@ gh auth login
 ```
 
 
-#### Minikube
+<!-- #### Minikube
 
 ```sh
 gh auth login
-```
+``` -->
 
 #### General
 
@@ -204,7 +204,7 @@ You may need to clean up your Github packages before creating new repos of the s
 
 **Note: If using a cloud provider, the following commands will create resources on your cloud provider account and begin to accrue a cost.** The reference infrastructure defaults to a lower-cost environment (small node count and instance size), however it will not be covered by either of GCP's or AWS's free tiers.
 
-**Note: If you are using Minikube, this will not create a local cluster and instead configure the local environment to be ready to be deployed to.**
+<!-- **Note: If you are using Minikube, this will not create a local cluster and instead configure the local environment to be ready to be deployed to.** -->
 
 ```sh
 # for example, if using GCP
@@ -270,10 +270,9 @@ After this completes, you're ready to deploy your subgraphs!
 ### Deploy subgraphs to dev
 
 ```sh
-gh workflow run "Merge to Main" --repo $GITHUB_ORG/apollo-supergraph-k8s-subgraph-a
-gh workflow run "Merge to Main" --repo $GITHUB_ORG/apollo-supergraph-k8s-subgraph-b
+gh workflow run "Merge to Main" --repo $GITHUB_ORG/reference-architecture
 # this deploys a dependency for prod, see note below
-gh workflow run "Deploy Open Telemetry Collector" --repo $GITHUB_ORG/apollo-supergraph-k8s-infra
+gh workflow run "Deploy Open Telemetry Collector" --repo $GITHUB_ORG/reference-architecture
 ```
 
 <details>
@@ -336,8 +335,8 @@ Follow the below instructions for your cloud provider you are using. Please note
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-ROUTER_IP=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
-open http://$ROUTER_IP
+ROUTER_HOSTNAME=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
+open http://$ROUTER_HOSTNAME
 ```
 
 Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
@@ -352,11 +351,33 @@ open http://$ROUTER_HOSTNAME
 
 Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
 
-### Client
+### Deploy the client
 
-The last step to getting fully configured is to deploy the client to both environments. 
+The last step to getting fully configured is to deploy the client to both environments. To do so, we'll need our router ingress URL to point the client to. This can be pulled from the prior commands, so if you are using the same terminal session, feel free to skip the next set of commands. 
 
-To do so:
+#### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
+
+```sh
+kubectx apollo-supergraph-k8s-prod
+ROUTER_HOSTNAME=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
+```
+
+Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
+
+#### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
+
+```sh
+kubectx apollo-supergraph-k8s-prod
+ROUTER_HOSTNAME=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
+```
+
+Once you have the router hostname, you'll need to set it as a secret in the GitHub repository created.
+
+```sh
+  gh variable set BACKEND_URL --body "$ROUTER_HOSTNAME" --repo $GITHUB_ORG/reference-architecture
+```
+
+Lastly, we'll need to deploy the client:
 
 ```sh
 gh workflow run "Deploy Client" --repo $GITHUB_ORG/reference-architecture \
@@ -370,7 +391,7 @@ gh workflow run "Deploy Client" --repo $GITHUB_ORG/reference-architecture \
   -f debug=false
 ```
 
-This will create another ingress specific to the client, so much like the router, you can run the following commands depending on your provider.
+This will create another ingress specific to the client, so much like the router, you can run the following commands depending on your provider. As with the other ingress, this may take a few minutes to become active. 
 
 #### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
 
@@ -380,7 +401,7 @@ ROUTER_IP=$(kubectl get ingress -n client -o jsonpath="{.*.*.status.loadBalancer
 open http://$ROUTER_IP
 ```
 
-Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
+You should now have the full architecture deployed!
 
 #### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
 
