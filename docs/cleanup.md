@@ -30,9 +30,9 @@ kubectl delete daemonsets,replicasets,services,deployments,pods,rc,ingress --all
 
 In order to ensure the load balancers are properly removed, and the IAM service roles are removed, please run:
 
-```
-gh workflow run "Uninstall Router" --repo $GITHUB_ORG/apollo-supergraph-k8s-infra
-open https://github.com/$GITHUB_ORG/apollo-supergraph-k8s-infra/actions/workflows/uninstall-router.yaml
+```sh
+gh workflow run "Uninstall Router" --repo $GITHUB_ORG/reference-architecture
+open https://github.com/$GITHUB_ORG/reference-architecture/actions/workflows/uninstall-router.yaml
 ``` 
 
 Wait for the action to complete on the opened screen, and once finished, run the following, replacing `apollo-supergraph-k8s` with the appropriate cluster prefix if modified: 
