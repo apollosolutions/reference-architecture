@@ -38,8 +38,8 @@
 ### Clone this repo
 
 ```
-git clone https://github.com/apollosolutions/build-a-supergraph.git
-cd build-a-supergraph
+git clone https://github.com/apollosolutions/reference-architecture.git
+cd reference-architecture
 git pull
 ```
 
@@ -73,7 +73,7 @@ git pull
 ### Gather accounts
 
 - [Github](https://github.com/signup)
-- [Apollo GraphOS](https://studio.apollographql.com/signup?referrer=build-a-supergraph)
+- [Apollo GraphOS](https://studio.apollographql.com/signup?referrer=reference-architecture)
 - If using a cloud provider: 
   - [Google Cloud](https://console.cloud.google.com/freetrial)
     - Must have a project [with billing enabled](https://cloud.google.com/resource-manager/docs/creating-managing-projects#gcloud)
@@ -271,9 +271,8 @@ After this completes, you're ready to deploy your subgraphs!
 
 ```sh
 gh workflow run "Merge to Main" --repo $GITHUB_ORG/reference-architecture
-gh workflow run "Merge to Main" --repo $GITHUB_ORG/apollo-supergraph-k8s-subgraph-b
 # this deploys a dependency for prod, see note below
-gh workflow run "Deploy Open Telemetry Collector" --repo $GITHUB_ORG/apollo-supergraph-k8s-infra
+gh workflow run "Deploy Open Telemetry Collector" --repo $GITHUB_ORG/reference-architecture
 ```
 
 <details>

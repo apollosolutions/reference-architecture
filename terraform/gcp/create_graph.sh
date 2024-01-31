@@ -29,7 +29,7 @@ if [[ $ACCOUNT_ID == "" ]]; then
     --silent
     --header "x-api-key: $APOLLO_KEY"
     --header 'content-type: application/json'
-    --header 'apollographql-client-name: build-a-supergraph'
+    --header 'apollographql-client-name: reference-architecture'
     --url 'https://graphql.api.apollographql.com/api/graphql'
     --data '{"query":"{ me { ... on User { memberships { permission account { id } } } } }"}'
   )
@@ -59,7 +59,7 @@ CREATE_ARGS=(
   --silent
   --header "x-api-key: $APOLLO_KEY"
   --header 'content-type: application/json'
-  --header 'apollographql-client-name: build-a-supergraph'
+  --header 'apollographql-client-name: reference-architecture'
   --url 'https://graphql.api.apollographql.com/api/graphql'
   --data "{\"query\":\"mutation CreateGraph(\$accountId: ID!, \$newServiceId: ID!, \$name: String, \$onboardingArchitecture: OnboardingArchitecture) { newService(accountId: \$accountId, id: \$newServiceId, name: \$name, onboardingArchitecture: \$onboardingArchitecture) { id apiKeys { token } } }\",\"variables\":{\"accountId\":\"$ACCOUNT_ID\",\"newServiceId\":\"$GRAPH_ID\",\"name\":\"Build a Supergraph $(date +"%Y-%m-%d")\",\"onboardingArchitecture\":\"SUPERGRAPH\"}}"
 )
