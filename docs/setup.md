@@ -2,6 +2,37 @@
 
 ⏱ Estimated time: 45 minutes
 
+- [Setup](#setup)
+  - [Part A: Gather accounts and credentials](#part-a-gather-accounts-and-credentials)
+    - [Clone this repo](#clone-this-repo)
+    - [Install dependencies](#install-dependencies)
+      - [Minimum required dependencies](#minimum-required-dependencies)
+      - [GCP](#gcp)
+      - [AWS](#aws)
+      - [Minikube](#minikube)
+    - [Gather accounts](#gather-accounts)
+    - [Gather credentials](#gather-credentials)
+      - [ GCP](#-gcp)
+      - [ AWS](#-aws)
+    - [Export all necessary variables](#export-all-necessary-variables)
+    - [Run setup commands](#run-setup-commands)
+      - [ GCP](#-gcp-1)
+      - [ AWS](#-aws-1)
+      - [Minikube](#minikube-1)
+      - [General](#general)
+  - [Part B: Provision resources](#part-b-provision-resources)
+    - [Create Kubernetes clusters, basic infrastructure, and Github repositories](#create-kubernetes-clusters-basic-infrastructure-and-github-repositories)
+    - [Run cluster setup script](#run-cluster-setup-script)
+  - [Part C: Deploy applications](#part-c-deploy-applications)
+    - [Deploy subgraphs to dev](#deploy-subgraphs-to-dev)
+    - [Deploy subgraphs to prod](#deploy-subgraphs-to-prod)
+    - [Deploy the router](#deploy-the-router)
+      - [ GCP](#-gcp-2)
+      - [ AWS](#-aws-2)
+    - [Client](#client)
+      - [ GCP](#-gcp-3)
+      - [ AWS](#-aws-3)
+
 ## Part A: Gather accounts and credentials
 
 ### Clone this repo
@@ -82,9 +113,9 @@ git pull
 
 ### Export all necessary variables
 
-First, change directories in the cloud provider you wish to use. All terraform is within the `terraform` root level folder, with each cloud provider having a subfolder within. For the below examples, we'll assume GCP, however the others will use the same commands. 
+First, change directories in the cloud provider you wish to use (or minikube). All terraform is within the `terraform` root level folder, with each provider having a subfolder within. For the below examples, we'll assume GCP, however the others will use the same commands. 
 
-Make a copy of `.env.sample` called `.env` to keep track of these values. You can always run `source .env` to reload all environment variables in a new terminal session.
+Next, make a copy of `.env.sample` called `.env` to keep track of these values. You can run `source .env` to reload all environment variables in a new terminal session.
 
 ```sh
 # in either terraform/aws, terraform/gcp, or terraform/minikube
@@ -108,7 +139,7 @@ source .env
 ./create_graph.sh
 ```
 
-The script adds a couple more environment variables to `.env`, so reload your environment now:
+The script adds a few more environment variables to `.env`, so reload your environment using:
 
 ```sh
 source .env
@@ -171,9 +202,9 @@ You may need to clean up your Github packages before creating new repos of the s
 
 ### Create Kubernetes clusters, basic infrastructure, and Github repositories
 
-**Note: If using a cloud provider, the following commands will create resources on your cloud provider account and begin to accrue a cost.** The example infrastructure defaults to a lower-cost environment (small node count and instance size), however it will not be covered by either of GCP's or AWS's free tiers.
+**Note: If using a cloud provider, the following commands will create resources on your cloud provider account and begin to accrue a cost.** The reference infrastructure defaults to a lower-cost environment (small node count and instance size), however it will not be covered by either of GCP's or AWS's free tiers.
 
-**Note: If you are using Minikube, this will not create the local cluster and instead configure the local environment to be ready to be deployed to.**
+**Note: If you are using Minikube, this will not create a local cluster and instead configure the local environment to be ready to be deployed to.**
 
 ```sh
 # for example, if using GCP
@@ -190,9 +221,7 @@ kubernetes_cluster_names = {
   "dev" = "apollo-supergraph-k8s-dev"
   "prod" = "apollo-supergraph-k8s-prod"
 }
-repo_infra = "https://github.com/you/apollo-supergraph-k8s-infra"
-repo_subgraph_a = "https://github.com/you/apollo-supergraph-k8s-subgraph-a"
-repo_subgraph_b = "https://github.com/you/apollo-supergraph-k8s-subgraph-b"
+repo = "https://github.com/you/reference-architecture"
 ```
 
 <details>
@@ -201,8 +230,8 @@ repo_subgraph_b = "https://github.com/you/apollo-supergraph-k8s-subgraph-b"
 Terraform provisions:
 
 - Two Kubernetes clusters (dev and prod)
-- Three Github repos (subgraph-a, subgraph-b, infra)
-- Github action secrets for GCP/AWS and Apollo credentials
+- The GitHub repository (`<your org>/reference-architecture`)
+- GitHub action secrets for GCP/AWS and Apollo credentials
 
 The subgraph repos are configured to build and deploy to the `dev` cluster once they're provisioned. (The deploy will fail the first time. See "Note about "initial commit" errors" below.)
 
@@ -222,7 +251,7 @@ cd terraform/gcp
 
 For both `dev` and `prod` clusters:
 
-- Configures your local `kubectl` so you can inspect your clusters
+- Configures your local `kubectl` environment so you can inspect your clusters
 - For GCP users:
   - Configures namespace, service account, and role bindings for Open Telemetry and Google Traces.
 - For AWS users:
@@ -250,7 +279,7 @@ gh workflow run "Deploy Open Telemetry Collector" --repo $GITHUB_ORG/apollo-supe
 <details>
   <summary>Note about "initial commit" errors</summary>
 
-When terraform creates the repositories, they immediately kick off initial workflow runs. But the secrets needed are available at that point. The "initial commit" runs will fail, but we're just re-running them with the commands above.
+When terraform creates the repositories, they immediately kick off initial workflow runs. But as the secrets needed are not available at that point, the "initial commit" runs will fail. As a result, we're just re-running them with the commands above to ensure the environments are correctly deployed.
 
 </details>
 
@@ -258,7 +287,7 @@ You can try out a subgraph using port forwarding:
 
 ```sh
 kubectx apollo-supergraph-k8s-dev
-kubectl port-forward service/graphql -n subgraph-a 4000:4000
+kubectl port-forward service/graphql -n checkout 4001:4000
 ```
 
 Then visit [http://localhost:4000/](http://localhost:4000/).
@@ -268,22 +297,97 @@ Then visit [http://localhost:4000/](http://localhost:4000/).
 Commits to the `main` branch of the subgraph repos are automatically built and deployed to the `dev` cluster. To deploy to prod, run the deploy actions:
 
 ```sh
-gh workflow run "Manual Deploy" --repo $GITHUB_ORG/apollo-supergraph-k8s-subgraph-a \
-  -f version=main \
-  -f environment=prod \
-  -f dry-run=false \
-  -f debug=false
-
-gh workflow run "Manual Deploy" --repo $GITHUB_ORG/apollo-supergraph-k8s-subgraph-b \
-  -f version=main \
-  -f environment=prod \
-  -f dry-run=false \
-  -f debug=false
+  gh workflow run "Manual Deploy - Subgraphs" --repo $GITHUB_ORG/reference-architecture \
+    -f version=main \
+    -f environment=prod \
+    -f dry-run=false \
+    -f debug=false
 ```
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-kubectl port-forward service/graphql -n subgraph-a 4000:4000
+kubectl port-forward service/graphql -n checkout 4000:4000
 ```
 
-Then visit [http://localhost:4000/](http://localhost:4000/). You've successfully deployed your subgraphs! Once you've tested the subgraph and made a few requests, close out of the port forwarding and move to the next step.
+Then visit [http://localhost:4000/](http://localhost:4000/). You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router. 
+
+
+### Deploy the router
+
+To do so, we'll need to run: 
+
+```sh
+gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=dev \
+  -f dry-run=false \
+  -f debug=false
+
+gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=prod \
+  -f dry-run=false \
+  -f debug=false
+```
+
+Which will deploy the router into both environments (`dev` and `prod`), as well as an ingress to access the router on both. In the case of AWS, it will be a domain name, and in the case of GCP, it'll be an IP. 
+
+Follow the below instructions for your cloud provider you are using. Please note that for both providers, the value for the ingress may take some time to become live, so you may need to give it a few minutes to process. 
+
+#### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
+
+```sh
+kubectx apollo-supergraph-k8s-prod
+ROUTER_IP=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
+open http://$ROUTER_IP
+```
+
+Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
+
+#### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
+
+```sh
+kubectx apollo-supergraph-k8s-prod
+ROUTER_HOSTNAME=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
+open http://$ROUTER_HOSTNAME
+```
+
+Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
+
+### Client
+
+The last step to getting fully configured is to deploy the client to both environments. 
+
+To do so:
+
+```sh
+gh workflow run "Deploy Client" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=dev \
+  -f dry-run=false \
+  -f debug=false
+
+gh workflow run "Deploy Client" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=prod \
+  -f dry-run=false \
+  -f debug=false
+```
+
+This will create another ingress specific to the client, so much like the router, you can run the following commands depending on your provider.
+
+#### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
+
+```sh
+kubectx apollo-supergraph-k8s-prod
+ROUTER_IP=$(kubectl get ingress -n client -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
+open http://$ROUTER_IP
+```
+
+Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
+
+#### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
+
+```sh
+kubectx apollo-supergraph-k8s-prod
+ROUTER_HOSTNAME=$(kubectl get ingress -n client -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
+open http://$ROUTER_HOSTNAME
+```
+
+You should now have the full architecture deployed!
