@@ -26,11 +26,9 @@ At a minimum, you will need:
 - A Github account.
 - An enterprise Apollo GraphOS account.
   - You can use [a free enterprise trial account](https://studio.apollographql.com/signup?type=enterprise-trial) if you don't have an enterprise contract.
-- Either:
-  - An account for:
-    - Google Cloud Platform (GCP).
-    - Amazon Web Services (AWS).
-  - A local Minikube setup.
+- An account for either:
+  - Google Cloud Platform (GCP).
+  - Amazon Web Services (AWS).
 
 Further requirements are noted within the [setup instructions](./docs/setup.md) as each type of environment (cloud vs. local) requires additional tooling.
 
@@ -41,10 +39,12 @@ Further requirements are noted within the [setup instructions](./docs/setup.md) 
 
 ### [Setup](/docs/setup.md)
 
-- Part A: Gather accounts and credentials
-- Part B: Provision resources
-- Part C: Deploy applications
+During setup, you'll be:
+
+- Gathering accounts and credentials
+- Provisioning resources
+- Deploying the applications, including router, subgraphs, client, and observability tools
 
 ### [Cleanup](/docs/cleanup.md)
 
-- Part A: Automated cleanup
+Once finished, you can cleanup your environments following the above document.
