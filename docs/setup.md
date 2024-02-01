@@ -325,6 +325,16 @@ gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
   -f environment=prod \
   -f dry-run=false \
   -f debug=false
+
+gh workflow run "Deploy Coprocessor" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=dev \
+  -f dry-run=false \
+  -f debug=false
+
+gh workflow run "Deploy Coprocessor" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=prod \
+  -f dry-run=false \
+  -f debug=false
 ```
 
 Which will deploy the router into both environments (`dev` and `prod`), as well as an ingress to access the router on both. In the case of AWS, it will be a domain name, and in the case of GCP, it'll be an IP. 
