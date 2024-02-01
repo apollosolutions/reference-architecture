@@ -308,7 +308,7 @@ kubectx apollo-supergraph-k8s-prod
 kubectl port-forward service/graphql -n checkout 4000:4000
 ```
 
-Then visit [http://localhost:4000/](http://localhost:4000/). You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router. 
+Then visit [http://localhost:4000/](http://localhost:4000/). You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router and Coprocessor. 
 
 
 ### Deploy the router
@@ -325,7 +325,13 @@ gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
   -f environment=prod \
   -f dry-run=false \
   -f debug=false
+```
 
+### Deploy the coprocessor
+
+To do so, we'll need to run:
+
+```sh
 gh workflow run "Deploy Coprocessor" --repo $GITHUB_ORG/reference-architecture \
   -f environment=dev \
   -f dry-run=false \
@@ -337,7 +343,7 @@ gh workflow run "Deploy Coprocessor" --repo $GITHUB_ORG/reference-architecture \
   -f debug=false
 ```
 
-Which will deploy the router into both environments (`dev` and `prod`), as well as an ingress to access the router on both. In the case of AWS, it will be a domain name, and in the case of GCP, it'll be an IP. 
+Which will deploy the router and coprocessor into both environments (`dev` and `prod`), as well as an ingress to access the router on both. In the case of AWS, it will be a domain name, and in the case of GCP, it'll be an IP. 
 
 Follow the below instructions for your cloud provider you are using. Please note that for both providers, the value for the ingress may take some time to become live, so you may need to give it a few minutes to process. 
 
