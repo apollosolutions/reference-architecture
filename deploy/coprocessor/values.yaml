@@ -22,7 +22,7 @@ service:
   port: 80
 
 ingress:
-  enabled: true
+  enabled: false
   hosts:
     - host: coprocessor.local
       paths:
