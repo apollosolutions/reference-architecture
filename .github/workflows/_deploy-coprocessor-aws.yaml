@@ -1,0 +1,108 @@
+name: _deploy-coprocessor-aws
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: main
+        required: true
+      cluster_suffix:
+        description: Target AWS cluster suffix
+        type: string
+        required: true
+      dry-run:
+        type: boolean
+        description: Run a dry run with helm
+        required: false
+        default: false
+      debug:
+        type: boolean
+        description: Run helm in debug mode
+        required: false
+        default: false
+      region:
+        description: AWS target region
+        type: string
+        default: us-east-1
+        required: false
+    secrets:
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_SECRET_KEY:
+        required: true
+      CLUSTER_PREFIX:
+        required: true
+
+env:
+  IMAGE: ${{ github.repository }}/coprocessor
+  REGISTRY: ghcr.io
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+  AWS_REGION: ${{ inputs.region }}
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Configure Kubeconfig w/ EKS"
+        run: aws eks update-kubeconfig --name ${{ secrets.CLUSTER_PREFIX }}-${{ inputs.cluster_suffix }} --region ${{ env.AWS_REGION }}
+
+      # Deploy the Docker image to the GKE cluster with dry run
+      - name: Helm dry-run
+        if: ${{ inputs.dry-run }}
+        run: |
+          repository=$(echo "$REGISTRY/$IMAGE" | tr '[:upper:]' '[:lower:]')
+
+          helm upgrade coprocessor \
+          --create-namespace \
+          --namespace coprocessor \
+          --set image.repository=$repository \
+          --set image.tag=${{ inputs.version }} \
+          --dry-run \
+          --atomic \
+          --install \
+          --timeout 60s \
+          ./deploy/coprocessor \
+          --values ./deploy/coprocessor/values.yaml \
+
+      # Deploy the Docker image to the GKE cluster for real with debug
+      - name: Deploy
+        if: ${{ !inputs.dry-run && inputs.debug }}
+        run: |
+          repository=$(echo "$REGISTRY/$IMAGE" | tr '[:upper:]' '[:lower:]')
+
+          helm upgrade coprocessor \
+          --create-namespace \
+          --namespace coprocessor \
+          --set image.repository=$repository \
+          --set image.tag=${{ inputs.version }} \
+          --atomic \
+          --install \
+          --timeout 60s \
+          --debug \
+          ./deploy/coprocessor \
+          --values ./deploy/coprocessor/values.yaml \
+
+      # Deploy the Docker image to the GKE cluster for real
+      - name: Deploy
+        if: ${{ !inputs.dry-run }}
+        run: |
+          repository=$(echo "$REGISTRY/$IMAGE" | tr '[:upper:]' '[:lower:]')
+
+          helm upgrade coprocessor \
+          --create-namespace \
+          --namespace coprocessor \
+          --set image.repository=$repository \
+          --set image.tag=${{ inputs.version }} \
+          --atomic \
+          --install \
+          --timeout 60s \
+          ./deploy/coprocessor \
+          --values ./deploy/coprocessor/values.yaml \
+

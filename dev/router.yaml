@@ -27,3 +27,30 @@ persisted_queries:
   safelist:
     enabled: false
     require_id: false
+
+coprocessor:
+  url: http://localhost:8081
+  timeout: 2s
+  router:
+    request:
+      headers: true # These boolean properties indicate which request data to include in the coprocessor request. All are optional and false by default.
+      body: false
+      context: false
+      sdl: false
+      path: false
+      method: false
+  subgraph:
+    all:
+      request:
+        headers: true
+        body: false
+        context: false
+        uri: false
+        method: false
+        service_name: false
+      response:
+        headers: true
+        body: false
+        context: false
+        service_name: false
+        status_code: false

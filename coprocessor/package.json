@@ -1,0 +1,19 @@
+{
+  "name": "node-coprocessor",
+  "version": "1.0.0",
+  "description": "A node-based Apollo Router coprocessor",
+  "main": "index.js",
+  "scripts": {
+    "build": "docker build . -t node-co",
+    "logs": "docker logs -fn 50 node-co",
+    "start": "npm run stop; npm run build && docker run -d --name node-co --env PORT=8081 -p 8081:8081 node-co",
+    "start:dev": "node .",
+    "stop": "docker stop node-co; docker rm node-co; docker rmi node-co"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0"
+  }
+}
