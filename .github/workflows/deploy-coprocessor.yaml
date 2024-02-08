@@ -26,31 +26,25 @@ jobs:
   determine_cloud_provider:
     uses: ./.github/workflows/_determine-provider.yaml
     secrets: inherit
-
-  publish_pqs: 
-    if: needs.determine_cloud_provider.outputs.apollo == 'true'
+  
+  deploy_gcp:
+    if: needs.determine_cloud_provider.outputs.gcp == 'true'
     needs: [determine_cloud_provider]
     uses: ./.github/workflows/_deploy-coprocessor-gke.yaml
     secrets: inherit
     with:
-      environment: ${{ inputs.environment }}
-  
-  deploy_gcp:
-    if: needs.determine_cloud_provider.outputs.gcp == 'true'
-    needs: [determine_cloud_provider, publish_pqs]
-    uses: ./.github/workflows/_deploy-coprocessor-gke.yaml
-    secrets: inherit
-    with:
+      version: main
       dry-run: ${{ inputs.dry-run }}
       debug: ${{ inputs.debug }}
-      environment: ${{ inputs.environment }}
+      cluster_suffix:  ${{ inputs.environment }}
 
   deploy_aws:
     if: needs.determine_cloud_provider.outputs.aws == 'true'
-    needs: [determine_cloud_provider, publish_pqs]
+    needs: [determine_cloud_provider]
     uses: ./.github/workflows/_deploy-coprocessor-aws.yaml
     secrets: inherit
     with:
+      version: main
       dry-run: ${{ inputs.dry-run }}
       debug: ${{ inputs.debug }}
-      environment: ${{ inputs.environment }}
+      cluster_suffix: ${{ inputs.environment }}
