@@ -11,9 +11,10 @@ COPY src ./src
 COPY tsconfig.json .
 COPY codegen.ts .
 COPY schema.graphql .
-
+COPY keys ./keys
 RUN npm run build
 
+# COPY ./src/keys /dist/keys
 EXPOSE 4001
 
 CMD [ "node", "--require","./dist/tracing.js","./dist/index.js" ]

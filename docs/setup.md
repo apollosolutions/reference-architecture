@@ -24,7 +24,7 @@
   - [Part C: Deploy applications](#part-c-deploy-applications)
     - [Deploy subgraphs to dev](#deploy-subgraphs-to-dev)
     - [Deploy subgraphs to prod](#deploy-subgraphs-to-prod)
-    - [Deploy the router](#deploy-the-router)
+    - [Deploy the coprocessor and router](#deploy-the-coprocessor-and-router)
       - [ GCP](#-gcp-2)
       - [ AWS](#-aws-2)
     - [Deploy the client](#deploy-the-client)
@@ -311,23 +311,7 @@ kubectl port-forward service/graphql -n checkout 4000:4000
 Then visit [http://localhost:4000/](http://localhost:4000/). You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router and Coprocessor. 
 
 
-### Deploy the router
-
-To do so, we'll need to run: 
-
-```sh
-gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
-  -f environment=dev \
-  -f dry-run=false \
-  -f debug=false
-
-gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
-  -f environment=prod \
-  -f dry-run=false \
-  -f debug=false
-```
-
-### Deploy the coprocessor
+### Deploy the coprocessor and router
 
 To do so, we'll need to run:
 
@@ -343,6 +327,20 @@ gh workflow run "Deploy Coprocessor" --repo $GITHUB_ORG/reference-architecture \
   -f debug=false
 ```
 
+First, and once the deploy completes, we'll deploy the router:
+
+```sh
+gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=dev \
+  -f dry-run=false \
+  -f debug=false
+
+gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=prod \
+  -f dry-run=false \
+  -f debug=false
+```
+
 Which will deploy the router and coprocessor into both environments (`dev` and `prod`), as well as an ingress to access the router on both. In the case of AWS, it will be a domain name, and in the case of GCP, it'll be an IP. 
 
 Follow the below instructions for your cloud provider you are using. Please note that for both providers, the value for the ingress may take some time to become live, so you may need to give it a few minutes to process. 
@@ -351,7 +349,7 @@ Follow the below instructions for your cloud provider you are using. Please note
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
+ROUTER_HOSTNAME=http://$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
 open http://$ROUTER_HOSTNAME
 ```
 
@@ -375,7 +373,7 @@ The last step to getting fully configured is to deploy the client to both enviro
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
+ROUTER_HOSTNAME=http://$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
 ```
 
 Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
@@ -396,11 +394,6 @@ Once you have the router hostname, you'll need to set it as a secret in the GitH
 Lastly, we'll need to deploy the client:
 
 ```sh
-gh workflow run "Deploy Client" --repo $GITHUB_ORG/reference-architecture \
-  -f environment=dev \
-  -f dry-run=false \
-  -f debug=false
-
 gh workflow run "Deploy Client" --repo $GITHUB_ORG/reference-architecture \
   -f environment=prod \
   -f dry-run=false \

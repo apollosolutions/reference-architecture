@@ -9,10 +9,6 @@ on:
         type: string
         default: main
         required: true
-      cluster_suffix:
-        description: Target GKE cluster suffix
-        type: string
-        required: true
       dry-run:
         type: boolean
         description: Run a dry run with helm
@@ -62,7 +58,7 @@ jobs:
       # Get the GKE credentials so we can deploy to the cluster
       - uses: google-github-actions/get-gke-credentials@fb08709ba27618c31c09e014e1d8364b02e5042e
         with:
-          cluster_name: ${{ secrets.CLUSTER_PREFIX }}-${{ inputs.cluster_suffix }}
+          cluster_name: ${{ secrets.CLUSTER_PREFIX }}-prod
           location: ${{ env.GKE_ZONE }}
 
       # Deploy the Docker image to the GKE cluster with dry run

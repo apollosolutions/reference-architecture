@@ -30,10 +30,10 @@ jobs:
   publish_pqs: 
     if: needs.determine_cloud_provider.outputs.apollo == 'true'
     needs: [determine_cloud_provider]
-    uses: ./.github/workflows/_deploy-client-gke.yaml
+    uses: ./.github/workflows/_rover-client-pq-publish.yml
     secrets: inherit
     with:
-      environment: ${{ inputs.environment }}
+      environment: prod
   
   deploy_gcp:
     if: needs.determine_cloud_provider.outputs.gcp == 'true'
@@ -43,7 +43,7 @@ jobs:
     with:
       dry-run: ${{ inputs.dry-run }}
       debug: ${{ inputs.debug }}
-      environment: ${{ inputs.environment }}
+      version: main
 
   deploy_aws:
     if: needs.determine_cloud_provider.outputs.aws == 'true'
@@ -53,4 +53,4 @@ jobs:
     with:
       dry-run: ${{ inputs.dry-run }}
       debug: ${{ inputs.debug }}
-      environment: ${{ inputs.environment }}
+      version: main

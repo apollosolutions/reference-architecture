@@ -154,15 +154,13 @@ jobs:
       region: us-east-1
 
   publish:
-    needs: [deploy_aws, deploy_gcp, determine_cloud_provider]
+    needs: [determine_cloud_provider]
     uses: ./.github/workflows/_rover-subgraph-publish.yml
     secrets: inherit
     strategy:
       matrix:
         subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
     if: always() &&
-      (needs.deploy_aws.result == 'success' || needs.deploy_aws.result == 'skipped') &&
-      (needs.deploy_gcp.result == 'success' || needs.deploy_gcp.result == 'skipped') &&
       (needs.determine_cloud_provider.outputs.apollo == 'true')
     with:
       subgraph_name: ${{ matrix.subgraph }} # change to subgraph-b in that repo
@@ -170,10 +168,8 @@ jobs:
   
   publish_pqs:
     uses: ./.github/workflows/_rover-client-pq-publish.yml
-    needs: [deploy_aws, deploy_gcp, determine_cloud_provider]
+    needs: [determine_cloud_provider]
     if: always() &&
-      (needs.deploy_aws.result == 'success' || needs.deploy_aws.result == 'skipped') &&
-      (needs.deploy_gcp.result == 'success' || needs.deploy_gcp.result == 'skipped') &&
       (needs.determine_cloud_provider.outputs.apollo == 'true')
     secrets: inherit
     with:

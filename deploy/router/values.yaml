@@ -29,6 +29,21 @@ router:
       authorization:
         preview_directives:
           enabled: true
+      cors: 
+        allow_any_origin: true
+      coprocessor:
+        url: http://coprocessor.coprocessor.svc.cluster.local:8081
+        timeout: 2s
+        router:
+          request:
+            headers: true # These boolean properties indicate which request data to include in the coprocessor request. All are optional and false by default.
+        subgraph:
+          all:
+            request:
+              headers: true
+            response:
+              headers: true
+
   extraVolumeMounts:
     - name: rhai-volume
       mountPath: /dist/rhai

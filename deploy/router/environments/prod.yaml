@@ -14,6 +14,14 @@ router:
         all: true
       plugins:
         experimental.expose_query_plan: true
+      cors: 
+        allow_any_origin: true
+      persisted_queries:
+        enabled: true
+        log_unknown: true
+        safelist:
+          enabled: false
+          require_id: false
       rhai:
         scripts: /dist/rhai
         main: main.rhai

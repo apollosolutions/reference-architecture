@@ -6,7 +6,7 @@ function handleCoprocessorRequest(req, res) {
     return;
   }
 
-  const payload = getRequestPayload(req);
+  const payload = req.body;
 
   payload.headers["source"] = ["coprocessor"];
 

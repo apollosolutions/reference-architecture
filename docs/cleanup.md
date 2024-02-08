@@ -21,7 +21,7 @@ kubectl delete daemonsets,replicasets,services,deployments,pods,rc,ingress --all
 
 The command may hang at the end. You can kill the process (`ctrl-c`) and repeat with the prod cluster:
 
-```
+```sh
 kubectx apollo-supergraph-k8s-prod
 kubectl delete daemonsets,replicasets,services,deployments,pods,rc,ingress --all --all-namespaces
 ```

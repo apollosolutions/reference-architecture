@@ -7,10 +7,6 @@ on:
         type: string
         default: main
         required: true
-      cluster_suffix:
-        description: Target AWS cluster suffix
-        type: string
-        required: true
       dry-run:
         type: boolean
         description: Run a dry run with helm
@@ -51,7 +47,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: "Configure Kubeconfig w/ EKS"
-        run: aws eks update-kubeconfig --name ${{ secrets.CLUSTER_PREFIX }}-${{ inputs.cluster_suffix }} --region ${{ env.AWS_REGION }}
+        run: aws eks update-kubeconfig --name ${{ secrets.CLUSTER_PREFIX }}-prod --region ${{ env.AWS_REGION }}
 
       # Deploy the Docker image to the GKE cluster with dry run
       - name: Helm dry-run
