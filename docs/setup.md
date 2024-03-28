@@ -214,6 +214,8 @@ terraform apply # will print plan then prompt for confirmation
 # takes about 10-15 minutes
 ```
 
+**Note**: If using GCP, you might get an `Invalid provider configuration (no credentials loaded)` error when running `terraform apply`, please run `gcloud auth application-default login` and try again.
+
 Expected output:
 
 ```
@@ -242,8 +244,9 @@ The subgraph repos are configured to build and deploy to the `dev` cluster once 
 After creating the necessary clusters, you will need to run the included cluster setup script:
 
 ```sh
+# for example, if using GCP
 cd terraform/gcp
-./setup_clusters.sh # about 2 minutes
+./setup_clusters.sh # takes about 2 minutes
 ```
 
 <details>
@@ -286,10 +289,10 @@ You can try out a subgraph using port forwarding:
 
 ```sh
 kubectx apollo-supergraph-k8s-dev
-kubectl port-forward service/graphql -n checkout 4001:4000
+kubectl port-forward service/graphql -n checkout 4001:4001
 ```
 
-Then visit [http://localhost:4000/](http://localhost:4000/).
+Then visit [http://localhost:4001/](http://localhost:4001/).
 
 ### Deploy subgraphs to prod
 
@@ -305,10 +308,10 @@ Commits to the `main` branch of the subgraph repos are automatically built and d
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-kubectl port-forward service/graphql -n checkout 4000:4000
+kubectl port-forward service/graphql -n checkout 4001:4001
 ```
 
-Then visit [http://localhost:4000/](http://localhost:4000/). You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router and Coprocessor. 
+Then visit [http://localhost:4001/](http://localhost:4001/). You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router and Coprocessor. 
 
 
 ### Deploy the coprocessor and router
@@ -350,10 +353,8 @@ Follow the below instructions for your cloud provider you are using. Please note
 ```sh
 kubectx apollo-supergraph-k8s-prod
 ROUTER_HOSTNAME=http://$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
-open http://$ROUTER_HOSTNAME
+open $ROUTER_HOSTNAME
 ```
-
-Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
 
 #### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
 
@@ -363,7 +364,13 @@ ROUTER_HOSTNAME=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBa
 open http://$ROUTER_HOSTNAME
 ```
 
-Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
+Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph!
+
+**Note**: If using Explorer to run operations, you will need to set the client headers first:
+```
+apollographql-client-name:apollo-client
+apollographql-client-version:b  
+```
 
 ### Deploy the client
 
