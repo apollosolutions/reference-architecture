@@ -366,7 +366,11 @@ open http://$ROUTER_HOSTNAME
 
 Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph!
 
-**Note**: If using Explorer to run operations, you might need to set the `apollographql-client-name` and `apollographql-client-version` client headers first.  
+**Note**: If using Explorer to run operations, you will need to set the client headers first:
+```
+apollographql-client-name:apollo-client
+apollographql-client-version:b  
+```
 
 ### Deploy the client
 
