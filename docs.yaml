@@ -1,0 +1,8 @@
+name: reference-architecture
+description: A reference architecture with Kubernetes when using Apollo
+  Federation. It uses GitHub Actions configured to automate most of the
+  deployment processes for the router, subgraphs, and client, along with minimal
+  observability tooling to load test the resulting environment.
+tags:
+  - Architecture
+  - Supergraph
