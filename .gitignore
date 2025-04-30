@@ -42,3 +42,4 @@ router
 !router/
 router.exe
 .repo.env
+lockfile.sh
