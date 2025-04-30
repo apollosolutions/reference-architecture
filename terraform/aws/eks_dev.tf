@@ -13,7 +13,8 @@ provider "kubernetes" {
 
 module "eks_dev" {
   source = "terraform-aws-modules/eks/aws"
-
+  version = "~> 19.21"
+  
   providers = {
     kubernetes = kubernetes.dev
   }
