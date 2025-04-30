@@ -48,7 +48,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: "Configure Kubeconfig w/ EKS"
         run: aws eks update-kubeconfig --name ${{ secrets.CLUSTER_PREFIX }}-${{ inputs.cluster_suffix }} --region ${{ env.AWS_REGION }}
