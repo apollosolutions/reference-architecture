@@ -20,7 +20,6 @@ on:
 
 env:
   APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
-  APOLLO_GRAPH_REF: ${{ secrets.APOLLO_GRAPH_ID }}
   APOLLO_VCS_COMMIT: ${{ github.event.pull_request.head.sha }}
 
 jobs:
@@ -30,33 +29,20 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rover
-        run: |
-          curl -sSL https://rover.apollo.dev/nix/latest | sh
-          echo "$HOME/.rover/bin" >> $GITHUB_PATH
+        uses: apollographql-gh-actions/install-rover@v1
 
       - name: Generate PQ manifest
         run: |
           cd ./client/
-          npm install --save-dev @apollo/generate-persisted-query-manifest
           npx generate-persisted-query-manifest 
           
-      - name: Publish to dev
-        if: inputs.environment == 'dev'
-        run: |
-          cd client
-          rover persisted-queries publish \
-          --graph-id ${{ secrets.APOLLO_GRAPH_ID }} \
-          --list-id ${{ secrets.APOLLO_PQ_DEV_ID }} \
-          --manifest ./persisted-query-manifest.json 
+      - name: Publish PQ Manifest
+        uses: apollographql-gh-actions/rover-persisted-queries-publish@v1
+        with:
+          apollo-key: ${{ secrets.APOLLO_KEY }}
+          graph-ref: ${{ secrets.APOLLO_GRAPH_ID }}@${{ inputs.environment }}
+          manifest: ./client/persisted-query-manifest.json
         
-      - name: Publish to prod
-        if: inputs.environment == 'prod'
-        run: |
-          cd client
-          rover persisted-queries publish \
-          --graph-id ${{ secrets.APOLLO_GRAPH_ID }} \
-          --list-id ${{ secrets.APOLLO_PQ_PROD_ID }} \
-          --manifest ./persisted-query-manifest.json 
