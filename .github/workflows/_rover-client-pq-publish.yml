@@ -13,10 +13,6 @@ on:
         required: true
       APOLLO_GRAPH_ID:
         required: true
-      APOLLO_PQ_DEV_ID:
-        required: true
-      APOLLO_PQ_PROD_ID:
-        required: true
 
 env:
   APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
