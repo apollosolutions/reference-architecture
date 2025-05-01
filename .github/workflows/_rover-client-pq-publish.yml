@@ -33,7 +33,7 @@ jobs:
       - name: Generate PQ manifest
         run: |
           cd ./client/
-          npx generate-persisted-query-manifest 
+          npx @apollo/generate-persisted-query-manifest 
           
       - name: Publish PQ Manifest
         uses: apollographql-gh-actions/rover-persisted-queries-publish@v1
