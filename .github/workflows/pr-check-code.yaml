@@ -12,6 +12,7 @@ jobs:
     outputs:
       subgraphs: ${{ steps.subgraphs.outputs.subgraphs }}
     steps:
+      - uses: actions/checkout@v4
       - name: Define Subgraphs
         id: subgraphs
         run: |
@@ -32,8 +33,7 @@ jobs:
         with:
           node-version: 22.x
           cache: "npm"
-      - name: Change directory
-        run: cd subgraphs/${{ matrix.subgraphs }}
-      - run: npm ci
-      - run: npm run build
+
+      - run: npm ci 
+      - run: npm run build -w subgraphs/${{ matrix.subgraphs }} --if-present
 
