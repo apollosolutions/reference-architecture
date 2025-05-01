@@ -4,18 +4,36 @@ on:
   pull_request:
     paths:
       - "subgraphs/**"
+
 jobs:
+  define-matrix:
+    runs-on: ubuntu-latest
+
+    outputs:
+      subgraphs: ${{ steps.subgraphs.outputs.subgraphs }}
+    steps:
+      - name: Define Subgraphs
+        id: subgraphs
+        run: |
+          # Find all subfolders except "node_modules" and convert them into an array
+          subfolders=($(find subgraphs -mindepth 1 -maxdepth 1 -type d ! -name "node_modules" -exec basename {} \;))
+
+          # Print the array
+          echo "subgraphs=$(printf '%s\n' "${subfolders[@]}" | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
   npm-build:
     runs-on: ubuntu-latest
+    needs: define-matrix
+    strategy:
+      matrix:
+        subgraphs: ${{ fromJson(needs.define-matrix.outputs.subgraphs) }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22.x
           cache: "npm"
-
+      - name: Change directory
+        run: cd subgraphs/${{ matrix.subgraphs }}
       - run: npm ci
-
       - run: npm run build
 
