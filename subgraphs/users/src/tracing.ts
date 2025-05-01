@@ -8,7 +8,7 @@ import {
   ConsoleMetricExporter,
 } from '@opentelemetry/sdk-metrics';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import  {
+import {
   OTLPMetricExporter,
 } from '@opentelemetry/exporter-metrics-otlp-http';
 import { name } from './lib';

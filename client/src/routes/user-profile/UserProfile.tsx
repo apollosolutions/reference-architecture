@@ -1,10 +1,4 @@
-import {
-  Flex,
-  useColorModeValue,
-  Heading,
-  Text,
-  Stack
-} from '@chakra-ui/react'
+import { Flex, useColorModeValue, Heading, Text, Stack } from '@chakra-ui/react'
 import UserProfileForm from './UserProfileForm'
 import { User } from '../../hooks/useAuth'
 
@@ -16,10 +10,11 @@ export default function UserProfile(props: Props) {
   return (
     <Flex
       minH={'100vh'}
-      flexDirection={"column"}
+      flexDirection={'column'}
       align={'center'}
       justify={'center'}
-      bg={useColorModeValue('navy.400', 'navy.500')}>
+      bg={useColorModeValue('navy.400', 'navy.500')}
+    >
       <Stack
         spacing={4}
         w={'full'}
@@ -28,7 +23,8 @@ export default function UserProfile(props: Props) {
         rounded={'xl'}
         boxShadow={'lg'}
         p={6}
-        my={12}>
+        my={12}
+      >
         <Heading lineHeight={1.1} fontSize={{ base: '2xl', sm: '3xl' }}>
           User Profile Edit
         </Heading>
@@ -42,14 +38,15 @@ export default function UserProfile(props: Props) {
         rounded={'xl'}
         boxShadow={'lg'}
         p={6}
-        my={12}>
+        my={12}
+      >
         <Heading lineHeight={1.1} fontSize={{ base: '2xl', sm: '3xl' }}>
           Authentication
         </Heading>
-        <Text as="pre" className={"whitespace-pre-wrap"}>
+        <Text as="pre" className={'whitespace-pre-wrap'}>
           {JSON.stringify(user, null, 2)}
         </Text>
       </Stack>
-    </Flex >
+    </Flex>
   )
 }

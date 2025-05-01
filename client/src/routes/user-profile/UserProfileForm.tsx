@@ -27,7 +27,7 @@ export default function UserProfileForm({ user }: Props) {
   // it is being added to so const won't work, but eslint doesn't seem to recognize that
   // eslint-disable-next-line prefer-const
   let headers: Headers = {
-    "x-user-id": "user:1",
+    'x-user-id': 'user:1',
   }
   if (user && user.token) {
     headers.authorization = `Bearer ${user.token}`
@@ -35,27 +35,28 @@ export default function UserProfileForm({ user }: Props) {
 
   const { loading, error, data } = useQuery(QUERIES.USER_PROFILE, {
     context: {
-      headers
+      headers,
     },
     variables: {},
-    errorPolicy: "all",
-    skip: !user || !user.token
+    errorPolicy: 'all',
+    skip: !user || !user.token,
   })
 
   if (loading) <Spinner />
   if (error) {
     return (
-      <Alert status='error' color="navy.400">
+      <Alert status="error" color="navy.400">
         <AlertIcon />
       </Alert>
     )
   }
-  if (!data) return (
-    <Alert status='error' color="navy.400">
-      <AlertIcon />
-      No data found
-    </Alert>
-  )
+  if (!data)
+    return (
+      <Alert status="error" color="navy.400">
+        <AlertIcon />
+        No data found
+      </Alert>
+    )
 
   return (
     <>
@@ -107,14 +108,15 @@ export default function UserProfileForm({ user }: Props) {
       </FormControl>
       <Stack spacing={6} direction={['column', 'row']}>
         <Button
-          variant={"outline"}
-          borderColor={"navy.400"}
-          borderWidth={"2px"}
+          variant={'outline'}
+          borderColor={'navy.400'}
+          borderWidth={'2px'}
           color={'navy.400'}
           w="full"
           _hover={{
             bg: 'red.500',
-          }}>
+          }}
+        >
           Cancel
         </Button>
         <Button
@@ -123,7 +125,8 @@ export default function UserProfileForm({ user }: Props) {
           w="full"
           _hover={{
             bg: 'orange.200',
-          }}>
+          }}
+        >
           Submit
         </Button>
       </Stack>

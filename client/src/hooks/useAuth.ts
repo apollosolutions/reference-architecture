@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from 'react'
 import { useMount } from '../hooks/useMount'
 import { useLocalStorage } from './useLocalStorage'
-import { AuthorizationContext } from '../context/AuthorizationContext'
+import { AuthorizationContext } from '../context'
 
 export interface User {
   id: string

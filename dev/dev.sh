@@ -9,7 +9,7 @@ fi
 
 if [ ! -f "./dev/router" ]; then
     cd dev
-    curl -sSL https://router.apollo.dev/download/nix/latest | sh 
+    curl -sSL https://router.apollo.dev/download/nix/v2.2.0 | sh 
     cd ..
 fi
 
