@@ -34,8 +34,9 @@ const HeroCardPlain = () => {
             space gear
           </Text>
         </Heading>
-        <Text color={useColorModeValue('navy.400', "beige.400")}>
-          Transform your space adventure experience with our cutting-edge products designed to enhance your trip!
+        <Text color={useColorModeValue('navy.400', 'beige.400')}>
+          Transform your space adventure experience with our cutting-edge
+          products designed to enhance your trip!
         </Text>
         <Stack
           direction={'column'}
@@ -50,7 +51,8 @@ const HeroCardPlain = () => {
             px={6}
             _hover={{
               bg: 'navy.500',
-            }}>
+            }}
+          >
             <Link to="/products">Shop Now</Link>
           </Button>
           <Link to="products">
@@ -73,7 +75,8 @@ const HeroCardPlain = () => {
               position={'absolute'}
               right={'-125px'}
               top={'-15px'}
-              transform={'rotate(20deg)'}>
+              transform={'rotate(20deg)'}
+            >
               Signup now for 20% off
             </Text>
           </Box>
@@ -88,20 +91,20 @@ const HeroCardPatterned = () => {
     <Container maxW={'3xl'} py={{ base: 20, md: 36 }}>
       <Card
         variant="elevated"
-        bg={useColorModeValue("navy.400", "beige.400")}
-        borderRadius={"xl"}
-        backgroundImage={"/assets/background-pattern.svg"}
+        bg={useColorModeValue('navy.400', 'beige.400')}
+        borderRadius={'xl'}
+        backgroundImage={'/assets/background-pattern.svg'}
       >
         <CardHeader
-          textColor={"beige.400"}
+          textColor={'beige.400'}
           fontWeight={900}
-          fontSize={"xxx-large"}
+          fontSize={'xxx-large'}
         >
           <Heading
             fontWeight={600}
             fontSize={{ base: '4xl', sm: '6xl', md: '8xl' }}
             lineHeight={'110%'}
-            color={useColorModeValue("beige.400", "navy.400")}
+            color={useColorModeValue('beige.400', 'navy.400')}
           >
             Buy the best <br />
             <Text as={'span'} color={'orange.400'}>
@@ -110,8 +113,9 @@ const HeroCardPatterned = () => {
           </Heading>
         </CardHeader>
         <CardBody>
-          <Text color={useColorModeValue("beige.400", "navy.400")}>
-            Transform your space adventure experience with our cutting-edge products designed to enhance your trip!
+          <Text color={useColorModeValue('beige.400', 'navy.400')}>
+            Transform your space adventure experience with our cutting-edge
+            products designed to enhance your trip!
           </Text>
           <Box marginTop="20px">
             <Stack
@@ -127,7 +131,8 @@ const HeroCardPatterned = () => {
                 px={6}
                 _hover={{
                   bg: 'beige.400',
-                }}>
+                }}
+              >
                 <Link to="/products">Shop Now</Link>
               </Button>
               <Button
@@ -137,9 +142,7 @@ const HeroCardPatterned = () => {
                 color="beige.400"
                 size={'sm'}
               >
-                <Link to="products">
-                  Learn More
-                </Link>
+                <Link to="products">Learn More</Link>
               </Button>
             </Stack>
           </Box>
@@ -151,11 +154,7 @@ const HeroCardPatterned = () => {
 
 const CallToActionWithAnnotation = () => {
   const toggleHeroCard = Math.floor((Math.random() * 10) / 5)
-  return (
-    <>
-      {toggleHeroCard ? <HeroCardPatterned /> : <HeroCardPlain />}
-    </>
-  )
+  return <>{toggleHeroCard ? <HeroCardPatterned /> : <HeroCardPlain />}</>
 }
 
 const Arrow = createIcon({

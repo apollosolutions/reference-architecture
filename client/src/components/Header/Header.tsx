@@ -8,7 +8,7 @@ import {
   useColorModeValue,
   Stack,
   Heading,
-  Text
+  Text,
 } from '@chakra-ui/react'
 import { HamburgerIcon, CloseIcon } from '@chakra-ui/icons'
 import Logo from '../Icons/Logo'
@@ -59,21 +59,29 @@ export default function Header() {
           <IconButton
             size={'md'}
             icon={isOpen ? <CloseIcon /> : <HamburgerIcon />}
-            bgColor={"orange.400"}
+            bgColor={'orange.400'}
             aria-label={'Open Menu'}
             display={{ md: 'none' }}
             onClick={isOpen ? onClose : onOpen}
           />
           <HStack spacing={8} alignItems={'center'}>
-            <HStack as={'nav'} spacing={4} display={{ base: 'none', md: 'flex' }}>
+            <HStack
+              as={'nav'}
+              spacing={4}
+              display={{ base: 'none', md: 'flex' }}
+            >
               <Link to="/home">
                 <Logo fill={useColorModeValue('beige.400', 'navy.400')} />
               </Link>
               <Link to="/home">
-                <Heading size={"lg"}>{STORE_NAME}</Heading>
+                <Heading size={'lg'}>{STORE_NAME}</Heading>
               </Link>
             </HStack>
-            <HStack as={'nav'} spacing={4} display={{ base: 'none', md: 'flex' }}>
+            <HStack
+              as={'nav'}
+              spacing={4}
+              display={{ base: 'none', md: 'flex' }}
+            >
               {LINKS.map((link) => (
                 <Link to={`/${link.toLowerCase()}`} key={link}>
                   <Text fontWeight={600}>{link}</Text>

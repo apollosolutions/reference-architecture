@@ -23,8 +23,8 @@ const ColorModeToggle = () => {
   return (
     <Button
       size={'md'}
-      color={colorMode === 'light' ? "orange.400" : "navy.400"}
-      bgColor={colorMode === 'light' ? "beige.400" : "orange.400"}
+      color={colorMode === 'light' ? 'orange.400' : 'navy.400'}
+      bgColor={colorMode === 'light' ? 'beige.400' : 'orange.400'}
       onClick={toggleColorMode}
     >
       {colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
@@ -33,12 +33,9 @@ const ColorModeToggle = () => {
 }
 
 export default function LoggedInMenu() {
-  const { logout } = useAuth();
+  const { logout } = useAuth()
   return (
-    <Flex
-      alignItems={'center'}
-      width={"275px"}
-    >
+    <Flex alignItems={'center'} width={'275px'}>
       <Menu>
         <MenuButton
           as={Button}
@@ -47,7 +44,7 @@ export default function LoggedInMenu() {
           cursor={'pointer'}
           minW={0}
         >
-          <HStack color={useColorModeValue("beige.400", "navy.400")}>
+          <HStack color={useColorModeValue('beige.400', 'navy.400')}>
             <Text>Welcome</Text>
             <Avatar
               size={'md'}
@@ -68,8 +65,8 @@ export default function LoggedInMenu() {
       <Spacer />
       <Button
         variant={'solid'}
-        bgColor={"orange.400"}
-        color={"navy.400"}
+        bgColor={'orange.400'}
+        color={'navy.400'}
         size={'md'}
         mr={4}
         leftIcon={<AddIcon />}

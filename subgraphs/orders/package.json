@@ -15,7 +15,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "engines": {
-    "node": ">=18.0"
+    "node": ">=22.0"
   },
   "scripts": {
     "prebuild": "npx genversion --esm --property name src/lib.ts",
@@ -50,5 +50,8 @@
     "ts-node": "^10.9.1",
     "typescript": "^5.0.0",
     "utility-types": "^3.10.0"
+  },
+  "volta": {
+    "node": "22.15.0"
   }
 }

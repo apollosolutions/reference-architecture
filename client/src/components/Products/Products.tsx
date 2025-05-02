@@ -13,22 +13,20 @@ type ProductListingProps = {
 const ProductListing = (props: ProductListingProps) => {
   const {
     data = {
-      searchProducts: []
-    }
+      searchProducts: [],
+    },
   } = props
 
   return (
-    <Container maxW={"container.xl"} centerContent>
-      <Grid templateColumns='repeat(2, 1fr)' gap={10}>
-        {
-          data.searchProducts.map((product) => {
-            return (
-              <GridItem key={product.id}>
-                <ProductCard product={product} />
-              </GridItem>
-            )
-          })
-        }
+    <Container maxW={'container.xl'} centerContent>
+      <Grid templateColumns="repeat(2, 1fr)" gap={10}>
+        {data.searchProducts.map((product) => {
+          return (
+            <GridItem key={product.id}>
+              <ProductCard product={product} />
+            </GridItem>
+          )
+        })}
       </Grid>
     </Container>
   )
@@ -37,7 +35,7 @@ const ProductListing = (props: ProductListingProps) => {
 export default function Products() {
   const { loading, error, data } = useQuery(QUERIES.SEARCH_PRODUCTS, {
     variables: {},
-    errorPolicy: "all"
+    errorPolicy: 'all',
   })
 
   if (loading) {
@@ -69,10 +67,9 @@ export default function Products() {
   if (!loading && !error) {
     return (
       <>
-
         <ProductListing data={data} />
       </>
     )
   }
-  return null;
+  return null
 }
