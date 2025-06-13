@@ -2,19 +2,32 @@
   "name": "node-coprocessor",
   "version": "1.0.0",
   "description": "A node-based Apollo Router coprocessor",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=22.0"
+  },
   "scripts": {
+    "prebuild": "npx genversion --esm --property name src/lib.ts",
     "build": "docker build . -t node-co",
     "logs": "docker logs -fn 50 node-co",
     "start": "npm run stop; npm run build && docker run -d --name node-co --env PORT=8081 -p 8081:8081 node-co",
     "stop": "docker stop node-co; docker rm node-co; docker rmi node-co",
-    "dev": "npx nodemon --watch --exec node ."
+    "dev": "nodemon --watch \"src/**\" --ext \"ts,json\" --exec \"npm run build:tsc && node dist/index.js\" --ignore ./src/__generated__/ --ignore ./src/lib.ts",
+    "build:tsc": "npx tsc"
   },
   "author": "",
   "license": "MIT",
   "dependencies": {
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.15.3",
+    "genversion": "^3.2.0",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   },
   "volta": {
     "node": "22.15.0"

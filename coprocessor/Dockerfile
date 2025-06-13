@@ -1,13 +1,17 @@
-FROM node:18-alpine as node-build
+FROM node:22-bookworm-slim
 
-ENV NODE_ENV=production
+WORKDIR /usr/src/app
 
-WORKDIR /app
+COPY package.json .
+COPY package-lock.json .
 
-COPY package.json package-lock.json ./
+RUN npm install --no-save
 
-RUN npm install --production
+COPY src ./src
+COPY tsconfig.json .
 
-COPY . .
+RUN npm run build:tsc
 
-CMD node index.js
+EXPOSE 8081
+
+CMD [ "node", "./dist/index.js" ]
