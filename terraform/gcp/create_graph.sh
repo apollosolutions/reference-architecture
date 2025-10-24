@@ -81,7 +81,7 @@ GRAPH_KEY=$(echo $CREATE_RESP | jq -r ".data.newService.apiKeys[0].token")
 
 for variant in "${VARIANTS[@]}"; do
   for folder in ../../subgraphs/*; do
-    if [[ $folder == *"node_modules"* ]]; then
+    if [[ $folder == *"node_modules"* ]] || [[ $folder == *"package-lock.json"* ]]; then
       continue
     fi
     rover subgraph publish $GRAPH_ID@$variant --name $(basename $folder) --routing-url http://graphql.$(basename $folder).svc.cluster.local:4001 --schema $folder/schema.graphql --client-timeout 120
@@ -94,7 +94,7 @@ CREATE_PQ_ARGS_DEV=(
     --header "x-api-key: $APOLLO_KEY"
     --header 'content-type: application/json'
     --url 'https://graphql.api.apollographql.com/api/graphql'
-    --data "{\"query\":\"mutation CreatePersistedQueryList(\$name: String!, \$graphId: ID!, \$linkedVariants: [String!]) {\n  graph(id: \$graphId) {\n    createPersistedQueryList(name: \$name, linkedVariants: \$linkedVariants) {\n      ... on CreatePersistedQueryListResult {\n        persistedQueryList {\n          id\n        }\n      }\n    }\n  }\n}\",\"variables\":{\"name\":\"dev\",\"graphId\":\"$GRAPH_ID\",\"linkedVariants\":[\"$GRAPH_ID@dev\"]}}"
+    --data "{\"query\":\"mutation CreatePersistedQueryList(\$name: String!, \$graphId: ID!) {\n  graph(id: \$graphId) {\n    createPersistedQueryList(name: \$name) {\n      ... on CreatePersistedQueryListResult {\n        persistedQueryList {\n          id\n        }\n      }\n    }\n  }\n}\",\"variables\":{\"name\":\"dev\",\"graphId\":\"$GRAPH_ID\"}}"
 )
 
 if [[ $HEADER != "" ]]; then
@@ -141,7 +141,7 @@ CREATE_PQ_ARGS_PROD=(
     --header "x-api-key: $APOLLO_KEY"
     --header 'content-type: application/json'
     --url 'https://graphql.api.apollographql.com/api/graphql'
-    --data "{\"query\":\"mutation CreatePersistedQueryList(\$name: String!, \$graphId: ID!, \$linkedVariants: [String!]) {\n  graph(id: \$graphId) {\n    createPersistedQueryList(name: \$name, linkedVariants: \$linkedVariants) {\n      ... on CreatePersistedQueryListResult {\n        persistedQueryList {\n          id\n        }\n      }\n    }\n  }\n}\",\"variables\":{\"name\":\"prod\",\"graphId\":\"$GRAPH_ID\",\"linkedVariants\":[\"prod\"]}}"
+    --data "{\"query\":\"mutation CreatePersistedQueryList(\$name: String!, \$graphId: ID!) {\n  graph(id: \$graphId) {\n    createPersistedQueryList(name: \$name) {\n      ... on CreatePersistedQueryListResult {\n        persistedQueryList {\n          id\n        }\n      }\n    }\n  }\n}\",\"variables\":{\"name\":\"prod\",\"graphId\":\"$GRAPH_ID\"}}"
 )
 
 if [[ $HEADER != "" ]]; then
