@@ -43,6 +43,43 @@ environment_setup(){
         --role roles/iam.workloadIdentityUser \
         --member "serviceAccount:${PROJECT_ID}.svc.id.goog[monitoring/metrics-writer]" \
         "${CLUSTER_PREFIX:0:12}-metrics-writer@$PROJECT_ID.iam.gserviceaccount.com"
+
+    # Apollo GraphOS Operator setup
+    echo "Installing Apollo GraphOS Operator..."
+    kubectl create namespace apollo-operator --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create namespace apollo --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Create operator API key secret (requires OPERATOR_KEY to be set)
+    if [[ -n "$OPERATOR_KEY" ]]; then
+        kubectl create secret generic apollo-api-key \
+            --from-literal="APOLLO_KEY=$OPERATOR_KEY" \
+            -n apollo-operator \
+            --dry-run=client -o yaml | kubectl apply -f -
+        echo "Operator API key secret created"
+    else
+        echo "Warning: OPERATOR_KEY not set. Operator secret not created."
+    fi
+
+    # Install operator using Helm
+    if [[ $(which helm) != "" ]]; then
+        helm upgrade --install --atomic apollo-operator \
+            oci://registry-1.docker.io/apollograph/operator-chart \
+            -n apollo-operator \
+            --create-namespace \
+            -f - <<EOF
+apiKey:
+  secretName: apollo-api-key
+config:
+  controllers:
+    supergraph:
+      apiKeySecret: apollo-api-key
+EOF
+        echo "Apollo GraphOS Operator installed successfully"
+    else
+        echo "Warning: helm not found. Skipping operator installation."
+    fi
+    
+    echo "Setup complete for ${1}"
 }
 
 for c in "${PROJECT_CLUSTERS[@]}"; do

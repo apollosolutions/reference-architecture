@@ -1,0 +1,14 @@
+apiVersion: apollographql.com/v1alpha2
+kind: Subgraph
+metadata:
+  name: products
+  namespace: products
+  labels:
+    app: products
+    apollo.io/subgraph: "true"
+spec:
+  endpoint: http://graphql.products.svc.cluster.local:4001
+  schema:
+    ociImage:
+      reference: ghcr.io/${GITHUB_ORG}/reference-architecture/products:main
+      path: /app/schema.graphql

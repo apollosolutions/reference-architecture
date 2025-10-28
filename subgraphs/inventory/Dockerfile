@@ -10,9 +10,12 @@ RUN npm install --no-save
 COPY src ./src
 COPY tsconfig.json .
 COPY codegen.ts .
-COPY schema.graphql .
 
 RUN npm run build
+
+# Copy schema to /app directory for operator to access
+RUN mkdir -p /app
+COPY schema.graphql /app/schema.graphql
 
 EXPOSE 4001
 

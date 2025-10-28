@@ -1,0 +1,14 @@
+apiVersion: apollographql.com/v1alpha2
+kind: Subgraph
+metadata:
+  name: inventory
+  namespace: inventory
+  labels:
+    app: inventory
+    apollo.io/subgraph: "true"
+spec:
+  endpoint: http://graphql.inventory.svc.cluster.local:4001
+  schema:
+    ociImage:
+      reference: ghcr.io/${GITHUB_ORG}/reference-architecture/inventory:main
+      path: /app/schema.graphql

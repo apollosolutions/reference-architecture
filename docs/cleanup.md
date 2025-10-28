@@ -6,6 +6,30 @@ Running Google Cloud or AWS resources will continue to incur costs on your accou
 
 ### Automated cleanup
 
+### Delete Operator-Managed Resources
+
+Before deleting Kubernetes resources, first remove the operator-managed CRDs:
+
+```sh
+# For both dev and prod clusters
+kubectx apollo-supergraph-k8s-dev  # or apollo-supergraph-k8s-prod
+
+# Delete Supergraph resources (this deletes the router deployment)
+kubectl delete supergraphs reference-architecture-dev -n apollo
+
+# Delete SupergraphSchema resources
+kubectl delete supergraphschemas reference-architecture-dev -n apollo
+
+# Delete Subgraph resources
+kubectl delete subgraph --all --all-namespaces
+
+# Uninstall the Apollo GraphOS Operator
+helm uninstall apollo-operator -n apollo-operator
+
+# Delete operator namespaces
+kubectl delete namespace apollo-operator apollo
+```
+
 ### Cloud-specific steps
 
 There are a few cloud-specific steps you'll need to take.

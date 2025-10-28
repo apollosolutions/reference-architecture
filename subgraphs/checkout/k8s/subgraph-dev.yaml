@@ -1,0 +1,15 @@
+apiVersion: apollographql.com/v1alpha2
+kind: Subgraph
+metadata:
+  name: checkout
+  namespace: checkout
+  labels:
+    app: checkout
+    apollo.io/subgraph: "true"
+spec:
+  endpoint: http://graphql.checkout.svc.cluster.local:4001
+  schema:
+    ociImage:
+      reference: ghcr.io/${GITHUB_ORG}/reference-architecture/checkout:main
+      path: /app/schema.graphql
+
