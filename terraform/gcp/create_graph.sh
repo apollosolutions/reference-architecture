@@ -41,16 +41,36 @@ if [[ $ACCOUNT_ID == "" ]]; then
   ACCOUNT_RESP=$(curl "${ACCOUNT_ARGS[@]}")
   ACCOUNT_COUNT=$(echo $ACCOUNT_RESP | jq -r ".data.me.memberships | length")
 
-  # if more than one account exists, exit early
+  # if more than one account exists, ask user to choose
   if [[ $ACCOUNT_COUNT > 1 ]]; then
     echo "Apollo Studio returned more than one account."
-    echo "Specify an account ID with ACCOUNT_ID=myaccount $0"
-    echo "Accounts: "
-    echo $(echo $ACCOUNT_RESP | jq -r ".data.me.memberships[].account.id")
-    exit 1
+    echo "Please select an account to use:"
+    echo ""
+    
+    # Store account IDs in array
+    ACCOUNT_IDS=($(echo $ACCOUNT_RESP | jq -r ".data.me.memberships[].account.id"))
+    
+    # Display numbered list of accounts
+    INDEX=1
+    for account_id in "${ACCOUNT_IDS[@]}"; do
+      echo "  $INDEX) $account_id"
+      ((INDEX++))
+    done
+    
+    echo ""
+    read -p "Enter the number of the account to use (1-$ACCOUNT_COUNT): " SELECTION
+    
+    # Validate selection
+    if [[ ! "$SELECTION" =~ ^[0-9]+$ ]] || [[ "$SELECTION" -lt 1 ]] || [[ "$SELECTION" -gt $ACCOUNT_COUNT ]]; then
+      echo "Invalid selection. Please run the script again and choose a valid number."
+      exit 1
+    fi
+    
+    ACCOUNT_ID=${ACCOUNT_IDS[$((SELECTION - 1))]}
+    echo "Selected account: $ACCOUNT_ID"
+  else
+    ACCOUNT_ID=$(echo $ACCOUNT_RESP | jq -r ".data.me.memberships[0].account.id")
   fi
-
-  ACCOUNT_ID=$(echo $ACCOUNT_RESP | jq -r ".data.me.memberships[0].account.id")
 fi
 
 echo "Creating graph $GRAPH_ID on account $ACCOUNT_ID..."
