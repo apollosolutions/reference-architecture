@@ -1,0 +1,65 @@
+# Default values for router.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+router:
+  router:
+    configuration:
+      # duplicated in environments/prod.yaml
+      health_check:
+        listen: 0.0.0.0:8080
+      sandbox:
+        enabled: true
+      homepage:
+        enabled: false
+      supergraph:
+        introspection: true
+      include_subgraph_errors:
+        all: true
+      plugins:
+        experimental.expose_query_plan: true
+      rhai:
+        scripts: /dist/rhai
+        main: main.rhai
+      authentication:
+        router:
+          jwt:
+            jwks:
+              - url: http://graphql.users.svc.cluster.local:4001/.well-known/jwks.json
+      authorization:
+        preview_directives:
+          enabled: true
+      cors: 
+        allow_any_origin: true
+      coprocessor:
+        url: http://coprocessor.coprocessor.svc.cluster.local:8081
+        timeout: 2s
+        router:
+          request:
+            headers: true # These boolean properties indicate which request data to include in the coprocessor request. All are optional and false by default.
+        subgraph:
+          all:
+            request:
+              headers: true
+            response:
+              headers: true
+
+  extraVolumeMounts:
+    - name: rhai-volume
+      mountPath: /dist/rhai
+      readOnly: true
+  extraVolumes:
+    - name: rhai-volume
+      configMap:
+        # Provide the name of the ConfigMap containing the files you want
+        # to add to the container
+        name: rhai-config
+  ngress:
+    enabled: false
+  service:
+    annotations:
+      cloud.google.com/backend-config: '{"default": "http-hc-config"}'
+ingress:
+  enabled: true
+  gcp: true
+  name: router

@@ -1,0 +1,58 @@
+router:
+  router:
+    configuration:
+      # duplicated from ../values.yaml
+      health_check:
+        listen: 0.0.0.0:8080
+      sandbox:
+        enabled: true
+      homepage:
+        enabled: false
+      supergraph:
+        introspection: true
+      include_subgraph_errors:
+        all: true
+      plugins:
+        experimental.expose_query_plan: true
+      cors: 
+        allow_any_origin: true
+      persisted_queries:
+        enabled: true
+        log_unknown: true
+        safelist:
+          enabled: false
+          require_id: false
+      rhai:
+        scripts: /dist/rhai
+        main: main.rhai
+      authentication:
+        router:
+          jwt:
+            jwks:
+              - url: http://graphql.users.svc.cluster.local:4001/.well-known/jwks.json
+      authorization:
+        preview_directives:
+          enabled: true
+      # end duplication
+      telemetry:
+        apollo:
+          field_level_instrumentation_sampler: 0.5
+        exporters:      
+          tracing:
+            otlp:
+              endpoint: http://collector.monitoring:4317
+              protocol: grpc
+              enabled: true
+            common:
+              sampler: 0.5
+              service_name: "router"
+              service_namespace: "router"
+          metrics:
+            otlp:
+              endpoint: http://collector.monitoring:4317
+              protocol: grpc
+              enabled: true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
