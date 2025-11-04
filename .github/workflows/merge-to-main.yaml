@@ -28,7 +28,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -65,7 +65,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -105,7 +105,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -126,45 +126,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  deploy_gcp:
-    if: needs.determine_cloud_provider.outputs.gcp == 'true'
-    needs: [determine_cloud_provider, build-and-push-subgraph-image, build-and-push-client-image]
-    uses: ./.github/workflows/_deploy-subgraphs-gke.yaml
-    secrets: inherit
-    strategy:
-      matrix:
-        subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
-    with:
-      version: main
-      app_name: ${{ matrix.subgraph }}
-      cluster_suffix: dev
-
-  deploy_aws:
-    if: needs.determine_cloud_provider.outputs.aws == 'true'
-    needs: [determine_cloud_provider, build-and-push-subgraph-image, build-and-push-client-image]
-    uses: ./.github/workflows/_deploy-subgraphs-aws.yaml
-    secrets: inherit
-    strategy:
-      matrix:
-        subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
-    with:
-      version: main
-      app_name: ${{ matrix.subgraph }}
-      cluster_suffix: dev
-      region: us-east-1
-
-  publish:
-    needs: [determine_cloud_provider]
-    uses: ./.github/workflows/_rover-subgraph-publish.yml
-    secrets: inherit
-    strategy:
-      matrix:
-        subgraph: [checkout, discovery, inventory, orders, products, reviews, shipping, users]
-    if: always() &&
-      (needs.determine_cloud_provider.outputs.apollo == 'true')
-    with:
-      subgraph_name: ${{ matrix.subgraph }} # change to subgraph-b in that repo
-      variant: dev
+  # Subgraph deployment is now handled by the operator
+  # No manual deployment or publishing needed
   
   publish_pqs:
     uses: ./.github/workflows/_rover-client-pq-publish.yml
