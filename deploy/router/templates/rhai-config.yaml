@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rhai-config
+  labels:
+    {{- include "router.labels" . | nindent 4 }}
+data:
+  {{- (.Files.Glob "rhai/*").AsConfig | nindent 2 }}

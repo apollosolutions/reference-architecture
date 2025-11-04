@@ -52,17 +52,17 @@ git pull
 - [kubectx](https://github.com/ahmetb/kubectx#installation)
 - [Github CLI](https://cli.github.com/)
 - [jq](https://stedolan.github.io/jq/download/)
-- [Rover CLI](https://www.apollographql.com/docs/rover/getting-started/) (for creating operator API keys)
-- [Helm](https://helm.sh/docs/intro/install/) (for installing the operator)
 
 #### GCP
 
 - [GCloud CLI](https://cloud.google.com/sdk/docs/install)
+- Optional: [Helm](https://helm.sh/docs/intro/install/)
 
 #### AWS
 
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 - [eksctl](https://eksctl.io/introduction/#installation)
+- Optional: [Helm](https://helm.sh/docs/intro/install/)
 
 
 <!-- #### Minikube
@@ -138,8 +138,6 @@ Run this script to create your graph and get environment variables for GraphOS:
 source .env
 ./create_graph.sh
 ```
-
-**Note:** With the Apollo GraphOS Operator, this script no longer publishes subgraph schemas to GraphOS. The schemas will be automatically published by the operator when Subgraph CRDs are deployed.
 
 The script adds a few more environment variables to `.env`, so reload your environment using:
 
@@ -261,14 +259,8 @@ For both `dev` and `prod` clusters:
   - Configures namespace, service account, and role bindings for Open Telemetry and Google Traces.
 - For AWS users:
   - Configures load balancer controller policy and IAM service account
-- **New**: Installs the Apollo GraphOS Operator via Helm
-- **New**: Creates the `apollo-operator` and `apollo` namespaces
-- **New**: Creates the operator API key secret
-<!-- - **New**: Creates the Rhai ConfigMap for router scripts -->
 
 </details>
-
-**Note**: The `create_graph.sh` script automatically creates an Operator API key using the Platform API. This key is exported as `OPERATOR_KEY` in your `.env` file and will be used by `setup_clusters.sh` to configure the operator secret.
 
 After this completes, you're ready to deploy your subgraphs!
 
@@ -280,32 +272,23 @@ After this completes, you're ready to deploy your subgraphs!
 
 ### Deploy subgraphs to dev
 
-Deploy the subgraph services and register them with the operator:
-
 ```sh
-kubectx apollo-supergraph-k8s-dev
-
-# Deploy each subgraph service
-for subgraph in checkout discovery inventory orders products reviews shipping users; do
-  kubectl create namespace $subgraph --dry-run=client -o yaml | kubectl apply -f -
-  helm install $subgraph subgraphs/$subgraph/deploy -f subgraphs/$subgraph/deploy/environments/dev.yaml -n $subgraph
-  kubectl apply -f subgraphs/$subgraph/k8s/subgraph-dev.yaml
-done
+gh workflow run "Merge to Main" --repo $GITHUB_ORG/reference-architecture
+# this deploys a dependency for prod, see note below
+gh workflow run "Deploy Open Telemetry Collector" --repo $GITHUB_ORG/reference-architecture
 ```
 
-The operator will automatically publish schemas to GraphOS and trigger composition. You can monitor the progress:
+<details>
+  <summary>Note about "initial commit" errors</summary>
 
-```sh
-# Check if subgraphs are registered
-kubectl get subgraphs --all-namespaces
+When terraform creates the repositories, they immediately kick off initial workflow runs. But as the secrets needed are not available at that point, the "initial commit" runs will fail. As a result, we're just re-running them with the commands above to ensure the environments are correctly deployed.
 
-# Check composition status
-kubectl describe supergraphschemas reference-architecture-dev -n apollo
-```
+</details>
 
 You can try out a subgraph using port forwarding:
 
 ```sh
+kubectx apollo-supergraph-k8s-dev
 kubectl port-forward service/graphql -n checkout 4001:4001
 ```
 
@@ -313,112 +296,55 @@ Then visit [http://localhost:4001/](http://localhost:4001/).
 
 ### Deploy subgraphs to prod
 
-Deploy the subgraphs to production using the same process:
+Commits to the `main` branch of the subgraph repos are automatically built and deployed to the `dev` cluster. To deploy to prod, run the deploy actions:
+
+```sh
+  gh workflow run "Manual Deploy - Subgraphs" --repo $GITHUB_ORG/reference-architecture \
+    -f version=main \
+    -f environment=prod \
+    -f dry-run=false \
+    -f debug=false
+```
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-
-# Deploy each subgraph service
-for subgraph in checkout discovery inventory orders products reviews shipping users; do
-  kubectl create namespace $subgraph --dry-run=client -o yaml | kubectl apply -f -
-  helm install $subgraph subgraphs/$subgraph/deploy -f subgraphs/$subgraph/deploy/environments/prod.yaml -n $subgraph
-  kubectl apply -f subgraphs/$subgraph/k8s/subgraph-prod.yaml
-done
+kubectl port-forward service/graphql -n checkout 4001:4001
 ```
 
-Monitor the deployment:
-
-```sh
-# Check if subgraphs are registered
-kubectl get subgraphs --all-namespaces
-
-# Check composition status
-kubectl describe supergraphschemas reference-architecture-prod -n apollo
-```
-
-You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router and Coprocessor. 
+Then visit [http://localhost:4001/](http://localhost:4001/). You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router and Coprocessor. 
 
 
 ### Deploy the coprocessor and router
 
-Deploy the coprocessor first:
+To do so, we'll need to run:
 
 ```sh
-# Deploy to dev (with envsubst for variable substitution)
-kubectx apollo-supergraph-k8s-dev
-if command -v envsubst &> /dev/null; then
-  envsubst < deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
-else
-  # Fallback if envsubst not available
-  sed "s|\${GITHUB_ORG}|${GITHUB_ORG:-apollosolutions}|g" deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
-fi
+gh workflow run "Deploy Coprocessor" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=dev \
+  -f dry-run=false \
+  -f debug=false
 
-# Deploy to prod
-kubectx apollo-supergraph-k8s-prod
-if command -v envsubst &> /dev/null; then
-  envsubst < deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
-else
-  # Fallback if envsubst not available
-  sed "s|\${GITHUB_ORG}|${GITHUB_ORG:-apollosolutions}|g" deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
-fi
+gh workflow run "Deploy Coprocessor" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=prod \
+  -f dry-run=false \
+  -f debug=false
 ```
 
-Once the coprocessor is deployed, deploy the router using the operator Supergraph CRDs:
-
-**Note:** Make sure you've sourced the `.env` file from your terraform directory first to set `TF_VAR_apollo_graph_id`:
+First, and once the deploy completes, we'll deploy the router:
 
 ```sh
-cd terraform/gcp  # or terraform/aws, terraform/minikube
-source .env
-cd ../..
+gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=dev \
+  -f dry-run=false \
+  -f debug=false
+
+gh workflow run "Deploy Router" --repo $GITHUB_ORG/reference-architecture \
+  -f environment=prod \
+  -f dry-run=false \
+  -f debug=false
 ```
 
-Then deploy the operator resources:
-
-```sh
-# Deploy to dev
-kubectx apollo-supergraph-k8s-dev
-cd deploy/operator-resources
-./apply-resources.sh dev
-cd ../..
-
-# Deploy to prod
-kubectx apollo-supergraph-k8s-prod
-cd deploy/operator-resources
-./apply-resources.sh prod
-cd ../..
-```
-
-Or manually apply with kubectl:
-
-```sh
-# Deploy to dev (with envsubst for variable substitution)
-kubectx apollo-supergraph-k8s-dev
-envsubst < deploy/operator-resources/supergraphschema-dev.yaml | kubectl apply -f -
-kubectl apply -f deploy/operator-resources/supergraph-dev.yaml
-kubectl apply -f deploy/operator-resources/ingress-dev.yaml
-
-# Deploy to prod
-kubectx apollo-supergraph-k8s-prod
-envsubst < deploy/operator-resources/supergraphschema-prod.yaml | kubectl apply -f -
-kubectl apply -f deploy/operator-resources/supergraph-prod.yaml
-kubectl apply -f deploy/operator-resources/ingress-prod.yaml
-```
-
-The operator will automatically deploy the router based on the composed supergraph schema. You can monitor the deployment:
-
-```sh
-# Check router deployment status
-kubectl get supergraphs -n apollo
-
-# Check router pods
-kubectl get pods -n apollo
-
-# Describe the supergraph to see conditions
-kubectl describe supergraphs reference-architecture-prod -n apollo
-```
-
-Once deployed, an ingress will be created to access the router. In the case of AWS, it will be a domain name, and in the case of GCP, it'll be an IP. 
+Which will deploy the router and coprocessor into both environments (`dev` and `prod`), as well as an ingress to access the router on both. In the case of AWS, it will be a domain name, and in the case of GCP, it'll be an IP. 
 
 Follow the below instructions for your cloud provider you are using. Please note that for both providers, the value for the ingress may take some time to become live, so you may need to give it a few minutes to process. 
 
@@ -426,7 +352,7 @@ Follow the below instructions for your cloud provider you are using. Please note
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=http://$(kubectl get ingress -n apollo -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
+ROUTER_HOSTNAME=http://$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
 open $ROUTER_HOSTNAME
 ```
 
@@ -434,7 +360,7 @@ open $ROUTER_HOSTNAME
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=$(kubectl get ingress -n apollo -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
+ROUTER_HOSTNAME=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
 open http://$ROUTER_HOSTNAME
 ```
 
@@ -454,7 +380,7 @@ The last step to getting fully configured is to deploy the client to both enviro
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=http://$(kubectl get ingress -n apollo -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
+ROUTER_HOSTNAME=http://$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
 ```
 
 Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
@@ -463,7 +389,7 @@ Upon running the above commands, you'll have the Router page open and you can ma
 
 ```sh
 kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=$(kubectl get ingress -n apollo -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
+ROUTER_HOSTNAME=$(kubectl get ingress -n router -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
 ```
 
 Once you have the router hostname, you'll need to set it as a secret in the GitHub repository created.
