@@ -1,0 +1,19 @@
+apiVersion: apollographql.com/v1alpha2
+kind: Supergraph
+metadata:
+  name: reference-architecture-dev
+  namespace: apollo
+spec:
+  replicas: 1
+  serviceName: router
+  podTemplate:
+    routerVersion: 1.37.0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+  schema:
+    resource:
+      name: reference-architecture-dev
+      namespace: apollo
+

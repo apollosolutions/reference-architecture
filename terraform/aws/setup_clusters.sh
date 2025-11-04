@@ -3,17 +3,12 @@ set -euxo pipefail
 
 # default vars
 CLUSTER_PREFIX=${CLUSTER_PREFIX:-"apollo-supergraph-k8s"}
-PROJECT_REGION=${PROJECT_REGION:-"us-east-1"}
+PROJECT_REGION=${PROJECT_REGION:-"us-east1"}
 PROJECT_CLUSTERS=("${CLUSTER_PREFIX}-dev" "${CLUSTER_PREFIX}-prod")
 # end default vars
 
-if [[ $(which aws) == "" ]]; then
-  echo "aws not installed; please visit https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
-  exit 1
-fi
-
-if [[ $(which eksctl) == "" ]]; then 
-  echo "eksctl not installed; please visit https://eksctl.io/introduction/?h=install#installation"
+if [[ $(which gcloud) == "" ]]; then
+  echo "gcloud not installed"
   exit 1
 fi
 
@@ -27,44 +22,64 @@ if [[ $(which kubectx) == "" ]]; then
   exit 1
 fi
 
-# get AWS account ID (numeric)
-ACCOUNT_ID=`aws sts get-caller-identity --output text --query Account`
-
-curl -o iam_policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.4.4/docs/install/iam_policy.json
-aws iam create-policy \
-    --policy-name AWSLoadBalancerControllerIAMPolicy \
-    --policy-document file://iam_policy.json || echo ""
-curl -Lo v2_4_4_ingclass.yaml https://github.com/kubernetes-sigs/aws-load-balancer-controller/releases/download/v2.4.4/v2_4_4_ingclass.yaml
+if [[ -z "$PROJECT_ID" ]]; then
+  echo "Must provide PROJECT_ID in environment" 1>&2
+  exit 1
+fi
 
 environment_setup(){
     echo "Configuring Kubeconfig for ${1}..."
-    # https://docs.aws.amazon.com/eks/latest/userguide/getting-started-console.html#eks-configure-kubectl
-    eksctl utils write-kubeconfig --cluster=${1} --region=${PROJECT_REGION}
-    kubectx ${1}=.
-    # https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html
-    # install LB Controller 
-    kubectl apply \
-      --validate=false \
-      -f https://github.com/jetstack/cert-manager/releases/download/v1.5.4/cert-manager.yaml
-    sleep 15
+    gcloud container clusters get-credentials ${1} --zone ${PROJECT_REGION} --project ${PROJECT_ID}
 
-    # there may need more done in order to work- see step 5 in the above link
-    # create necessary service account
-    eksctl create iamserviceaccount \
-      --cluster=${1} \
-      --namespace=kube-system \
-      --name="aws-load-balancer-controller" \
-      --role-name "AmazonEKSLoadBalancerControllerRole-${1}" \
-      --attach-policy-arn=arn:aws:iam::${ACCOUNT_ID}:policy/AWSLoadBalancerControllerIAMPolicy \
-      --approve \
-      --region ${PROJECT_REGION} \
-      --override-existing-serviceaccounts
-    curl -Lo v2_4_4_full.yaml https://github.com/kubernetes-sigs/aws-load-balancer-controller/releases/download/v2.4.4/v2_4_4_full.yaml
-    sed -i.bak -e '480,488d' ./v2_4_4_full.yaml
-    sed -i.bak -e "s|your-cluster-name|${1}|" ./v2_4_4_full.yaml
-    kubectl apply -f v2_4_4_full.yaml
-    kubectl apply -f v2_4_4_ingclass.yaml
-    # validate with: kubectl get deployment -n kube-system aws-load-balancer-controller
+    # short context aliases: supports `kubectx apollo-supergraph-k8s-dev`
+    kubectx ${1}=.
+
+    # monitoring setup: namespace, service account, and binding
+    # the service account name matches the otel collector's service account in its helm chart
+    kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create serviceaccount -n "monitoring" "metrics-writer" --dry-run=client -o yaml | kubectl apply -f -
+    kubectl annotate serviceaccount -n "monitoring" "metrics-writer" "iam.gke.io/gcp-service-account=${CLUSTER_PREFIX:0:12}-metrics-writer@$PROJECT_ID.iam.gserviceaccount.com" --overwrite
+    gcloud iam service-accounts add-iam-policy-binding \
+        --role roles/iam.workloadIdentityUser \
+        --member "serviceAccount:${PROJECT_ID}.svc.id.goog[monitoring/metrics-writer]" \
+        "${CLUSTER_PREFIX:0:12}-metrics-writer@$PROJECT_ID.iam.gserviceaccount.com"
+
+    # Apollo GraphOS Operator setup
+    echo "Installing Apollo GraphOS Operator..."
+    kubectl create namespace apollo-operator --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create namespace apollo --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Create operator API key secret (requires OPERATOR_KEY to be set)
+    if [[ -n "$OPERATOR_KEY" ]]; then
+        kubectl create secret generic apollo-api-key \
+            --from-literal="APOLLO_KEY=$OPERATOR_KEY" \
+            -n apollo-operator \
+            --dry-run=client -o yaml | kubectl apply -f -
+        echo "Operator API key secret created"
+    else
+        echo "Warning: OPERATOR_KEY not set. Operator secret not created."
+    fi
+
+    # Install operator using Helm
+    if [[ $(which helm) != "" ]]; then
+        helm upgrade --install --atomic apollo-operator \
+            oci://registry-1.docker.io/apollograph/operator-chart \
+            -n apollo-operator \
+            --create-namespace \
+            -f - <<EOF
+apiKey:
+  secretName: apollo-api-key
+config:
+  controllers:
+    supergraph:
+      apiKeySecret: apollo-api-key
+EOF
+        echo "Apollo GraphOS Operator installed successfully"
+    else
+        echo "Warning: helm not found. Skipping operator installation."
+    fi
+    
+    echo "Setup complete for ${1}"
 }
 
 for c in "${PROJECT_CLUSTERS[@]}"; do

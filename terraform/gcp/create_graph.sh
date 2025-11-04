@@ -79,22 +79,70 @@ fi
 
 GRAPH_KEY=$(echo $CREATE_RESP | jq -r ".data.newService.apiKeys[0].token")
 
+# Create Operator API key for the operator to use
+echo "Creating Operator API key..."
+
+CREATE_OPERATOR_KEY_ARGS=(
+  --silent
+  --header "x-api-key: $APOLLO_KEY"
+  --header "apollographql-client-name: reference-architecture"
+  --header "apollographql-client-version: 1.0"
+  --header 'content-type: application/json'
+  --url 'https://api.apollographql.com/api/graphql'
+  --data "{\"query\":\"mutation CreateOperatorKey(\$name: String!, \$type: GraphOsKeyType!, \$organizationId: ID!) { organization(id: \$organizationId) { createKey(name: \$name, type: \$type) { id keyName expiresAt token } } }\",\"variables\":{\"name\":\"operator\",\"type\":\"OPERATOR\",\"organizationId\":\"$ACCOUNT_ID\"}}"
+)
+
+CREATE_OPERATOR_KEY_RESP=$(curl "${CREATE_OPERATOR_KEY_ARGS[@]}")
+
+OPERATOR_KEY=$(echo $CREATE_OPERATOR_KEY_RESP | jq -r ".data.organization.createKey.token")
+if [[ "$OPERATOR_KEY" == "null" ]]; then
+  echo "Error creating operator key"
+  echo $CREATE_OPERATOR_KEY_RESP | jq .
+  exit 1
+fi
+
+echo "Operator key created successfully"
+
+# Note: Subgraph schema publishing is now handled by the Apollo GraphOS Operator
+# when Subgraph CRDs are deployed. No manual rover publish commands needed.
+# We create variants by publishing dummy subgraphs to them.
+
+echo "Creating dev and prod variants by publishing dummy subgraphs..."
+
 for variant in "${VARIANTS[@]}"; do
-  for folder in ../../subgraphs/*; do
-    if [[ $folder == *"node_modules"* ]]; then
-      continue
-    fi
-    rover subgraph publish $GRAPH_ID@$variant --name $(basename $folder) --routing-url http://graphql.$(basename $folder).svc.cluster.local:4001 --schema $folder/schema.graphql --client-timeout 120
-  done
+  echo "Creating variant: $variant"
+  
+  PUBLISH_ARGS=(
+    --silent
+    --header "x-api-key: $GRAPH_KEY"
+    --header "apollographql-client-name: reference-architecture"
+    --header "apollographql-client-version: 1.0"
+    --header 'content-type: application/json'
+    --url 'https://api.apollographql.com/api/graphql'
+    --data "{\"query\":\"mutation PublishSubgraph(\$graphId: ID!, \$graphVariant: String!, \$name: String!, \$revision: String!, \$activePartialSchema: PartialSchemaInput!, \$url: String) { graph(id: \$graphId) { publishSubgraph(graphVariant: \$graphVariant, name: \$name, revision: \$revision, activePartialSchema: \$activePartialSchema, url: \$url) { subgraphsCreated errors { message locations { column line } code } wasCreated wasUpdated } } }\",\"variables\":{\"graphId\":\"$GRAPH_ID\",\"graphVariant\":\"$variant\",\"name\":\"temp-subgraph\",\"revision\":\"1\",\"activePartialSchema\":{\"sdl\":\"type Query { temp: String }\"},\"url\":\"http://localhost:1234\"}}"
+  )
+  
+  PUBLISH_RESP=$(curl "${PUBLISH_ARGS[@]}")
+  
+  if [[ $(echo $PUBLISH_RESP | jq -r ".data.graph.publishSubgraph.errors | length") > 0 ]]; then
+    echo "Error creating variant $variant"
+    echo $PUBLISH_RESP | jq .
+    exit 1
+  fi
+  
+  echo "Created variant: $variant"
 done
 
+# Create persisted query lists for dev and prod
 # dev
 CREATE_PQ_ARGS_DEV=(
     --silent
     --header "x-api-key: $APOLLO_KEY"
     --header 'content-type: application/json'
-    --url 'https://graphql.api.apollographql.com/api/graphql'
-    --data "{\"query\":\"mutation CreatePersistedQueryList(\$name: String!, \$graphId: ID!, \$linkedVariants: [String!]) {\n  graph(id: \$graphId) {\n    createPersistedQueryList(name: \$name, linkedVariants: \$linkedVariants) {\n      ... on CreatePersistedQueryListResult {\n        persistedQueryList {\n          id\n        }\n      }\n    }\n  }\n}\",\"variables\":{\"name\":\"dev\",\"graphId\":\"$GRAPH_ID\",\"linkedVariants\":[\"$GRAPH_ID@dev\"]}}"
+    --header 'apollographql-client-name: reference-architecture'
+    --header 'apollographql-client-version: 1.0'
+    --url 'https://api.apollographql.com/api/graphql'
+    --data "{\"query\":\"mutation CreatePersistedQueryList(\$name: String!, \$graphId: ID!) { graph(id: \$graphId) { createPersistedQueryList(name: \$name) { ... on CreatePersistedQueryListResult { persistedQueryList { id } } } } }\",\"variables\":{\"name\":\"dev\",\"graphId\":\"$GRAPH_ID\"}}"
 )
 
 if [[ $HEADER != "" ]]; then
@@ -116,9 +164,11 @@ UPDATE_DEV_PQ_LIST_ARGS=(
     --silent
     --request POST 
     --header "x-api-key: $APOLLO_KEY"
-    --header 'content-type: application/json' 
-    --url 'https://graphql.api.apollographql.com/api/graphql' 
-    --data "{\"query\":\"mutation LinkPersistedQueryList(\$persistedQueryListId: ID!, \$name: String!, \$graphId: ID!) {\\n  graph(id: \$graphId) {\\n    variant(name: \$name) {\\n      linkPersistedQueryList(persistedQueryListId: \$persistedQueryListId) {\\n    __typename    ... on LinkPersistedQueryListResult {\\n          persistedQueryList {\\n            id\\n          }\\n        }\\n      }\\n    }\\n  }\\n}\",\"variables\":{\"persistedQueryListId\":\"$DEV_PQ_ID\",\"name\":\"dev\",\"graphId\":\"$GRAPH_ID\"}}"
+    --header 'content-type: application/json'
+    --header 'apollographql-client-name: reference-architecture'
+    --header 'apollographql-client-version: 1.0'
+    --url 'https://api.apollographql.com/api/graphql' 
+    --data "{\"query\":\"mutation LinkPersistedQueryList(\$persistedQueryListId: ID!, \$name: String!, \$graphId: ID!) { graph(id: \$graphId) { variant(name: \$name) { linkPersistedQueryList(persistedQueryListId: \$persistedQueryListId) { __typename ... on ListNotFoundError { listId message } ... on PermissionError { message } ... on VariantAlreadyLinkedError { message } } } } }\",\"variables\":{\"persistedQueryListId\":\"$DEV_PQ_ID\",\"name\":\"dev\",\"graphId\":\"$GRAPH_ID\"}}"
 )
 
 if [[ $HEADER != "" ]]; then
@@ -127,10 +177,10 @@ fi
 
 UPDATE_DEV_PQ_LIST_RESP=$(curl "${UPDATE_DEV_PQ_LIST_ARGS[@]}")
 
-IS_SUCCESS=$(echo $UPDATE_DEV_PQ_LIST_RESP | jq -r ".data.graph.variant.linkPersistedQueryList.persistedQueryList")
-if [[ "$IS_SUCCESS" == "null" ]]; then
-  echo "Error updating pq list for dev"
-  echo ${UPDATE_DEV_PQ_LIST_ARGS[@]}
+# Check for errors in the response
+ERROR_TYPE=$(echo $UPDATE_DEV_PQ_LIST_RESP | jq -r ".data.graph.variant.linkPersistedQueryList.__typename")
+if [[ "$ERROR_TYPE" == "ListNotFoundError" ]] || [[ "$ERROR_TYPE" == "PermissionError" ]] || [[ "$ERROR_TYPE" == "VariantAlreadyLinkedError" ]]; then
+  echo "Error linking pq list for dev"
   echo $UPDATE_DEV_PQ_LIST_RESP | jq .
   exit 1
 fi
@@ -140,8 +190,10 @@ CREATE_PQ_ARGS_PROD=(
     --silent
     --header "x-api-key: $APOLLO_KEY"
     --header 'content-type: application/json'
-    --url 'https://graphql.api.apollographql.com/api/graphql'
-    --data "{\"query\":\"mutation CreatePersistedQueryList(\$name: String!, \$graphId: ID!, \$linkedVariants: [String!]) {\n  graph(id: \$graphId) {\n    createPersistedQueryList(name: \$name, linkedVariants: \$linkedVariants) {\n      ... on CreatePersistedQueryListResult {\n        persistedQueryList {\n          id\n        }\n      }\n    }\n  }\n}\",\"variables\":{\"name\":\"prod\",\"graphId\":\"$GRAPH_ID\",\"linkedVariants\":[\"prod\"]}}"
+    --header 'apollographql-client-name: reference-architecture'
+    --header 'apollographql-client-version: 1.0'
+    --url 'https://api.apollographql.com/api/graphql'
+    --data "{\"query\":\"mutation CreatePersistedQueryList(\$name: String!, \$graphId: ID!) { graph(id: \$graphId) { createPersistedQueryList(name: \$name) { ... on CreatePersistedQueryListResult { persistedQueryList { id } } } } }\",\"variables\":{\"name\":\"prod\",\"graphId\":\"$GRAPH_ID\"}}"
 )
 
 if [[ $HEADER != "" ]]; then
@@ -162,9 +214,11 @@ UPDATE_PROD_PQ_LIST_ARGS=(
     --silent
     --request POST 
     --header "x-api-key: $APOLLO_KEY"
-    --header 'content-type: application/json' 
-    --url 'https://graphql.api.apollographql.com/api/graphql' 
-    --data "{\"query\":\"mutation LinkPersistedQueryList(\$persistedQueryListId: ID!, \$name: String!, \$graphId: ID!) {\\n  graph(id: \$graphId) {\\n    variant(name: \$name) {\\n      linkPersistedQueryList(persistedQueryListId: \$persistedQueryListId) {\\n        ... on LinkPersistedQueryListResult {\\n          persistedQueryList {\\n            id\\n          }\\n        }\\n      }\\n    }\\n  }\\n}\",\"variables\":{\"persistedQueryListId\":\"$PROD_PQ_ID\",\"name\":\"prod\",\"graphId\":\"$GRAPH_ID\"}}"
+    --header 'content-type: application/json'
+    --header 'apollographql-client-name: reference-architecture'
+    --header 'apollographql-client-version: 1.0'
+    --url 'https://api.apollographql.com/api/graphql' 
+    --data "{\"query\":\"mutation LinkPersistedQueryList(\$persistedQueryListId: ID!, \$name: String!, \$graphId: ID!) { graph(id: \$graphId) { variant(name: \$name) { linkPersistedQueryList(persistedQueryListId: \$persistedQueryListId) { __typename ... on ListNotFoundError { listId message } ... on PermissionError { message } ... on VariantAlreadyLinkedError { message } } } } }\",\"variables\":{\"persistedQueryListId\":\"$PROD_PQ_ID\",\"name\":\"prod\",\"graphId\":\"$GRAPH_ID\"}}"
 )
 if [[ $HEADER != "" ]]; then
   UPDATE_PROD_PQ_LIST_ARGS+=(--header "$HEADER")
@@ -172,10 +226,11 @@ fi
 
 UPDATE_PROD_PQ_LIST_RESP=$(curl "${UPDATE_PROD_PQ_LIST_ARGS[@]}")
 
-IS_SUCCESS=$(echo $UPDATE_PROD_PQ_LIST_RESP | jq -r ".data.graph.variant.linkPersistedQueryList.persistedQueryList")
-if [[ "$IS_SUCCESS" == "null" ]]; then
-  echo "Error updating pq list for prod"
-  echo $CREATE_PQ_PROD_RESP | jq .
+# Check for errors in the response
+ERROR_TYPE=$(echo $UPDATE_PROD_PQ_LIST_RESP | jq -r ".data.graph.variant.linkPersistedQueryList.__typename")
+if [[ "$ERROR_TYPE" == "ListNotFoundError" ]] || [[ "$ERROR_TYPE" == "PermissionError" ]] || [[ "$ERROR_TYPE" == "VariantAlreadyLinkedError" ]]; then
+  echo "Error linking pq list for prod"
+  echo $UPDATE_PROD_PQ_LIST_RESP | jq .
   exit 1
 fi
 
@@ -186,5 +241,7 @@ echo "export TF_VAR_apollo_key=\"$GRAPH_KEY\"" >> .env
 echo "export TF_VAR_apollo_graph_id=\"$GRAPH_ID\"" >> .env
 echo "export TF_VAR_pq_dev_id=\"$DEV_PQ_ID\"" >> .env
 echo "export TF_VAR_pq_prod_id=\"$PROD_PQ_ID\"" >> .env
+echo "export OPERATOR_KEY=\"$OPERATOR_KEY\"" >> .env
+echo "export GITHUB_ORG=\"$(git remote get-url origin 2>/dev/null | sed -E 's|.*github.com/([^/]+)/.*|\1|' || echo 'apollosolutions')\"" >> .env
 echo '' >> .env
 echo 'Re-run `source .env` to load them.'

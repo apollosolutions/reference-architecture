@@ -4,14 +4,14 @@ This repository contains a reference architecture utilizing [Kubernetes](https:/
 
 Once the architecture is fully stood up, you'll have: 
 
-- An Apollo Router running utilizing:
+- An Apollo Router running and managed by the [Apollo GraphOS Operator](https://www.apollographql.com/docs/apollo-operator/), utilizing:
   - [Persisted Queries for safelisting operations](https://www.apollographql.com/docs/router/configuration/persisted-queries/#differences-from-automatic-persisted-queries)
   - [A coprocessor for handling customizations outside of the router](https://www.apollographql.com/docs/router/customizations/coprocessor)
   - [Rhai scripts to do basic customizations within the router container](https://www.apollographql.com/docs/router/customizations/rhai)
   - [Authorization/Authentication directives](https://www.apollographql.com/docs/router/configuration/authorization)
-- Eight subgraphs, each handling a portion of the overall supergraph schema
+- Eight subgraphs, each handling a portion of the overall supergraph schema, with schemas automatically published to GraphOS via the operator
 - A React-based frontend application utilizing Apollo Client
-- GitHub Actions to automate image building and GraphOS-specific implementations, including schema publishing and persisted query manifest creation/publishing
+- Apollo GraphOS Operator for automated schema publishing, composition, and deployment
 - Tools to run k6 load tests against the architecture from within the same cluster
 
 ### The ending architecture
@@ -44,6 +44,14 @@ During setup, you'll be:
 - Gathering accounts and credentials
 - Provisioning resources
 - Deploying the applications, including router, subgraphs, client, and observability tools
+
+### [Operator Guide](/docs/operator-guide.md)
+
+Learn how the Apollo GraphOS Operator works in this architecture, including:
+- Schema publishing and composition flow
+- Monitoring operator-managed resources
+- Troubleshooting common issues
+- Updating router configuration
 
 ### [Cleanup](/docs/cleanup.md)
 

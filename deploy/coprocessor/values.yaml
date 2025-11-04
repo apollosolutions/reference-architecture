@@ -1,7 +1,9 @@
+namespace: apollo
+
 replicaCount: 3
 
 image:
-  repository: ghcr.io/apollosolutions/reference-architecture/coprocessor
+  repository: ghcr.io/${GITHUB_ORG}/reference-architecture/coprocessor
   pullPolicy: Always
   tag: main
 

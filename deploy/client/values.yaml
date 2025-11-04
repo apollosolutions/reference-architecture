@@ -1,7 +1,7 @@
 replicaCount: 3
 
 image:
-  repository: ghcr.io/apollosolutions/reference-architecture/client
+  repository: ghcr.io/${GITHUB_ORG}/reference-architecture/client
   pullPolicy: Always
   tag: main
 

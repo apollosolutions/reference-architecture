@@ -1,0 +1,14 @@
+apiVersion: apollographql.com/v1alpha2
+kind: Subgraph
+metadata:
+  name: discovery
+  namespace: discovery
+  labels:
+    app: discovery
+    apollo.io/subgraph: "true"
+spec:
+  endpoint: http://graphql.discovery.svc.cluster.local:4001
+  schema:
+    ociImage:
+      reference: ghcr.io/${GITHUB_ORG}/reference-architecture/discovery:main
+      path: /app/schema.graphql
