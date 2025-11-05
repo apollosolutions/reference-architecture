@@ -299,8 +299,6 @@ The operator will automatically publish schemas to GraphOS and trigger compositi
 # Check if subgraphs are registered
 kubectl get subgraphs --all-namespaces
 
-# Check composition status
-kubectl describe supergraphschemas reference-architecture-dev -n apollo
 ```
 
 You can try out a subgraph using port forwarding:
@@ -332,8 +330,6 @@ Monitor the deployment:
 # Check if subgraphs are registered
 kubectl get subgraphs --all-namespaces
 
-# Check composition status
-kubectl describe supergraphschemas reference-architecture-prod -n apollo
 ```
 
 You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router and Coprocessor. 

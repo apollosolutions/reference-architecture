@@ -10,6 +10,7 @@ RUN npm install --no-save
 COPY src ./src
 COPY tsconfig.json .
 COPY codegen.ts .
+COPY schema.graphql .
 
 RUN npm run build
 
