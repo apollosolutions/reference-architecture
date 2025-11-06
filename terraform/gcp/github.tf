@@ -4,15 +4,15 @@ provider "github" {
 
 # Infra repo for Router, Otel, load testing
 resource "github_repository" "repo" {
-  name        = "reference-architecture"
+  name        = "implemented-reference-architecture"
   description = "Apollo supergraph reference architecture repository"
   visibility  = "public"
   depends_on = [
     module.gke
   ]
   template {
-    owner      = "apollosolutions"
-    repository = "reference-architecture"
+    owner      = "andywgarcia"
+    repository = "reference-architecture-1"
   }
 }
 

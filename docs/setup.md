@@ -127,7 +127,7 @@ Edit the new `.env` file:
 ```sh
 export PROJECT_ID="<your google cloud project id>" # if using AWS, you will not see this line and can omit this
 export APOLLO_KEY="<your apollo personal api key>"
-export GITHUB_ORG="<your github account name or organization name>"
+export GITHUB_ORG="<your github username or organization name>" #  (not a git URL, just the username/org name)
 export TF_VAR_github_token="<your github personal access token>"
 ```
 
@@ -280,15 +280,27 @@ After this completes, you're ready to deploy your subgraphs!
 
 ### Deploy subgraphs to dev
 
+**Note:** The image pull secret is automatically created by `setup_clusters.sh` if `TF_VAR_github_token` and `GITHUB_ORG` are set. `GITHUB_ORG` must be your GitHub username or organization name (e.g., `andywgarcia`), not a git URL. If you need to create it manually, use the commands below with your GitHub username and token.
+
 Deploy the subgraph services and register them with the operator:
 
 ```sh
-kubectx apollo-supergraph-k8s-dev
-
 # Deploy each subgraph service
 for subgraph in checkout discovery inventory orders products reviews shipping users; do
   kubectl create namespace $subgraph --dry-run=client -o yaml | kubectl apply -f -
-  helm install $subgraph subgraphs/$subgraph/deploy -f subgraphs/$subgraph/deploy/environments/dev.yaml -n $subgraph
+  
+  # Copy the image pull secret to each namespace (if it exists)
+  if kubectl get secret ghcr-secret -n default &>/dev/null; then
+    kubectl get secret ghcr-secret -n default -o yaml | \
+      sed 's/namespace: default/namespace: '"$subgraph"'/' | \
+      kubectl apply -f -
+  fi
+  
+  # Install (imagePullSecrets are configured in values.yaml)
+  helm install $subgraph subgraphs/$subgraph/deploy \
+    -f subgraphs/$subgraph/deploy/environments/dev.yaml \
+    -n $subgraph
+  
   kubectl apply -f subgraphs/$subgraph/k8s/subgraph-dev.yaml
 done
 ```
@@ -311,15 +323,27 @@ Then visit [http://localhost:4001/](http://localhost:4001/).
 
 ### Deploy subgraphs to prod
 
-Deploy the subgraphs to production using the same process:
+**Note:** The image pull secret is automatically created by `setup_clusters.sh` if `TF_VAR_github_token` and `GITHUB_ORG` are set. `GITHUB_ORG` must be your GitHub username or organization name (e.g., `andywgarcia`), not a git URL. If you need to create it manually, use the commands below with your GitHub username and token.
+
+Deploy the subgraphs to production:
 
 ```sh
-kubectx apollo-supergraph-k8s-prod
-
 # Deploy each subgraph service
 for subgraph in checkout discovery inventory orders products reviews shipping users; do
   kubectl create namespace $subgraph --dry-run=client -o yaml | kubectl apply -f -
-  helm install $subgraph subgraphs/$subgraph/deploy -f subgraphs/$subgraph/deploy/environments/prod.yaml -n $subgraph
+  
+  # Copy the image pull secret to each namespace (if it exists)
+  if kubectl get secret ghcr-secret -n default &>/dev/null; then
+    kubectl get secret ghcr-secret -n default -o yaml | \
+      sed 's/namespace: default/namespace: '"$subgraph"'/' | \
+      kubectl apply -f -
+  fi
+  
+  # Install (imagePullSecrets are configured in values.yaml)
+  helm install $subgraph subgraphs/$subgraph/deploy \
+    -f subgraphs/$subgraph/deploy/environments/prod.yaml \
+    -n $subgraph
+  
   kubectl apply -f subgraphs/$subgraph/k8s/subgraph-prod.yaml
 done
 ```
@@ -345,7 +369,6 @@ kubectx apollo-supergraph-k8s-dev
 if command -v envsubst &> /dev/null; then
   envsubst < deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
 else
-  # Fallback if envsubst not available
   sed "s|\${GITHUB_ORG}|${GITHUB_ORG:-apollosolutions}|g" deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
 fi
 
@@ -354,7 +377,6 @@ kubectx apollo-supergraph-k8s-prod
 if command -v envsubst &> /dev/null; then
   envsubst < deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
 else
-  # Fallback if envsubst not available
   sed "s|\${GITHUB_ORG}|${GITHUB_ORG:-apollosolutions}|g" deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
 fi
 ```

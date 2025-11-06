@@ -11,6 +11,7 @@ COPY src ./src
 COPY tsconfig.json .
 COPY codegen.ts .
 COPY schema.graphql .
+COPY keys ./keys
 
 RUN npm run build
 

@@ -10,5 +10,5 @@ spec:
   endpoint: http://graphql.inventory.svc.cluster.local:4001
   schema:
     ociImage:
-      reference: ghcr.io/${GITHUB_ORG}/reference-architecture/inventory:main
+      reference: ghcr.io/${GITHUB_ORG}/implemented-reference-architecture/inventory:main
       path: /app/schema.graphql

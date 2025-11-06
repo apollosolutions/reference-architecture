@@ -60,6 +60,42 @@ environment_setup(){
         echo "Warning: OPERATOR_KEY not set. Operator secret not created."
     fi
 
+    # Create GitHub Container Registry image pull secret (optional, requires TF_VAR_github_token)
+    if [[ -n "$TF_VAR_github_token" && -n "$GITHUB_ORG" ]]; then
+        echo "Creating GitHub Container Registry image pull secret..."
+        # Create in default namespace
+        kubectl create secret docker-registry ghcr-secret \
+            --docker-server=ghcr.io \
+            --docker-username="$GITHUB_ORG" \
+            --docker-password="$TF_VAR_github_token" \
+            --namespace=default \
+            --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Create in apollo namespace
+        kubectl create secret docker-registry ghcr-secret \
+            --docker-server=ghcr.io \
+            --docker-username="$GITHUB_ORG" \
+            --docker-password="$TF_VAR_github_token" \
+            --namespace=apollo \
+            --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Create in apollo-operator namespace and patch service account
+        kubectl create secret docker-registry ghcr-secret \
+            --docker-server=ghcr.io \
+            --docker-username="$GITHUB_ORG" \
+            --docker-password="$TF_VAR_github_token" \
+            --namespace=apollo-operator \
+            --dry-run=client -o yaml | kubectl apply -f -
+        
+        kubectl patch serviceaccount apollo-operator -n apollo-operator \
+            -p '{"imagePullSecrets":[{"name":"ghcr-secret"}]}' || true
+        
+        echo "GitHub Container Registry image pull secret created"
+    else
+        echo "Warning: TF_VAR_github_token and/or GITHUB_ORG not set. Image pull secret not created."
+        echo "  Subgraphs may fail to pull images if they are private. Set these variables to enable image pull authentication."
+    fi
+
     # Install operator using Helm
     if [[ $(which helm) != "" ]]; then
         helm upgrade --install --atomic apollo-operator \

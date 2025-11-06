@@ -10,5 +10,5 @@ spec:
   endpoint: http://graphql.orders.svc.cluster.local:4001
   schema:
     ociImage:
-      reference: ghcr.io/${GITHUB_ORG}/reference-architecture/orders:main
+      reference: ghcr.io/${GITHUB_ORG}/implemented-reference-architecture/orders:main
       path: /app/schema.graphql

@@ -242,6 +242,5 @@ echo "export TF_VAR_apollo_graph_id=\"$GRAPH_ID\"" >> .env
 echo "export TF_VAR_pq_dev_id=\"$DEV_PQ_ID\"" >> .env
 echo "export TF_VAR_pq_prod_id=\"$PROD_PQ_ID\"" >> .env
 echo "export OPERATOR_KEY=\"$OPERATOR_KEY\"" >> .env
-echo "export GITHUB_ORG=\"$(git remote get-url origin 2>/dev/null | sed -E 's|.*github.com/([^/]+)/.*|\1|' || echo 'apollosolutions')\"" >> .env
 echo '' >> .env
 echo 'Re-run `source .env` to load them.'

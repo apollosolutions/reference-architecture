@@ -10,5 +10,5 @@ spec:
   endpoint: http://graphql.products.svc.cluster.local:4001
   schema:
     ociImage:
-      reference: ghcr.io/${GITHUB_ORG}/reference-architecture/products:main
+      reference: ghcr.io/${GITHUB_ORG}/implemented-reference-architecture/products:main
       path: /app/schema.graphql

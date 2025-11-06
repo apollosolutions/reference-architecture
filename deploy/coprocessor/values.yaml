@@ -3,7 +3,7 @@ namespace: apollo
 replicaCount: 3
 
 image:
-  repository: ghcr.io/${GITHUB_ORG}/reference-architecture/coprocessor
+  repository: ghcr.io/${GITHUB_ORG}/implemented-reference-architecture/coprocessor
   pullPolicy: Always
   tag: main
 
@@ -12,6 +12,10 @@ fullnameOverride: coprocessor
 
 serviceAccount:
   create: false
+
+# Image pull secrets for GitHub Container Registry
+imagePullSecrets:
+  - name: ghcr-secret
 
 podAnnotations: {}
 

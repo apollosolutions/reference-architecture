@@ -10,6 +10,6 @@ spec:
   endpoint: http://graphql.checkout.svc.cluster.local:4001
   schema:
     ociImage:
-      reference: ghcr.io/andywgarcia/reference-architecture/checkout:main
+      reference: ghcr.io/${GITHUB_ORG}/implemented-reference-architecture/checkout:main
       path: /app/schema.graphql
 

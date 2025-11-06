@@ -5,7 +5,6 @@ metadata:
   namespace: apollo
 spec:
   replicas: 3
-  serviceName: router
   podTemplate:
     routerVersion: 1.37.0
     resources:
