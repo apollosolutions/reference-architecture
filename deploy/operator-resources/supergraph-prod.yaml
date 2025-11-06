@@ -6,7 +6,7 @@ metadata:
 spec:
   replicas: 3
   podTemplate:
-    routerVersion: 1.37.0
+    routerVersion: 2.3.0
     resources:
       requests:
         cpu: 500m
