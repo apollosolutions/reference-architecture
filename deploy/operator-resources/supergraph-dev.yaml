@@ -12,8 +12,6 @@ spec:
         cpu: 100m
         memory: 256Mi
   schema:
-    studio:
-      graphRef: my-graph@dev
     resource:
       name: reference-architecture-dev
       namespace: apollo
