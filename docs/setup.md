@@ -58,7 +58,7 @@ cp scripts/minikube/.env.sample .env
 
 ```bash
 export APOLLO_KEY="your-apollo-personal-api-key"
-export ENVIRONMENT="dev"  # Required: e.g., "dev", "prod", "staging"
+export ENVIRONMENT="dev"
 ```
 
 The `ENVIRONMENT` variable is required and allows you to create multiple environments. Each environment will have its own Apollo GraphOS variant.
@@ -97,7 +97,7 @@ This script:
 ### Script 03: Setup Kubernetes Cluster
 
 ```bash
-source .env  # Load the variables set by script 02
+source .env
 ./scripts/minikube/03-setup-cluster.sh
 ```
 
@@ -185,7 +185,6 @@ After running all scripts, you can access your supergraph in several ways:
 The ingress controller has been configured as a LoadBalancer service. To access it via `minikube tunnel`:
 
 ```bash
-# In a separate terminal, run:
 minikube tunnel
 ```
 
@@ -229,8 +228,6 @@ echo "Access at: http://${MINIKUBE_IP}:${NODEPORT}"
 Test the router with a simple GraphQL query:
 
 ```bash
-# If using minikube service, it will show you the URL to use
-# If using port forwarding, use http://localhost:4000
 curl -X POST http://localhost:4000 \
   -H "Content-Type: application/json" \
   -d '{"query":"{ __typename }"}'
@@ -285,13 +282,13 @@ export ENVIRONMENT="prod"
 2. Run scripts 02-07 again with the new environment:
 
 ```bash
-./scripts/minikube/02-setup-apollo-graph.sh  # Creates prod variant
+./scripts/minikube/02-setup-apollo-graph.sh
 source .env
-./scripts/minikube/03-setup-cluster.sh       # Uses same cluster
-./scripts/minikube/04-build-images.sh       # Reuses images
-./scripts/minikube/05-deploy-subgraphs.sh   # Deploys to prod namespaces
-./scripts/minikube/06-deploy-operator-resources.sh  # Creates prod router
-./scripts/minikube/07-deploy-ingress.sh     # Updates ingress
+./scripts/minikube/03-setup-cluster.sh
+./scripts/minikube/04-build-images.sh
+./scripts/minikube/05-deploy-subgraphs.sh
+./scripts/minikube/06-deploy-operator-resources.sh
+./scripts/minikube/07-deploy-ingress.sh
 ```
 
 Each environment will have:
