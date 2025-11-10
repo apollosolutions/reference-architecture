@@ -1,19 +1,15 @@
 replicaCount: 3
 
 image:
-  repository: ghcr.io/${GITHUB_ORG}/implemented-reference-architecture/client
-  pullPolicy: Always
-  tag: main
+  repository: client
+  pullPolicy: Never
+  tag: local
 
 nameOverride: web
 fullnameOverride: web
 
 serviceAccount:
   create: false
-
-# Image pull secrets for GitHub Container Registry
-imagePullSecrets:
-  - name: ghcr-secret
 
 podAnnotations: {}
 

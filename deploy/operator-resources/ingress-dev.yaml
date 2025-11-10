@@ -4,9 +4,15 @@ metadata:
   name: router
   namespace: apollo
 spec:
-  defaultBackend:
-    service:
-      name: router
-      port:
-        number: 80
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: reference-architecture-dev
+                port:
+                  number: 80
 

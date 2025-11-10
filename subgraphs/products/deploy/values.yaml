@@ -1,20 +1,15 @@
 replicaCount: 3
 
 image:
-  repository: ghcr.io/andywgarcia/implemented-reference-architecture/products
-  pullPolicy: Always
-  tag: main
+  repository: products
+  pullPolicy: Never
+  tag: local
 
 nameOverride: graphql
 fullnameOverride: graphql
 
 serviceAccount:
   create: false
-
-# Image pull secrets for GitHub Container Registry
-# Set this if your images are private and require authentication
-imagePullSecrets:
-  - name: ghcr-secret
 
 podAnnotations: {}
 

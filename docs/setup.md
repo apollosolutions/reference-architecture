@@ -1,522 +1,299 @@
 # Setup
 
-⏱ Estimated time: 45 minutes
+⏱ Estimated time: 30 minutes
+
+This guide will walk you through setting up the Apollo Federation Supergraph reference architecture on Minikube for local development.
 
 - [Setup](#setup)
-  - [Part A: Gather accounts and credentials](#part-a-gather-accounts-and-credentials)
-    - [Clone this repo](#clone-this-repo)
-    - [Install dependencies](#install-dependencies)
-      - [Minimum required dependencies](#minimum-required-dependencies)
-      - [GCP](#gcp)
-      - [AWS](#aws)
-    - [Gather accounts](#gather-accounts)
-    - [Gather credentials](#gather-credentials)
-      - [ GCP](#-gcp)
-      - [ AWS](#-aws)
-    - [Export all necessary variables](#export-all-necessary-variables)
-    - [Run setup commands](#run-setup-commands)
-      - [ GCP](#-gcp-1)
-      - [ AWS](#-aws-1)
-      - [General](#general)
-  - [Part B: Provision resources](#part-b-provision-resources)
-    - [Create Kubernetes clusters, basic infrastructure, and Github repositories](#create-kubernetes-clusters-basic-infrastructure-and-github-repositories)
-    - [Run cluster setup script](#run-cluster-setup-script)
-  - [Part C: Deploy applications](#part-c-deploy-applications)
-    - [Deploy subgraphs to dev](#deploy-subgraphs-to-dev)
-    - [Deploy subgraphs to prod](#deploy-subgraphs-to-prod)
-    - [Deploy the coprocessor and router](#deploy-the-coprocessor-and-router)
-      - [ GCP](#-gcp-2)
-      - [ AWS](#-aws-2)
-    - [Deploy the client](#deploy-the-client)
-      - [ GCP](#-gcp-3)
-      - [ AWS](#-aws-3)
-      - [ GCP](#-gcp-4)
-      - [ AWS](#-aws-4)
+  - [Prerequisites](#prerequisites)
+  - [Step 1: Install Minikube and Dependencies](#step-1-install-minikube-and-dependencies)
+  - [Step 2: Configure Environment Variables](#step-2-configure-environment-variables)
+  - [Step 3: Run Setup Scripts](#step-3-run-setup-scripts)
+  - [Step 4: Access Your Supergraph](#step-4-access-your-supergraph)
+  - [Creating Additional Environments](#creating-additional-environments)
 
-## Part A: Gather accounts and credentials
+## Prerequisites
 
-### Clone this repo
+Before you begin, ensure you have:
 
-```
-git clone https://github.com/apollosolutions/reference-architecture.git
-cd reference-architecture
-git pull
-```
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/) installed and configured
+- [kubectl](https://kubernetes.io/docs/tasks/tools/) installed
+- [Helm](https://helm.sh/docs/intro/install/) installed
+- [Docker](https://docs.docker.com/get-docker/) installed
+- [jq](https://stedolan.github.io/jq/download/) installed
+- [curl](https://curl.se/) installed
+- An [Apollo GraphOS account](https://studio.apollographql.com/signup) with a Personal API key
 
-### Install dependencies
+### Get Your Apollo GraphOS Personal API Key
 
-#### Minimum required dependencies
+1. Go to [Apollo GraphOS Studio](https://studio.apollographql.com)
+2. Navigate to [User Settings > API Keys](https://studio.apollographql.com/user-settings/api-keys)
+3. Create a new Personal API key or use an existing one
+4. Copy the API key value
 
-- [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [kubectx](https://github.com/ahmetb/kubectx#installation)
-- [Github CLI](https://cli.github.com/)
-- [jq](https://stedolan.github.io/jq/download/)
-- [Rover CLI](https://www.apollographql.com/docs/rover/getting-started/) (for creating operator API keys)
-- [Helm](https://helm.sh/docs/intro/install/) (for installing the operator)
+## Step 1: Install Minikube and Dependencies
 
-#### GCP
+### Install Minikube
 
-- [GCloud CLI](https://cloud.google.com/sdk/docs/install)
+Follow the [Minikube installation guide](https://minikube.sigs.k8s.io/docs/start/) for your operating system.
 
-#### AWS
+### Verify Installation
 
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- [eksctl](https://eksctl.io/introduction/#installation)
-
-
-<!-- #### Minikube
-
-- [Minikube](https://minikube.sigs.k8s.io/docs/start/) configured according to the link
-- [Helm](https://helm.sh/docs/intro/install/) -->
-
-### Gather accounts
-
-- [Github](https://github.com/signup)
-- [Apollo GraphOS](https://studio.apollographql.com/signup?referrer=reference-architecture)
-- If using a cloud provider: 
-  - [Google Cloud](https://console.cloud.google.com/freetrial)
-    - Must have a project [with billing enabled](https://cloud.google.com/resource-manager/docs/creating-managing-projects#gcloud)
-  - [AWS](https://signin.aws.amazon.com/signin) with billing enabled
-
-### Gather credentials
-
-#### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
-
-- Google Cloud project ID
-- [Github personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
-  - [Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens)
-  - Grant it permissions to the following scopes:
-    - `repo` (for creating repos)
-    - `delete_repo` (for cleanup at the end)
-- [Apollo GraphOS Personal API key](https://studio.apollographql.com/user-settings/api-keys)
-
-#### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
-
-- [AWS Access Key and Secret for use with the AWS CLI*](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html)
-  - Additionally, ensure you either:
-    - Set the default region during the AWS CLI configuration
-    - Set the `AWS_REGION` environment variable when running commands
-- [Github personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
-  - [Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens)
-  - Grant it permissions to the following scopes:
-    - `repo` (for creating repos)
-    - `delete_repo` (for cleanup at the end)
-- [Apollo GraphOS Personal API key](https://studio.apollographql.com/user-settings/api-keys)
-
-\* Please note to use an account with Administrator privileges, or at minimum, the ability to run: 
-
-* Terraform, which creates: 
-  * IAM user and policy
-  * EKS cluster and node groups, and associates IAM permissions to Kubernetes service accounts
-  * VPC and subnets
-
-### Export all necessary variables
-
-First, change directories in the cloud provider you wish to use. All Terraform is within the `terraform` root level folder, with each provider having a subfolder within. For the below examples, we'll assume GCP, however the others will use the same commands. 
-
-Next, make a copy of `.env.sample` called `.env` to keep track of these values. You can run `source .env` to reload all environment variables in a new terminal session.
-
-```sh
-# in either terraform/aws or terraform/gcp
-cp .env.sample .env
+```bash
+minikube version
+kubectl version --client
+helm version
+docker --version
 ```
 
-Edit the new `.env` file:
+## Step 2: Configure Environment Variables
 
-```sh
-export PROJECT_ID="<your google cloud project id>" # if using AWS, you will not see this line and can omit this
-export APOLLO_KEY="<your apollo personal api key>"
-export GITHUB_ORG="<your github username or organization name>" #  (not a git URL, just the username/org name)
-export TF_VAR_github_token="<your github personal access token>"
+1. Copy the environment template:
+
+```bash
+cp scripts/minikube/.env.sample .env
 ```
 
-Run this script to create your graph and get environment variables for GraphOS:
+2. Edit `.env` and set your Apollo GraphOS Personal API key and environment:
 
-```sh
-# in the respective terraform/ folder
-source .env
-./create_graph.sh
+```bash
+export APOLLO_KEY="your-apollo-personal-api-key"
+export ENVIRONMENT="dev"  # Required: e.g., "dev", "prod", "staging"
 ```
 
-**Note:** With the Apollo GraphOS Operator, this script no longer publishes subgraph schemas to GraphOS. The schemas will be automatically published by the operator when Subgraph CRDs are deployed.
+The `ENVIRONMENT` variable is required and allows you to create multiple environments. Each environment will have its own Apollo GraphOS variant.
 
-The script adds a few more environment variables to `.env`, so reload your environment using:
+**Note:** When deploying subgraphs, the scripts will look for environment-specific values files at `subgraphs/{subgraph}/deploy/environments/${ENVIRONMENT}.yaml`. If this file exists, it will be used to override the default `values.yaml`. If it doesn't exist, the default `values.yaml` will be used. The repository includes `dev.yaml` and `prod.yaml` files for all subgraphs. If you create a custom environment name, you can optionally create matching values files for environment-specific configurations.
 
-```sh
-source .env
+## Step 3: Run Setup Scripts
+
+Run the scripts in order from the repository root:
+
+### Script 01: Setup Minikube Cluster
+
+```bash
+./scripts/minikube/01-setup-minikube.sh
 ```
 
-### Run setup commands
+This script:
+- Starts or creates a Minikube cluster
+- Enables the ingress addon for external access
+- Configures kubectl to use the Minikube context
 
-#### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
+### Script 02: Setup Apollo GraphOS Graph
 
-```sh
-gcloud components update
-gcloud components install gke-gcloud-auth-plugin
-gcloud auth login
-
-gcloud config set project ${PROJECT_ID}
-gcloud services enable \
-  container.googleapis.com \
-  secretmanager.googleapis.com \
-  cloudasset.googleapis.com \
-  storage.googleapis.com
-gh auth login
+```bash
+./scripts/minikube/02-setup-apollo-graph.sh
 ```
 
-#### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
+This script:
+- Creates an Apollo GraphOS graph
+- Creates an Operator API key
+- Creates a variant for your environment
+- Saves configuration to `.env`
 
-```sh
-aws configure
-gh auth login
+**Note:** Make sure your `.env` file has `APOLLO_KEY` set before running this script.
+
+### Script 03: Setup Kubernetes Cluster
+
+```bash
+source .env  # Load the variables set by script 02
+./scripts/minikube/03-setup-cluster.sh
 ```
 
+This script:
+- Creates required namespaces (`apollo-operator`, `apollo`)
+- Creates the operator API key secret
+- Installs the Apollo GraphOS Operator via Helm
 
-<!-- #### Minikube
+### Script 04: Build Docker Images
 
-```sh
-gh auth login
-``` -->
-
-#### General
-
-<details>
-  <summary>Optional: how do I specify a different name for clusters and repos? (The default is "apollo-supergraph-k8s".)</summary>
-
-Before running `create_graph.sh`, `setup_clusters.sh`, or `terraform apply` export the prefix as as environment variables:
-
-```sh
-export CLUSTER_PREFIX=my-custom-prefix
-export TF_VAR_demo_name=$CLUSTER_PREFIX
+```bash
+./scripts/minikube/04-build-images.sh
 ```
 
-</details>
+This script:
+- Configures Docker to use Minikube's Docker daemon
+- Builds all subgraph images locally
+- Tags images as `{subgraph}:local`
+- Builds coprocessor and client images (for future use)
 
-## Part B: Provision resources
+### Script 05: Deploy Subgraphs
 
-<details>
-  <summary>Have you run this tutorial before?</summary>
-
-You may need to clean up your Github packages before creating new repos of the same name. Visit `https://github.com/<your github username>?tab=packages` and delete the packages created by the previous versions of the repos.
-
-</details>
-
-### Create Kubernetes clusters, basic infrastructure, and Github repositories
-
-**Note: If using a cloud provider, the following commands will create resources on your cloud provider account and begin to accrue a cost.** The reference infrastructure defaults to a lower-cost environment (small node count and instance size), however it will not be covered by either of GCP's or AWS's free tiers.
-
-<!-- **Note: If you are using Minikube, this will not create a local cluster and instead configure the local environment to be ready to be deployed to.** -->
-
-```sh
-# for example, if using GCP
-cd terraform/gcp
-terraform init # takes about 2 minutes
-terraform apply # will print plan then prompt for confirmation
-# takes about 10-15 minutes
+```bash
+./scripts/minikube/05-deploy-subgraphs.sh
 ```
 
-**Note**: If using GCP, you might get an `Invalid provider configuration (no credentials loaded)` error when running `terraform apply`, please run `gcloud auth application-default login` and try again.
+This script:
+- Deploys each subgraph using Helm charts
+- Creates Subgraph CRDs with inline SDL schemas
+- Configures images to use local builds
 
-Expected output:
+Monitor subgraph deployment:
 
-```
-kubernetes_cluster_names = {
-  "dev" = "apollo-supergraph-k8s-dev"
-  "prod" = "apollo-supergraph-k8s-prod"
-}
-repo = "https://github.com/you/reference-architecture"
-```
-
-<details>
-  <summary>What does this do?</summary>
-
-Terraform provisions:
-
-- Two Kubernetes clusters (dev and prod)
-- The GitHub repository (`<your org>/reference-architecture`)
-- GitHub action secrets for GCP/AWS and Apollo credentials
-
-The subgraph repos are configured to build and deploy to the `dev` cluster once they're provisioned. (The deploy will fail the first time. See "Note about "initial commit" errors" below.)
-
-</details>
-
-### Run cluster setup script
-
-After creating the necessary clusters, you will need to run the included cluster setup script:
-
-```sh
-# for example, if using GCP
-cd terraform/gcp
-./setup_clusters.sh # takes about 2 minutes
-```
-
-<details>
-  <summary>What does this do?</summary>
-
-For both `dev` and `prod` clusters:
-
-- Configures your local `kubectl` environment so you can inspect your clusters
-- For GCP users:
-  - Configures namespace, service account, and role bindings for Open Telemetry and Google Traces.
-- For AWS users:
-  - Configures load balancer controller policy and IAM service account
-- **New**: Installs the Apollo GraphOS Operator via Helm
-- **New**: Creates the `apollo-operator` and `apollo` namespaces
-- **New**: Creates the operator API key secret
-<!-- - **New**: Creates the Rhai ConfigMap for router scripts -->
-
-</details>
-
-**Note**: The `create_graph.sh` script automatically creates an Operator API key using the Platform API. This key is exported as `OPERATOR_KEY` in your `.env` file and will be used by `setup_clusters.sh` to configure the operator secret.
-
-After this completes, you're ready to deploy your subgraphs!
-
-## Part C: Deploy applications
-
-<!---
-  TODO: Add section for minikube support
--->
-
-### Deploy subgraphs to dev
-
-**Note:** The image pull secret is automatically created by `setup_clusters.sh` if `TF_VAR_github_token` and `GITHUB_ORG` are set. `GITHUB_ORG` must be your GitHub username or organization name (e.g., `andywgarcia`), not a git URL. If you need to create it manually, use the commands below with your GitHub username and token.
-
-Deploy the subgraph services and register them with the operator:
-
-```sh
-# Deploy each subgraph service
-for subgraph in checkout discovery inventory orders products reviews shipping users; do
-  kubectl create namespace $subgraph --dry-run=client -o yaml | kubectl apply -f -
-  
-  # Copy the image pull secret to each namespace (if it exists)
-  if kubectl get secret ghcr-secret -n default &>/dev/null; then
-    kubectl get secret ghcr-secret -n default -o yaml | \
-      sed 's/namespace: default/namespace: '"$subgraph"'/' | \
-      kubectl apply -f -
-  fi
-  
-  # Install (imagePullSecrets are configured in values.yaml)
-  helm install $subgraph subgraphs/$subgraph/deploy \
-    -f subgraphs/$subgraph/deploy/environments/dev.yaml \
-    -n $subgraph
-  
-  kubectl apply -f subgraphs/$subgraph/k8s/subgraph-dev.yaml
-done
-```
-
-The operator will automatically publish schemas to GraphOS and trigger composition. You can monitor the progress:
-
-```sh
-# Check if subgraphs are registered
+```bash
 kubectl get subgraphs --all-namespaces
-
+kubectl get pods --all-namespaces
 ```
 
-You can try out a subgraph using port forwarding:
+### Script 06: Deploy Operator Resources
 
-```sh
-kubectl port-forward service/graphql -n checkout 4001:4001
+```bash
+./scripts/minikube/06-deploy-operator-resources.sh
 ```
 
-Then visit [http://localhost:4001/](http://localhost:4001/).
+This script:
+- Deploys SupergraphSchema CRD (triggers composition)
+- Deploys Supergraph CRD (deploys the Apollo Router)
+- Waits for the router to be ready
 
-### Deploy subgraphs to prod
+Monitor router deployment:
 
-**Note:** The image pull secret is automatically created by `setup_clusters.sh` if `TF_VAR_github_token` and `GITHUB_ORG` are set. `GITHUB_ORG` must be your GitHub username or organization name (e.g., `andywgarcia`), not a git URL. If you need to create it manually, use the commands below with your GitHub username and token.
-
-Deploy the subgraphs to production:
-
-```sh
-# Deploy each subgraph service
-for subgraph in checkout discovery inventory orders products reviews shipping users; do
-  kubectl create namespace $subgraph --dry-run=client -o yaml | kubectl apply -f -
-  
-  # Copy the image pull secret to each namespace (if it exists)
-  if kubectl get secret ghcr-secret -n default &>/dev/null; then
-    kubectl get secret ghcr-secret -n default -o yaml | \
-      sed 's/namespace: default/namespace: '"$subgraph"'/' | \
-      kubectl apply -f -
-  fi
-  
-  # Install (imagePullSecrets are configured in values.yaml)
-  helm install $subgraph subgraphs/$subgraph/deploy \
-    -f subgraphs/$subgraph/deploy/environments/prod.yaml \
-    -n $subgraph
-  
-  kubectl apply -f subgraphs/$subgraph/k8s/subgraph-prod.yaml
-done
-```
-
-Monitor the deployment:
-
-```sh
-# Check if subgraphs are registered
-kubectl get subgraphs --all-namespaces
-
-```
-
-You've successfully deployed your subgraphs! The next step is to deploy the Apollo Router and Coprocessor. 
-
-
-### Deploy the coprocessor and router
-
-Deploy the coprocessor first:
-
-```sh
-# Deploy to dev (with envsubst for variable substitution)
-kubectx apollo-supergraph-k8s-dev
-if command -v envsubst &> /dev/null; then
-  envsubst < deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
-else
-  sed "s|\${GITHUB_ORG}|${GITHUB_ORG:-apollosolutions}|g" deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
-fi
-
-# Deploy to prod
-kubectx apollo-supergraph-k8s-prod
-if command -v envsubst &> /dev/null; then
-  envsubst < deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
-else
-  sed "s|\${GITHUB_ORG}|${GITHUB_ORG:-apollosolutions}|g" deploy/coprocessor/values.yaml | helm install coprocessor deploy/coprocessor -f - -n apollo
-fi
-```
-
-Once the coprocessor is deployed, deploy the router using the operator Supergraph CRDs:
-
-**Note:** Make sure you've sourced the `.env` file from your terraform directory first to set `TF_VAR_apollo_graph_id`:
-
-```sh
-cd terraform/gcp  # or terraform/aws, terraform/minikube
-source .env
-cd ../..
-```
-
-Then deploy the operator resources:
-
-```sh
-# Deploy to dev
-kubectx apollo-supergraph-k8s-dev
-cd deploy/operator-resources
-./apply-resources.sh dev
-cd ../..
-
-# Deploy to prod
-kubectx apollo-supergraph-k8s-prod
-cd deploy/operator-resources
-./apply-resources.sh prod
-cd ../..
-```
-
-Or manually apply with kubectl:
-
-```sh
-# Deploy to dev (with envsubst for variable substitution)
-kubectx apollo-supergraph-k8s-dev
-envsubst < deploy/operator-resources/supergraphschema-dev.yaml | kubectl apply -f -
-kubectl apply -f deploy/operator-resources/supergraph-dev.yaml
-kubectl apply -f deploy/operator-resources/ingress-dev.yaml
-
-# Deploy to prod
-kubectx apollo-supergraph-k8s-prod
-envsubst < deploy/operator-resources/supergraphschema-prod.yaml | kubectl apply -f -
-kubectl apply -f deploy/operator-resources/supergraph-prod.yaml
-kubectl apply -f deploy/operator-resources/ingress-prod.yaml
-```
-
-The operator will automatically deploy the router based on the composed supergraph schema. You can monitor the deployment:
-
-```sh
-# Check router deployment status
+```bash
 kubectl get supergraphs -n apollo
-
-# Check router pods
 kubectl get pods -n apollo
-
-# Describe the supergraph to see conditions
-kubectl describe supergraphs reference-architecture-prod -n apollo
+kubectl describe supergraph reference-architecture-${ENVIRONMENT} -n apollo
 ```
 
-Once deployed, an ingress will be created to access the router. In the case of AWS, it will be a domain name, and in the case of GCP, it'll be an IP. 
+### Script 07: Deploy Ingress
 
-Follow the below instructions for your cloud provider you are using. Please note that for both providers, the value for the ingress may take some time to become live, so you may need to give it a few minutes to process. 
-
-#### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
-
-```sh
-kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=http://$(kubectl get ingress -n apollo -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
-open $ROUTER_HOSTNAME
+```bash
+./scripts/minikube/07-deploy-ingress.sh
 ```
 
-#### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
+This script:
+- Deploys an Ingress resource for external access
+- Provides access URLs for the router
 
-```sh
-kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=$(kubectl get ingress -n apollo -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
-open http://$ROUTER_HOSTNAME
+### Script 08: Deploy Client (Optional)
+
+```bash
+./scripts/minikube/08-deploy-client.sh
 ```
 
-Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph!
+This script:
+- Builds and deploys the client application
+- Sets up ingress for client access
 
-**Note**: If using Explorer to run operations, you will need to set the client headers first:
-```
-apollographql-client-name:apollo-client
-apollographql-client-version:b  
-```
+## Step 4: Access Your Supergraph
 
-### Deploy the client
+After running all scripts, you can access your supergraph in several ways:
 
-The last step to getting fully configured is to deploy the client to both environments. To do so, we'll need our router ingress URL to point the client to. This can be pulled from the prior commands, so if you are using the same terminal session, feel free to skip the next set of commands. 
+### Option 1: Using Ingress IP
 
-#### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
+If ingress is configured, get the IP:
 
-```sh
-kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=http://$(kubectl get ingress -n apollo -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
+```bash
+kubectl get ingress router -n apollo
 ```
 
-Upon running the above commands, you'll have the Router page open and you can make requests against your newly deployed supergraph! 
+Then access at `http://<INGRESS_IP>`
 
-#### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
+### Option 2: Using Minikube Service
 
-```sh
-kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=$(kubectl get ingress -n apollo -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
+```bash
+minikube service reference-architecture-${ENVIRONMENT} -n apollo
 ```
 
-Once you have the router hostname, you'll need to set it as a secret in the GitHub repository created.
+This will open the router in your default browser.
 
-```sh
-  gh variable set BACKEND_URL --body "$ROUTER_HOSTNAME" --repo $GITHUB_ORG/reference-architecture
+### Option 3: Using Port Forwarding
+
+```bash
+kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80
 ```
 
-Lastly, we'll need to deploy the client:
+Then access at `http://localhost:4000`
 
-```sh
-gh workflow run "Deploy Client" --repo $GITHUB_ORG/reference-architecture \
-  -f environment=prod \
-  -f dry-run=false \
-  -f debug=false
+### Verify Router is Working
+
+Test the router health endpoint:
+
+```bash
+curl http://localhost:4000/.well-known/apollo/server-health
 ```
 
-This will create another ingress specific to the client, so much like the router, you can run the following commands depending on your provider. As with the other ingress, this may take a few minutes to become active. 
+Or visit the router in Apollo Studio:
+1. Go to [Apollo GraphOS Studio](https://studio.apollographql.com)
+2. Select your graph
+3. Navigate to the variant (e.g., "dev")
+4. View the router status and metrics
 
-#### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
+## Creating Additional Environments
 
-```sh
-kubectx apollo-supergraph-k8s-prod
-ROUTER_IP=$(kubectl get ingress -n client -o jsonpath="{.*.*.status.loadBalancer.ingress.*.ip}")
-open http://$ROUTER_IP
+To create a new environment (e.g., "prod"):
+
+1. Set the environment variable:
+
+```bash
+export ENVIRONMENT="prod"
 ```
 
-You should now have the full architecture deployed!
+2. Run scripts 02-07 again with the new environment:
 
-#### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
-
-```sh
-kubectx apollo-supergraph-k8s-prod
-ROUTER_HOSTNAME=$(kubectl get ingress -n client -o jsonpath="{.*.*.status.loadBalancer.ingress.*.hostname}")
-open http://$ROUTER_HOSTNAME
+```bash
+./scripts/minikube/02-setup-apollo-graph.sh  # Creates prod variant
+source .env
+./scripts/minikube/03-setup-cluster.sh       # Uses same cluster
+./scripts/minikube/04-build-images.sh       # Reuses images
+./scripts/minikube/05-deploy-subgraphs.sh   # Deploys to prod namespaces
+./scripts/minikube/06-deploy-operator-resources.sh  # Creates prod router
+./scripts/minikube/07-deploy-ingress.sh     # Updates ingress
 ```
 
-You should now have the full architecture deployed!
+Each environment will have:
+- Its own Apollo GraphOS variant
+- Separate Kubernetes resources (namespaces, services, etc.)
+- Its own router instance
+
+## Troubleshooting
+
+### Minikube won't start
+
+```bash
+minikube delete
+minikube start
+```
+
+### Images not found
+
+Ensure script 04 built the images and Docker is using Minikube's daemon:
+
+```bash
+eval $(minikube docker-env)
+docker images | grep local
+```
+
+### Subgraphs not publishing schemas
+
+Check subgraph status:
+
+```bash
+kubectl describe subgraph <subgraph-name> -n <subgraph-namespace>
+```
+
+Look for errors in schema extraction or API key authentication.
+
+### Router not deploying
+
+Check router status:
+
+```bash
+kubectl describe supergraph reference-architecture-${ENVIRONMENT} -n apollo
+kubectl logs -n apollo deployment/reference-architecture-${ENVIRONMENT}
+```
+
+### Ingress not working
+
+Ensure ingress addon is enabled:
+
+```bash
+minikube addons enable ingress
+kubectl get pods -n ingress-nginx
+```
+
+## Next Steps
+
+- Read the [Operator Guide](./operator-guide.md) to understand how the Apollo GraphOS Operator works
+- Explore your supergraph in [Apollo Studio](https://studio.apollographql.com)
+- Make schema changes and see them automatically composed and deployed

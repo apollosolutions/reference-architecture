@@ -2,36 +2,92 @@
 set -euo pipefail
 
 # This script applies the operator resources with the correct graph ID
-# Usage: ./apply-resources.sh {dev|prod}
+# Usage: ./apply-resources.sh [environment]
+# Environment defaults to "dev" if not specified
 
 ENVIRONMENT=${1:-dev}
 
-if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
-  echo "Error: Environment must be 'dev' or 'prod'"
-  exit 1
+# Check if APOLLO_GRAPH_ID is set (load from .env if available)
+if [ -f .env ]; then
+    source .env
 fi
 
-# Check if TF_VAR_apollo_graph_id is set
-if [[ -z "${TF_VAR_apollo_graph_id:-}" ]]; then
-  echo "Error: TF_VAR_apollo_graph_id is not set. Please source .env file from your terraform directory."
-  exit 1
+if [[ -z "${APOLLO_GRAPH_ID:-}" ]]; then
+    echo "Error: APOLLO_GRAPH_ID is not set. Please source .env file or set it as an environment variable."
+    exit 1
 fi
 
-echo "Deploying operator resources for ${ENVIRONMENT} environment with graph ID: ${TF_VAR_apollo_graph_id}"
+echo "Deploying operator resources for ${ENVIRONMENT} environment with graph ID: ${APOLLO_GRAPH_ID}"
 
-# Apply SupergraphSchema with graph ID substitution
-if command -v envsubst &> /dev/null; then
-  envsubst < "supergraphschema-${ENVIRONMENT}.yaml" | kubectl apply -f -
+RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
+
+# Apply SupergraphSchema
+cat <<EOF | kubectl apply -f -
+apiVersion: apollographql.com/v1alpha2
+kind: SupergraphSchema
+metadata:
+  name: ${RESOURCE_NAME}
+  namespace: apollo
+spec:
+  graphRef: ${APOLLO_GRAPH_ID}@${ENVIRONMENT}
+  selectors:
+    - matchExpressions:
+        - key: apollo.io/subgraph
+          operator: Exists
+  partial: false
+EOF
+
+# Apply Supergraph (use dev or prod file as template, or create dynamically)
+if [ -f "supergraph-${ENVIRONMENT}.yaml" ]; then
+    kubectl apply -f "supergraph-${ENVIRONMENT}.yaml"
 else
-  # Fallback if envsubst not available
-  sed "s|\${TF_VAR_apollo_graph_id}|${TF_VAR_apollo_graph_id}|g" "supergraphschema-${ENVIRONMENT}.yaml" | kubectl apply -f -
+    # Create dynamically with dev defaults
+    cat <<EOF | kubectl apply -f -
+apiVersion: apollographql.com/v1alpha2
+kind: Supergraph
+metadata:
+  name: ${RESOURCE_NAME}
+  namespace: apollo
+spec:
+  replicas: 1
+  podTemplate:
+    routerVersion: 2.7.0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+  schema:
+    resource:
+      name: ${RESOURCE_NAME}
+      namespace: apollo
+EOF
 fi
-
-# Apply Supergraph
-kubectl apply -f "supergraph-${ENVIRONMENT}.yaml"
 
 # Apply Ingress
-kubectl apply -f "ingress-${ENVIRONMENT}.yaml"
+if [ -f "ingress-${ENVIRONMENT}.yaml" ]; then
+    kubectl apply -f "ingress-${ENVIRONMENT}.yaml"
+else
+    # Create dynamically
+    cat <<EOF | kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: router
+  namespace: apollo
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ${RESOURCE_NAME}
+                port:
+                  number: 80
+EOF
+fi
 
 echo "Operator resources deployed successfully for ${ENVIRONMENT} environment"
 
