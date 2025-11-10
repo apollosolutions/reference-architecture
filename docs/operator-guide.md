@@ -128,6 +128,50 @@ When you update a subgraph schema and redeploy the image:
 6. Supergraph fetches the new composed schema
 7. Router is rolled out with the new schema
 
+### Example: Updating a Single Subgraph
+
+To update a single subgraph (e.g., `products`), follow these steps:
+
+```bash
+SUBGRAPH="products"
+ENVIRONMENT="dev"
+
+eval $(minikube docker-env)
+docker build -t "${SUBGRAPH}:local" "subgraphs/${SUBGRAPH}"
+
+SCHEMA_FILE="subgraphs/${SUBGRAPH}/schema.graphql"
+SCHEMA_CONTENT=$(cat "$SCHEMA_FILE" | sed 's/^/      /')
+
+cat <<EOF | kubectl apply -f -
+apiVersion: apollographql.com/v1alpha2
+kind: Subgraph
+metadata:
+  name: ${SUBGRAPH}
+  namespace: ${SUBGRAPH}
+  labels:
+    app: ${SUBGRAPH}
+    apollo.io/subgraph: "true"
+spec:
+  endpoint: http://graphql.${SUBGRAPH}.svc.cluster.local:4001
+  schema:
+    sdl: |
+${SCHEMA_CONTENT}
+EOF
+```
+
+The operator will automatically:
+- Detect the schema change
+- Publish the updated schema to GraphOS
+- Trigger re-composition
+- Roll out the new router with the updated schema
+
+Monitor the update progress:
+
+```bash
+kubectl get subgraph ${SUBGRAPH} -n ${SUBGRAPH} -w
+kubectl get supergraphschema reference-architecture-${ENVIRONMENT} -n apollo
+```
+
 ### Manual Trigger
 
 If you need to manually trigger composition:
