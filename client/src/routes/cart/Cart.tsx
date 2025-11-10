@@ -65,7 +65,7 @@ export default function Cart(props: Props) {
     )
   }
 
-  const cart = data?.user?.cart
+  const cart = data?.me?.cart
   const items = cart?.items || []
   const subtotal = cart?.subtotal || 0
 

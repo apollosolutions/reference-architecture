@@ -53,7 +53,7 @@ export default function LoggedInMenu() {
     },
   })
 
-  const cartItemCount = data?.user?.cart?.items?.length || 0
+  const cartItemCount = data?.me?.cart?.items?.length || 0
 
   return (
     <Flex alignItems={'center'} width={'275px'}>

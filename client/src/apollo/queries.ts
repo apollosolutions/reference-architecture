@@ -40,7 +40,7 @@ const USER_PROFILE = gql`
 `
 const USER_PROFILE_FULL = gql`
   query UserProfileFull {
-    user {
+    me {
       id
       cart {
         userId
