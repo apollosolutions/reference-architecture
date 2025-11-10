@@ -60,8 +60,11 @@ async function validateToken(token: string | undefined): Promise<boolean> {
 
 /**
  * Handles a coprocessor request
- * Validates JWT authentication for RouterRequest stage
  * Adds a "source" header to SubgraphRequest stage
+ *
+ * Note: JWT authentication is handled by the router's built-in authentication plugin.
+ * The router automatically validates JWTs and enforces the @authenticated directive.
+ * The coprocessor should not block requests at RouterRequest stage.
  *
  * @param req - The request object
  * @param res - The response object
@@ -71,30 +74,6 @@ async function handleCoprocessorRequest(
   res: express.Response
 ): Promise<void> {
   const payload = req.body;
-
-  // Handle RouterRequest stage - validate authentication
-  if (payload.stage === CoprocessorStage.ROUTER_REQUEST) {
-    const authHeader = payload.headers.authorization?.[0];
-    const isValid = await validateToken(authHeader);
-
-    if (!isValid) {
-      // Return 401 Unauthorized if token is invalid or missing
-      res.json({
-        ...payload,
-        control: {
-          break: 401,
-        },
-      });
-      return;
-    }
-
-    // Token is valid, continue with the request
-    res.json({
-      ...payload,
-      control: "continue",
-    });
-    return;
-  }
 
   // Handle SubgraphRequest stage - add source header
   if (payload.stage === CoprocessorStage.SUBGRAPH_REQUEST) {

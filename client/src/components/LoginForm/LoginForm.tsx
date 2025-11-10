@@ -28,7 +28,6 @@ const LoginForm = () => {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [scopes, setScopes] = useState('')
   const [loginError, setLoginError] = useState(
     undefined as ApolloError | undefined
   )
@@ -36,7 +35,6 @@ const LoginForm = () => {
   const resetForm = () => {
     setUsername('')
     setPassword('')
-    setScopes('')
   }
 
   const handleChangeUsername = (e: React.FormEvent<HTMLInputElement>) => {
@@ -47,17 +45,12 @@ const LoginForm = () => {
     setPassword(e?.currentTarget.value)
   }
 
-  const handleChangeScopes = (e: React.FormEvent<HTMLInputElement>) => {
-    setScopes(e?.currentTarget.value)
-  }
-
   const [loginMutation, { data, loading, error: requestError }] = useMutation(
     MUTATIONS.LOGIN,
     {
       variables: {
         username: username,
         password: password,
-        scopes: scopes.split(','),
       },
       onCompleted: async (data) => {
         // Request succeeded but login failed
@@ -102,7 +95,7 @@ const LoginForm = () => {
               bg="navy.400"
               borderWidth="2px"
               borderColor="beige.400"
-              placeholder="Type your username"
+              placeholder="user1, user2, or user3"
               value={username}
               onChange={handleChangeUsername}
             />
@@ -112,19 +105,9 @@ const LoginForm = () => {
             <Input
               type="password"
               {...inputProps}
-              placeholder="Your Password"
+              placeholder="Any password (non-empty)"
               value={password}
               onChange={handleChangePassword}
-            />
-          </FormControl>
-          <FormControl id="scopes">
-            <FormLabel>Scopes</FormLabel>
-            <Input
-              type="scopes"
-              {...inputProps}
-              placeholder="Comma Separated Scopes"
-              value={scopes}
-              onChange={handleChangeScopes}
             />
           </FormControl>
           <Stack spacing={10}>

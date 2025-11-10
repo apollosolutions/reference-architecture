@@ -128,7 +128,7 @@ const LOGIN = gql`
   mutation Mutation(
     $username: String!
     $password: String!
-    $scopes: [String!]!
+    $scopes: [String!]
   ) {
     login(username: $username, password: $password, scopes: $scopes) {
       ... on LoginSuccessful {

@@ -54,6 +54,15 @@ kubectl create configmap router-config \
 
 echo "Router configuration ConfigMap created"
 
+# Create Rhai scripts ConfigMap
+echo "Creating Rhai scripts ConfigMap..."
+kubectl create configmap rhai-scripts \
+    --from-file=main.rhai=deploy/operator-resources/rhai/main.rhai \
+    -n apollo \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+echo "Rhai scripts ConfigMap created"
+
 # Deploy SupergraphSchema
 echo "Deploying SupergraphSchema..."
 cat <<EOF | kubectl apply -f -

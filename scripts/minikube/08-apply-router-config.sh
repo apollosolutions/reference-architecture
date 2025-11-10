@@ -37,9 +37,15 @@ fi
 RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
 DEPLOYMENT_NAME="${RESOURCE_NAME}"
 
-# Verify ConfigMap exists
+# Verify ConfigMaps exist
 if ! kubectl get configmap router-config -n apollo &>/dev/null; then
     echo "Error: router-config ConfigMap not found"
+    echo "Please run 07-deploy-operator-resources.sh first to create the ConfigMap"
+    exit 1
+fi
+
+if ! kubectl get configmap rhai-scripts -n apollo &>/dev/null; then
+    echo "Error: rhai-scripts ConfigMap not found"
     echo "Please run 07-deploy-operator-resources.sh first to create the ConfigMap"
     exit 1
 fi
@@ -241,6 +247,48 @@ else
     fi
 fi
 
+# Add Rhai scripts volume and volumeMount
+echo "Adding Rhai scripts volume and volumeMount..."
+
+# Check if rhai-scripts volume exists
+if ! kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.volumes[*].name}' | grep -q "rhai-scripts"; then
+    echo "  Adding rhai-scripts volume..."
+    kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
+        {
+            "op": "add",
+            "path": "/spec/template/spec/volumes/-",
+            "value": {
+                "name": "rhai-scripts",
+                "configMap": {
+                    "name": "rhai-scripts"
+                }
+            }
+        }
+    ]'
+    echo "  Added rhai-scripts volume"
+else
+    echo "  rhai-scripts volume already exists"
+fi
+
+# Check if rhai-scripts volumeMount exists
+if ! kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].volumeMounts[*].name}' | grep -q "rhai-scripts"; then
+    echo "  Adding rhai-scripts volumeMount..."
+    kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
+        {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/volumeMounts/-",
+            "value": {
+                "name": "rhai-scripts",
+                "mountPath": "/etc/rhai",
+                "readOnly": true
+            }
+        }
+    ]'
+    echo "  Added rhai-scripts volumeMount"
+else
+    echo "  rhai-scripts volumeMount already exists"
+fi
+
 # Check if --config args exist and replace them if needed
 CURRENT_ARGS=$(kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].args[*]}' || echo "")
 if [[ "$CURRENT_ARGS" =~ "--config" ]]; then
@@ -338,6 +386,46 @@ else
     echo "  Added --config arguments"
 fi
 
+# Add --log=debug argument if it doesn't exist
+echo "Checking for --log argument..."
+CURRENT_ARGS=$(kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].args[*]}' || echo "")
+if [[ ! "$CURRENT_ARGS" =~ "--log" ]]; then
+    echo "  Adding --log=debug argument..."
+    kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
+        {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/args/-",
+            "value": "--log=debug"
+        }
+    ]'
+    echo "  Added --log=debug argument"
+else
+    echo "  --log argument already exists, checking if it's set to debug..."
+    ARGS_JSON=$(kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].args}' || echo "[]")
+    ARGS_LIST=$(echo "$ARGS_JSON" | grep -o '"[^"]*"' | tr -d '"' | tr '\n' ' ')
+    LOG_INDEX=-1
+    INDEX=0
+    for arg in $ARGS_LIST; do
+        if [[ "$arg" =~ "--log" ]]; then
+            LOG_INDEX=$INDEX
+            break
+        fi
+        INDEX=$((INDEX + 1))
+    done
+    
+    if [[ $LOG_INDEX -ge 0 ]]; then
+        echo "  Replacing existing --log argument with --log=debug..."
+        kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p="[
+            {
+                \"op\": \"replace\",
+                \"path\": \"/spec/template/spec/containers/0/args/$LOG_INDEX\",
+                \"value\": \"--log=debug\"
+            }
+        ]"
+        echo "  Updated --log argument to debug"
+    fi
+fi
+
 echo "Router deployment patched"
 
 # Wait for rollout to complete
@@ -354,7 +442,12 @@ echo ""
 echo "Router configuration has been applied via ConfigMap:"
 echo "  ConfigMap: router-config (contains router.yaml)"
 echo "  Mounted at: /etc/router/router.yaml"
-echo "  Router args: --config /etc/router/router.yaml"
+echo "  Router args: --config /etc/router/router.yaml --log=debug"
+echo ""
+echo "Rhai scripts have been mounted:"
+echo "  ConfigMap: rhai-scripts (contains main.rhai)"
+echo "  Mounted at: /etc/rhai"
+echo "  Scripts will log at all router lifecycle stages"
 echo ""
 echo "Monitor router status with:"
 echo "  kubectl get supergraphs -n apollo"
