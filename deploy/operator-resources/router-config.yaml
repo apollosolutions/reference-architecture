@@ -46,18 +46,11 @@ coprocessor:
         headers: true
 
 health_check:
-  listen: 0.0.0.0:8080
+  listen: 0.0.0.0:8088
 
 sandbox:
   enabled: true
 
 homepage:
   enabled: false
-
-include_subgraph_errors:
-  all: true
-
-plugins:
-  experimental:
-    expose_query_plan: true
 
