@@ -95,18 +95,6 @@ spec:
       requests:
         cpu: 100m
         memory: 256Mi
-    extraVolumes:
-      - name: router-config
-        configMap:
-          name: router-config
-    extraVolumeMounts:
-      - name: router-config
-        mountPath: /etc/router
-        readOnly: true
-    router:
-      args:
-        - --config
-        - /etc/router/router.yaml
   schema:
     resource:
       name: ${RESOURCE_NAME}
@@ -115,6 +103,91 @@ EOF
 
 echo "Supergraph deployed"
 
+# Wait for router deployment to be created
+echo "Waiting for router deployment to be created..."
+DEPLOYMENT_NAME="${RESOURCE_NAME}"
+for i in {1..60}; do
+    if kubectl get deployment ${DEPLOYMENT_NAME} -n apollo &>/dev/null; then
+        echo "Router deployment found"
+        break
+    fi
+    echo "  Waiting for deployment... ($i/60)"
+    sleep 2
+done
+
+if ! kubectl get deployment ${DEPLOYMENT_NAME} -n apollo &>/dev/null; then
+    echo "Error: Router deployment not found after waiting"
+    echo "Please check the Supergraph status:"
+    echo "  kubectl get supergraph ${RESOURCE_NAME} -n apollo"
+    exit 1
+fi
+
+# Patch the router deployment to mount the ConfigMap and use it
+echo "Patching router deployment to use ConfigMap..."
+
+# Check if volume already exists, if not add it
+if ! kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.volumes[*].name}' | grep -q "router-config"; then
+    kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
+        {
+            "op": "add",
+            "path": "/spec/template/spec/volumes/-",
+            "value": {
+                "name": "router-config",
+                "configMap": {
+                    "name": "router-config"
+                }
+            }
+        }
+    ]'
+    echo "  Added router-config volume"
+else
+    echo "  Volume already exists"
+fi
+
+# Check if volumeMount already exists, if not add it
+if ! kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].volumeMounts[*].name}' | grep -q "router-config"; then
+    kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
+        {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/volumeMounts/-",
+            "value": {
+                "name": "router-config",
+                "mountPath": "/etc/router",
+                "readOnly": true
+            }
+        }
+    ]'
+    echo "  Added router-config volumeMount"
+else
+    echo "  VolumeMount already exists"
+fi
+
+# Check if --config args already exist, if not add them
+CURRENT_ARGS=$(kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].args[*]}' || echo "")
+if [[ ! "$CURRENT_ARGS" =~ "--config" ]]; then
+    kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
+        {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/args/-",
+            "value": "--config"
+        },
+        {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/args/-",
+            "value": "/etc/router/router.yaml"
+        }
+    ]'
+    echo "  Added --config arguments"
+else
+    echo "  --config arguments already exist"
+fi
+
+echo "Router deployment patched"
+
+# Wait for rollout to complete
+echo "Waiting for router rollout to complete..."
+kubectl rollout status deployment/${DEPLOYMENT_NAME} -n apollo --timeout=300s || true
+
 # Wait for router to be ready
 echo "Waiting for router to be ready..."
 kubectl wait --for=condition=ready --timeout=300s supergraph/${RESOURCE_NAME} -n apollo || true
@@ -122,9 +195,15 @@ kubectl wait --for=condition=ready --timeout=300s supergraph/${RESOURCE_NAME} -n
 echo ""
 echo "✓ Operator resources deployed!"
 echo ""
+echo "Router configuration has been applied via ConfigMap:"
+echo "  ConfigMap: router-config (contains router.yaml)"
+echo "  Mounted at: /etc/router/router.yaml"
+echo "  Router args: --config /etc/router/router.yaml"
+echo ""
 echo "Monitor router status with:"
 echo "  kubectl get supergraphs -n apollo"
 echo "  kubectl get pods -n apollo"
+echo "  kubectl logs -n apollo deployment/${DEPLOYMENT_NAME}"
 echo ""
 echo "Next step: Run 08-deploy-ingress.sh to setup external access"
 

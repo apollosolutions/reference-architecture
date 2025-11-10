@@ -1,6 +1,13 @@
 # Router configuration for Apollo Router
-# This file is loaded via ConfigMap and referenced in the Supergraph CRD
-# Based on: https://github.com/apollosolutions/reference-architecture/blob/main/deploy/router/values.yaml
+#
+# This configuration is loaded via a ConfigMap and mounted into the router pods.
+# The script 07-deploy-operator-resources.sh:
+#   1. Creates a ConfigMap from this file
+#   2. Patches the router deployment to mount the ConfigMap as a volume at /etc/router
+#   3. Patches the router deployment to add --config /etc/router/router.yaml as container args
+#
+# Note: The Apollo GraphOS Operator CRD does not support router configuration
+# in the Supergraph CRD, so we patch the deployment manually after it's created.
 
 supergraph:
   listen: 0.0.0.0:4000
