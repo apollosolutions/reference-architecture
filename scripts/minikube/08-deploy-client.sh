@@ -38,17 +38,14 @@ if ! kubectl cluster-info &> /dev/null; then
     exit 1
 fi
 
-# Get router URL for backend configuration
-RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
-INGRESS_IP=$(kubectl get ingress router -n apollo -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-
-if [ -z "$INGRESS_IP" ]; then
-    echo "Error: Router ingress not found or has no IP address"
-    echo "Please ensure script 07-deploy-ingress.sh completed successfully"
+# Get router URL from .env file
+if [[ -z "${ROUTER_URL:-}" ]]; then
+    echo "Error: ROUTER_URL is not set"
+    echo "Please run 07-deploy-ingress.sh first to set up the router URL"
     exit 1
 fi
 
-BACKEND_URL="http://${INGRESS_IP}"
+BACKEND_URL="$ROUTER_URL"
 echo "Using backend URL: $BACKEND_URL"
 
 # Create client namespace
@@ -61,10 +58,28 @@ if [ ! -d "client" ]; then
 fi
 
 # Build client with BACKEND_URL if Dockerfile supports it
+RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
 if [ -f "client/Dockerfile" ] && grep -q "BACKEND_URL" "client/Dockerfile"; then
     echo "Building client image with BACKEND_URL=$BACKEND_URL..."
+    echo "Note: The client's nginx will proxy /graphql requests to the router service"
     eval $(minikube docker-env)
-    docker build --build-arg BACKEND_URL="$BACKEND_URL" -t client:local client
+    # Backup original nginx config
+    cp client/docker/nginx/conf.d/default.conf client/docker/nginx/conf.d/default.conf.bak
+    # Replace placeholder with actual service name (handle both macOS and Linux sed)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s/\${ROUTER_SERVICE_NAME}/$RESOURCE_NAME/g" client/docker/nginx/conf.d/default.conf
+    else
+        sed -i "s/\${ROUTER_SERVICE_NAME}/$RESOURCE_NAME/g" client/docker/nginx/conf.d/default.conf
+    fi
+    # Verify the replacement worked
+    if grep -q "\${ROUTER_SERVICE_NAME}" client/docker/nginx/conf.d/default.conf; then
+        echo "Warning: Placeholder replacement may have failed. Checking config..."
+        cat client/docker/nginx/conf.d/default.conf
+    fi
+    # Build without cache to ensure nginx config is included
+    docker build --no-cache --build-arg BACKEND_URL="$BACKEND_URL" -t client:local client
+    # Restore original nginx config
+    mv client/docker/nginx/conf.d/default.conf.bak client/docker/nginx/conf.d/default.conf
 fi
 
 # Install using Helm
@@ -73,35 +88,18 @@ helm upgrade --install client "deploy/client" \
     -n client \
     --wait
 
-# Deploy ingress for client
-echo "Deploying ingress for client..."
-cat <<EOF | kubectl apply -f -
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: client
-  namespace: client
-spec:
-  ingressClassName: nginx
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: web
-                port:
-                  number: 80
-EOF
+# Force pod restart to pick up new image
+echo "Restarting client pods to pick up new image..."
+kubectl rollout restart deployment/web -n client
+kubectl rollout status deployment/web -n client --timeout=120s
 
-echo "Client ingress deployed"
-
-# Wait for ingress to get an IP address
-echo "Waiting for client ingress to get an IP address..."
+# The Helm chart already creates an ingress resource named "web"
+# Check if ingress exists and get its status
+echo "Checking client ingress status..."
+CLIENT_INGRESS_NAME="web"
 CLIENT_IP=""
 for i in {1..30}; do
-    CLIENT_IP=$(kubectl get ingress client -n client -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+    CLIENT_IP=$(kubectl get ingress ${CLIENT_INGRESS_NAME} -n client -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
     if [ -n "$CLIENT_IP" ]; then
         break
     fi
@@ -111,24 +109,17 @@ done
 
 if [ -z "$CLIENT_IP" ]; then
     echo ""
-    echo "Error: Client ingress did not get an IP address after waiting"
-    echo "This may indicate an issue with the ingress controller"
+    echo "Warning: Client ingress did not get an IP address after waiting"
+    echo "The ingress may still be configuring. Check status with:"
+    echo "  kubectl get ingress ${CLIENT_INGRESS_NAME} -n client"
     echo ""
-    echo "Troubleshooting:"
-    echo "  1. Check ingress controller status: kubectl get pods -n ingress-nginx"
-    echo "  2. Check ingress status: kubectl describe ingress client -n client"
-    exit 1
+else
+    echo ""
+    echo "✓ Client is accessible at:"
+    echo "  http://${CLIENT_IP}"
+    echo ""
+    echo "If using minikube tunnel, access at: http://127.0.0.1/"
+    echo "(The client ingress uses the same LoadBalancer as the router)"
+    echo ""
 fi
-
-echo ""
-echo "✓ Client is accessible at:"
-echo "  http://${CLIENT_IP}"
-echo ""
-echo "You can access the client at the IP above. If you want to use a hostname instead,"
-echo "you can add this to your /etc/hosts file:"
-echo "  ${CLIENT_IP}  client.local"
-echo ""
-echo "Then access at: http://client.local"
-echo ""
-echo "✓ Client deployment complete!"
 

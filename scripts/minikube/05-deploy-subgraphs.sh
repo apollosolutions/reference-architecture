@@ -76,8 +76,8 @@ for subgraph in "${SUBGRAPHS[@]}"; do
         exit 1
     fi
     
-    # Read schema and escape for YAML
-    SCHEMA_CONTENT=$(cat "$SCHEMA_FILE" | sed 's/^/    /')
+    # Read schema and indent for YAML (6 spaces to be indented relative to 'sdl:')
+    SCHEMA_CONTENT=$(cat "$SCHEMA_FILE" | sed 's/^/      /')
     
     # Create Subgraph CRD YAML
     cat <<EOF | kubectl apply -f -

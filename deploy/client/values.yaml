@@ -23,6 +23,7 @@ service:
 
 ingress:
   enabled: true
+  className: nginx
   name: web
   tls: []
 

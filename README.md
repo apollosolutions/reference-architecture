@@ -15,7 +15,70 @@ Once the architecture is fully stood up, you'll have:
 
 ### The ending architecture
 
-![Software Development Life Cycle](/images/sdlc.png)
+```mermaid
+graph TB
+    subgraph "Minikube Cluster"
+        subgraph "Client Namespace"
+            Client[React Client<br/>Apollo Client]
+        end
+        
+        subgraph "Apollo Namespace"
+            Router[Apollo Router<br/>Managed by Operator]
+            Operator[Apollo GraphOS Operator]
+            SupergraphSchema[SupergraphSchema CRD]
+            Supergraph[Supergraph CRD]
+        end
+        
+        subgraph "Subgraph Namespaces"
+            Checkout[Checkout Subgraph]
+            Discovery[Discovery Subgraph]
+            Inventory[Inventory Subgraph]
+            Orders[Orders Subgraph]
+            Products[Products Subgraph]
+            Reviews[Reviews Subgraph]
+            Shipping[Shipping Subgraph]
+            Users[Users Subgraph]
+        end
+        
+        Ingress[NGINX Ingress Controller]
+    end
+    
+    subgraph "External Services"
+        GraphOS[Apollo GraphOS Studio<br/>Schema Composition]
+    end
+    
+    Client -->|HTTP| Ingress
+    Ingress -->|HTTP| Router
+    Router -->|GraphQL| Checkout
+    Router -->|GraphQL| Discovery
+    Router -->|GraphQL| Inventory
+    Router -->|GraphQL| Orders
+    Router -->|GraphQL| Products
+    Router -->|GraphQL| Reviews
+    Router -->|GraphQL| Shipping
+    Router -->|GraphQL| Users
+    
+    Operator -->|Manages| SupergraphSchema
+    Operator -->|Manages| Supergraph
+    Operator -->|Publishes Schemas| GraphOS
+    GraphOS -->|Composed Schema| SupergraphSchema
+    SupergraphSchema -->|Schema Reference| Supergraph
+    Supergraph -->|Deploys| Router
+    
+    Checkout -.->|Schema via CRD| Operator
+    Discovery -.->|Schema via CRD| Operator
+    Inventory -.->|Schema via CRD| Operator
+    Orders -.->|Schema via CRD| Operator
+    Products -.->|Schema via CRD| Operator
+    Reviews -.->|Schema via CRD| Operator
+    Shipping -.->|Schema via CRD| Operator
+    Users -.->|Schema via CRD| Operator
+    
+    style Router fill:#e1f5ff
+    style Operator fill:#fff4e1
+    style GraphOS fill:#e8f5e9
+    style Client fill:#f3e5f5
+```
 
 
 ### Prerequisites

@@ -76,7 +76,7 @@ metadata:
   name: ${RESOURCE_NAME}
   namespace: apollo
 spec:
-  replicas: 1
+  replicas: 3
   podTemplate:
     routerVersion: 2.7.0
     resources:

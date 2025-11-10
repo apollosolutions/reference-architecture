@@ -163,6 +163,7 @@ kubectl describe supergraph reference-architecture-${ENVIRONMENT} -n apollo
 
 This script:
 - Deploys an Ingress resource for external access
+- Configures the ingress controller as LoadBalancer for `minikube tunnel` support
 - Provides access URLs for the router
 
 ### Script 08: Deploy Client (Optional)
@@ -179,45 +180,97 @@ This script:
 
 After running all scripts, you can access your supergraph in several ways:
 
-### Option 1: Using Ingress IP
+### Option 1: Using Minikube Tunnel (recommended for LoadBalancer access)
 
-If ingress is configured, get the IP:
-
-```bash
-kubectl get ingress router -n apollo
-```
-
-Then access at `http://<INGRESS_IP>`
-
-### Option 2: Using Minikube Service
+The ingress controller has been configured as a LoadBalancer service. To access it via `minikube tunnel`:
 
 ```bash
-minikube service reference-architecture-${ENVIRONMENT} -n apollo
+# In a separate terminal, run:
+minikube tunnel
 ```
 
-This will open the router in your default browser.
+**Important notes:**
+- Enter your sudo password when prompted
+- You may see a message "Starting tunnel for service router" - **this can be safely ignored**
+- The "router" is an Ingress resource (not a service), so it doesn't need tunneling
+- Only the `ingress-nginx-controller` LoadBalancer service needs tunneling
+- Wait for the "Status: running" message
+- Access the router at: `http://127.0.0.1/`
 
-### Option 3: Using Port Forwarding
+**Why you see "router" in the tunnel output:**
+The ingress controller automatically sets a LoadBalancer status on Ingress resources, which makes `minikube tunnel` think it needs to tunnel them. However, since the ingress controller is already being tunneled, the router is accessible through it. You can safely ignore this message.
+
+### Option 2: Using Port Forwarding
+
+Port forward directly to the router service:
 
 ```bash
 kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80
 ```
 
-Then access at `http://localhost:4000`
+Then access at `http://localhost:4000` in your browser.
+
+**Note:** Keep the port-forward command running in a terminal while you access the router.
+
+### Option 3: Using Ingress via NodePort
+
+Get the Minikube IP and ingress controller NodePort:
+
+```bash
+MINIKUBE_IP=$(minikube ip)
+NODEPORT=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
+echo "Access at: http://${MINIKUBE_IP}:${NODEPORT}"
+```
+
+**Note:** This method may not work reliably on macOS due to network routing. Use Option 1 (minikube tunnel) instead.
 
 ### Verify Router is Working
 
-Test the router health endpoint:
+Test the router with a simple GraphQL query:
 
 ```bash
-curl http://localhost:4000/.well-known/apollo/server-health
+# If using minikube service, it will show you the URL to use
+# If using port forwarding, use http://localhost:4000
+curl -X POST http://localhost:4000 \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ __typename }"}'
 ```
 
-Or visit the router in Apollo Studio:
-1. Go to [Apollo GraphOS Studio](https://studio.apollographql.com)
-2. Select your graph
-3. Navigate to the variant (e.g., "dev")
-4. View the router status and metrics
+Or test the health endpoint (if accessible on the main port):
+
+```bash
+curl http://localhost:4000/health
+```
+
+## Step 5: Logging Into the Client Application
+
+If you deployed the client application (script 08), you can log in using the following test credentials:
+
+### Test Users
+
+The application includes three test users:
+
+| Username | Password | Email | Notes |
+|----------|----------|-------|-------|
+| `user1` | Any non-empty password | user1@contoso.org | Has 2 credit cards, cart with items |
+| `user2` | Any non-empty password | user2@contoso.org | Has 1 debit card, cart with items |
+| `user3` | Any non-empty password | user3@contoso.org | Has debit card and bank account, empty cart |
+
+### Login Instructions
+
+1. Navigate to the client application (typically at `http://127.0.0.1/` if using minikube tunnel)
+2. Click "Login" in the navigation menu
+3. Enter one of the test usernames (e.g., `user1`)
+4. Enter any non-empty password (e.g., `password`)
+5. Optionally enter scopes (comma-separated, e.g., `user:read:email`)
+6. Click "Sign In"
+
+**Note:** The password validation only checks that it's not empty. Any non-empty password will work for authentication.
+
+### Scopes
+
+Scopes are optional but can be used to control access to certain fields:
+- `user:read:email` - Allows reading the user's email address
 
 ## Creating Additional Environments
 
