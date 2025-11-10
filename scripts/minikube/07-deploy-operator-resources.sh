@@ -1,10 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-# Script 06: Deploy Operator Resources
+# Script 07: Deploy Operator Resources
 # This script deploys SupergraphSchema and Supergraph CRDs
+# Note: The coprocessor (script 06) must be deployed first as the router requires it
 
-echo "=== Step 06: Deploying Operator Resources ==="
+echo "=== Step 07: Deploying Operator Resources ==="
 
 # Load environment variables from .env if it exists
 if [ -f .env ]; then
@@ -44,6 +45,15 @@ kubectl create namespace apollo --dry-run=client -o yaml | kubectl apply -f -
 # Resource name based on environment
 RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
 
+# Create router configuration ConfigMap
+echo "Creating router configuration ConfigMap..."
+kubectl create configmap router-config \
+    --from-file=router.yaml=deploy/operator-resources/router-config.yaml \
+    -n apollo \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+echo "Router configuration ConfigMap created"
+
 # Deploy SupergraphSchema
 echo "Deploying SupergraphSchema..."
 cat <<EOF | kubectl apply -f -
@@ -67,7 +77,9 @@ echo "SupergraphSchema deployed"
 echo "Waiting for schema composition..."
 sleep 5
 
-# Deploy Supergraph
+# Deploy Supergraph with ConfigMap-mounted router configuration
+# The router configuration is loaded from the ConfigMap and mounted as a volume
+# The router will use the --config flag to reference the mounted file
 echo "Deploying Supergraph..."
 cat <<EOF | kubectl apply -f -
 apiVersion: apollographql.com/v1alpha2
@@ -83,6 +95,18 @@ spec:
       requests:
         cpu: 100m
         memory: 256Mi
+    extraVolumes:
+      - name: router-config
+        configMap:
+          name: router-config
+    extraVolumeMounts:
+      - name: router-config
+        mountPath: /etc/router
+        readOnly: true
+    router:
+      args:
+        - --config
+        - /etc/router/router.yaml
   schema:
     resource:
       name: ${RESOURCE_NAME}
@@ -102,5 +126,5 @@ echo "Monitor router status with:"
 echo "  kubectl get supergraphs -n apollo"
 echo "  kubectl get pods -n apollo"
 echo ""
-echo "Next step: Run 07-deploy-ingress.sh to setup external access"
+echo "Next step: Run 08-deploy-ingress.sh to setup external access"
 

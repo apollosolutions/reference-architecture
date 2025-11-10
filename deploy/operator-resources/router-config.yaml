@@ -1,0 +1,56 @@
+# Router configuration for Apollo Router
+# This file is loaded via ConfigMap and referenced in the Supergraph CRD
+# Based on: https://github.com/apollosolutions/reference-architecture/blob/main/deploy/router/values.yaml
+
+supergraph:
+  listen: 0.0.0.0:4000
+  introspection: true
+
+headers:
+  all:
+    request:
+      - propagate:
+          matching: .*
+
+authentication:
+  router:
+    jwt:
+      jwks:
+        - url: http://graphql.users.svc.cluster.local:4001/.well-known/jwks.json
+
+authorization:
+  directives:
+    enabled: true
+
+cors:
+  allow_any_origin: true
+
+coprocessor:
+  url: http://coprocessor.apollo.svc.cluster.local:8081
+  timeout: 2s
+  router:
+    request:
+      headers: true
+  subgraph:
+    all:
+      request:
+        headers: true
+      response:
+        headers: true
+
+health_check:
+  listen: 0.0.0.0:8080
+
+sandbox:
+  enabled: true
+
+homepage:
+  enabled: false
+
+include_subgraph_errors:
+  all: true
+
+plugins:
+  experimental:
+    expose_query_plan: true
+

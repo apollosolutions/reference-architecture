@@ -136,16 +136,34 @@ kubectl get subgraphs --all-namespaces
 kubectl get pods --all-namespaces
 ```
 
-### Script 06: Deploy Operator Resources
+### Script 06: Deploy Coprocessor
+
+The coprocessor handles JWT authentication for the `@authenticated` directive and is required for the router to function properly.
 
 ```bash
-./scripts/minikube/06-deploy-operator-resources.sh
+./scripts/minikube/06-deploy-coprocessor.sh
+```
+
+This script:
+- Builds the coprocessor Docker image (if not already built)
+- Deploys the coprocessor using Helm
+- Waits for coprocessor pods to be ready
+
+**Note:** The coprocessor validates JWT tokens from the users subgraph's JWKS endpoint and enables the `@authenticated` directive to work properly. It must be deployed before the router (script 07).
+
+### Script 07: Deploy Operator Resources
+
+```bash
+./scripts/minikube/07-deploy-operator-resources.sh
 ```
 
 This script:
 - Deploys SupergraphSchema CRD (triggers composition)
 - Deploys Supergraph CRD (deploys the Apollo Router)
+- Configures the router to use the coprocessor (required)
 - Waits for the router to be ready
+
+**Note:** The coprocessor (script 06) must be deployed before running this script, as the router configuration requires it.
 
 Monitor router deployment:
 
@@ -155,10 +173,10 @@ kubectl get pods -n apollo
 kubectl describe supergraph reference-architecture-${ENVIRONMENT} -n apollo
 ```
 
-### Script 07: Deploy Ingress
+### Script 08: Deploy Ingress
 
 ```bash
-./scripts/minikube/07-deploy-ingress.sh
+./scripts/minikube/08-deploy-ingress.sh
 ```
 
 This script:
@@ -166,10 +184,10 @@ This script:
 - Configures the ingress controller as LoadBalancer for `minikube tunnel` support
 - Provides access URLs for the router
 
-### Script 08: Deploy Client (Optional)
+### Script 09: Deploy Client (Optional)
 
 ```bash
-./scripts/minikube/08-deploy-client.sh
+./scripts/minikube/09-deploy-client.sh
 ```
 
 This script:
@@ -279,7 +297,7 @@ To create a new environment (e.g., "prod"):
 export ENVIRONMENT="prod"
 ```
 
-2. Run scripts 02-07 again with the new environment:
+2. Run scripts 02-09 again with the new environment:
 
 ```bash
 ./scripts/minikube/02-setup-apollo-graph.sh
@@ -287,8 +305,10 @@ source .env
 ./scripts/minikube/03-setup-cluster.sh
 ./scripts/minikube/04-build-images.sh
 ./scripts/minikube/05-deploy-subgraphs.sh
-./scripts/minikube/06-deploy-operator-resources.sh
-./scripts/minikube/07-deploy-ingress.sh
+./scripts/minikube/06-deploy-coprocessor.sh
+./scripts/minikube/07-deploy-operator-resources.sh
+./scripts/minikube/08-deploy-ingress.sh
+./scripts/minikube/09-deploy-client.sh
 ```
 
 Each environment will have:
