@@ -158,12 +158,12 @@ This script:
 ```
 
 This script:
+- Creates the router-config ConfigMap
 - Deploys SupergraphSchema CRD (triggers composition)
 - Deploys Supergraph CRD (deploys the Apollo Router)
-- Configures the router to use the coprocessor (required)
-- Waits for the router to be ready
+- Waits for the router deployment to be created
 
-**Note:** The coprocessor (script 06) must be deployed before running this script, as the router configuration requires it.
+**Note:** The coprocessor (script 06) must be deployed before running this script.
 
 Monitor router deployment:
 
@@ -173,10 +173,23 @@ kubectl get pods -n apollo
 kubectl describe supergraph reference-architecture-${ENVIRONMENT} -n apollo
 ```
 
-### Script 08: Deploy Ingress
+### Script 08: Apply Router Configuration
 
 ```bash
-./scripts/minikube/08-deploy-ingress.sh
+./scripts/minikube/08-apply-router-config.sh
+```
+
+This script:
+- Patches the router deployment to mount the router-config ConfigMap
+- Configures the router to use custom settings (coprocessor, CORS, etc.)
+- Waits for the router rollout to complete
+
+**Note:** Script 07 must be run first to create the Supergraph and ConfigMap.
+
+### Script 09: Deploy Ingress
+
+```bash
+./scripts/minikube/09-deploy-ingress.sh
 ```
 
 This script:
@@ -184,10 +197,10 @@ This script:
 - Configures the ingress controller as LoadBalancer for `minikube tunnel` support
 - Provides access URLs for the router
 
-### Script 09: Deploy Client (Optional)
+### Script 10: Deploy Client (Optional)
 
 ```bash
-./scripts/minikube/09-deploy-client.sh
+./scripts/minikube/10-deploy-client.sh
 ```
 
 This script:
@@ -297,7 +310,7 @@ To create a new environment (e.g., "prod"):
 export ENVIRONMENT="prod"
 ```
 
-2. Run scripts 02-09 again with the new environment:
+2. Run scripts 02-10 again with the new environment:
 
 ```bash
 ./scripts/minikube/02-setup-apollo-graph.sh
@@ -307,8 +320,9 @@ source .env
 ./scripts/minikube/05-deploy-subgraphs.sh
 ./scripts/minikube/06-deploy-coprocessor.sh
 ./scripts/minikube/07-deploy-operator-resources.sh
-./scripts/minikube/08-deploy-ingress.sh
-./scripts/minikube/09-deploy-client.sh
+./scripts/minikube/08-apply-router-config.sh
+./scripts/minikube/09-deploy-ingress.sh
+./scripts/minikube/10-deploy-client.sh
 ```
 
 Each environment will have:
