@@ -11,6 +11,7 @@ import * as ProductsRoute from './routes/products'
 import * as UserProfileRoute from './routes/user-profile'
 import * as LoginRoute from './routes/login'
 import * as LogoutRoute from './routes/logout'
+import * as CartRoute from './routes/cart'
 
 import ErrorPage from './components/Error'
 
@@ -31,6 +32,7 @@ const routes = createRoutesFromElements(
 
       {/* User Routes */}
       <Route path="/profile" element={<UserProfileRoute.RouteComponent />} />
+      <Route path="/cart" element={<CartRoute.RouteComponent />} />
       <Route path="/login" element={<LoginRoute.RouteComponent />} />
       <Route path="/logout" element={<LogoutRoute.RouteComponent />} />
 

@@ -87,7 +87,7 @@ export default function UserProfileForm({ user }: Props) {
           placeholder="UserName"
           _placeholder={{ color: 'gray.500' }}
           type="text"
-          defaultValue={data?.user?.username}
+          defaultValue={data?.me?.username}
         />
       </FormControl>
       <FormControl id="email" isRequired>

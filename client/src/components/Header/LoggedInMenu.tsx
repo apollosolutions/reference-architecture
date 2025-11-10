@@ -13,10 +13,13 @@ import {
   Spacer,
   useColorMode,
   useColorModeValue,
+  Badge,
 } from '@chakra-ui/react'
 import { AtSignIcon, AddIcon, SunIcon, MoonIcon } from '@chakra-ui/icons'
 import { ShoppingCart } from '../Icons/ShoppingCart'
 import { useAuth } from '../../hooks/useAuth'
+import { useQuery } from '@apollo/client'
+import { QUERIES } from '../../apollo/queries'
 
 const ColorModeToggle = () => {
   const { colorMode, toggleColorMode } = useColorMode()
@@ -33,7 +36,25 @@ const ColorModeToggle = () => {
 }
 
 export default function LoggedInMenu() {
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+
+  const headers: { [key: string]: string } = {
+    'x-user-id': 'user:1',
+  }
+  if (user && user.token) {
+    headers.authorization = `Bearer ${user.token}`
+  }
+
+  const { data } = useQuery(QUERIES.USER_PROFILE_FULL, {
+    skip: !user || !user.token,
+    errorPolicy: 'all',
+    context: {
+      headers,
+    },
+  })
+
+  const cartItemCount = data?.user?.cart?.items?.length || 0
+
   return (
     <Flex alignItems={'center'} width={'275px'}>
       <Menu>
@@ -70,8 +91,29 @@ export default function LoggedInMenu() {
         size={'md'}
         mr={4}
         leftIcon={<AddIcon />}
+        position="relative"
+        as={Link}
+        to="/cart"
       >
         <ShoppingCart />
+        {cartItemCount > 0 && (
+          <Badge
+            position="absolute"
+            top="-8px"
+            right="-8px"
+            borderRadius="full"
+            bg="red.500"
+            color="white"
+            fontSize="xs"
+            minW="20px"
+            h="20px"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            {cartItemCount}
+          </Badge>
+        )}
       </Button>
       <ColorModeToggle />
     </Flex>

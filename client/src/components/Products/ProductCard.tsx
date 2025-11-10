@@ -15,13 +15,23 @@ import {
 import ShowMoreText from 'react-show-more-text'
 import { StarIcon } from '../Icons/Star'
 import { Product } from '../../apollo/types'
+import { useCart } from '../../hooks/useCart'
 
 type ProductCardProps = {
   product: Product
 }
 export default function ProductCard(props: ProductCardProps) {
   const { product } = props
+  const { addToCart, addingToCart } = useCart()
   const productDescription = product.description.padEnd(125)
+  const firstVariant = product?.variants?.[0]
+
+  const handleAddToCart = () => {
+    if (firstVariant?.id) {
+      addToCart(String(firstVariant.id), 1)
+    }
+  }
+
   return (
     <Card
       variant="elevated"
@@ -72,7 +82,7 @@ export default function ProductCard(props: ProductCardProps) {
       </CardBody>
       <CardFooter bg="navy.300" borderBottomRadius={'xl'} p={{ base: 3, md: 6 }}>
         <Flex w="100%" direction={{ base: 'column', sm: 'row' }} gap={3} align="center">
-          <Heading size={{ base: 'md', md: 'lg' }}>${product?.variants[0].price}</Heading>
+          <Heading size={{ base: 'md', md: 'lg' }}>${firstVariant?.price || '0.00'}</Heading>
           <Spacer display={{ base: 'none', sm: 'block' }} />
           <Button
             variant="outline"
@@ -82,6 +92,10 @@ export default function ProductCard(props: ProductCardProps) {
             size={{ base: 'md', md: 'lg' }}
             borderWidth={'2px'}
             w={{ base: '100%', sm: 'auto' }}
+            isLoading={addingToCart}
+            loadingText="Adding..."
+            onClick={handleAddToCart}
+            disabled={!firstVariant?.id}
             _hover={{
               bg: 'beige.400',
               color: 'navy.400',

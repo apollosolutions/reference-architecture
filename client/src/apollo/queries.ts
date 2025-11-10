@@ -146,6 +146,19 @@ const LOGIN = gql`
     }
   }
 `
+
+const ADD_VARIANT_TO_CART = gql`
+  mutation AddVariantToCart($variantId: ID!, $quantity: Int) {
+    cart {
+      addVariantToCart(variantId: $variantId, quantity: $quantity) {
+        successful
+        message
+      }
+    }
+  }
+`
+
 export const MUTATIONS = {
   LOGIN,
+  ADD_VARIANT_TO_CART,
 }
