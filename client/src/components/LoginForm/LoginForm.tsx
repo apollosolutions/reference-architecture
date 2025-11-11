@@ -87,7 +87,7 @@ const LoginForm = () => {
   return (
     <>
       {!data && (
-        <>
+        <form onSubmit={handleSubmit}>
           <FormControl id="username">
             <FormLabel>Username</FormLabel>
             <Input
@@ -120,18 +120,18 @@ const LoginForm = () => {
               <Text color={'blue.400'}>Forgot password?</Text>
             </Stack>
             <Button
+              type="submit"
               bg={'orange.400'}
               rounded={'full'}
               px={6}
               _hover={{
                 bg: 'navy.500',
               }}
-              onClick={handleSubmit}
             >
               Sign In
             </Button>
           </Stack>
-        </>
+        </form>
       )}
       {!loading && (
         <Stack spacing={3}>
