@@ -85,13 +85,8 @@ This matches any Subgraph CRD with the `apollo.io/subgraph` label, regardless of
 ### Check Subgraph Status
 
 ```bash
-# List all subgraphs
 kubectl get subgraph --all-namespaces
-
-# Describe a specific subgraph
 kubectl describe subgraph checkout -n checkout
-
-# Watch subgraph status
 kubectl get subgraph -w
 ```
 
@@ -100,10 +95,7 @@ Look for `SchemaLoaded` condition in the status to verify schema extraction.
 ### Check Composition Status
 
 ```bash
-# Get SupergraphSchema status
 kubectl get supergraphschema -n apollo
-
-# Describe for detailed status
 kubectl describe supergraphschema reference-architecture-dev -n apollo
 ```
 
@@ -115,10 +107,7 @@ Status conditions:
 ### Check Router Deployment
 
 ```bash
-# Get supergraph status
 kubectl get supergraph -n apollo
-
-# Describe for detailed status
 kubectl describe supergraph reference-architecture-dev -n apollo
 ```
 
@@ -139,19 +128,56 @@ When you update a subgraph schema and redeploy the image:
 6. Supergraph fetches the new composed schema
 7. Router is rolled out with the new schema
 
+### Example: Updating a Single Subgraph
+
+To update a single subgraph (e.g., `products`), follow these steps:
+
+```bash
+SUBGRAPH="products"
+ENVIRONMENT="dev"
+
+eval $(minikube docker-env)
+docker build -t "${SUBGRAPH}:local" "subgraphs/${SUBGRAPH}"
+
+SCHEMA_FILE="subgraphs/${SUBGRAPH}/schema.graphql"
+SCHEMA_CONTENT=$(cat "$SCHEMA_FILE" | sed 's/^/      /')
+
+cat <<EOF | kubectl apply -f -
+apiVersion: apollographql.com/v1alpha2
+kind: Subgraph
+metadata:
+  name: ${SUBGRAPH}
+  namespace: ${SUBGRAPH}
+  labels:
+    app: ${SUBGRAPH}
+    apollo.io/subgraph: "true"
+spec:
+  endpoint: http://graphql.${SUBGRAPH}.svc.cluster.local:4001
+  schema:
+    sdl: |
+${SCHEMA_CONTENT}
+EOF
+```
+
+The operator will automatically:
+- Detect the schema change
+- Publish the updated schema to GraphOS
+- Trigger re-composition
+- Roll out the new router with the updated schema
+
+Monitor the update progress:
+
+```bash
+kubectl get subgraph ${SUBGRAPH} -n ${SUBGRAPH} -w
+kubectl get supergraphschema reference-architecture-${ENVIRONMENT} -n apollo
+```
+
 ### Manual Trigger
 
 If you need to manually trigger composition:
 
 ```bash
-# Edit the SupergraphSchema
 kubectl edit supergraphschema reference-architecture-dev -n apollo
-
-# Temporarily disable composition
-# Set: compositionEnabled: false
-
-# Save and exit, then re-enable
-# Set: compositionEnabled: true (or remove the field)
 ```
 
 ## Troubleshooting
@@ -202,26 +228,30 @@ Look for:
 ### Viewing Router Logs
 
 ```bash
-# Get router pods
 kubectl get pods -n apollo
-
-# View logs
 kubectl logs -n apollo deployment/reference-architecture-{dev|prod}
 ```
 
 ## Updating Router Configuration
 
-To update router configuration without changing subgraphs:
+Router configuration is handled directly via `spec.routerConfig` in the Supergraph CRD:
 
-```bash
-# Edit the Supergraph CRD
-kubectl edit supergraph reference-architecture-dev -n apollo
+1. Edit `deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml`
+2. Update the `spec.routerConfig` section
+3. Apply: `kubectl apply -f deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml`
+4. The operator automatically updates the router deployment and rolls out changes
 
-# Update spec.podTemplate.router.configuration
-# Save and the operator will roll out the changes
+**Example:**
+```yaml
+spec:
+  routerConfig:
+    supergraph:
+      listen: 0.0.0.0:4000
+      introspection: true
+    # ... other router settings
 ```
 
-Changes are applied via rolling update - the operator manages the rollout.
+The operator handles the rollout automatically - no manual patching or restarts needed!
 
 ## Best Practices
 

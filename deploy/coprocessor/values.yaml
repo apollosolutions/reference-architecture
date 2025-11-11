@@ -3,9 +3,9 @@ namespace: apollo
 replicaCount: 3
 
 image:
-  repository: ghcr.io/${GITHUB_ORG}/reference-architecture/coprocessor
-  pullPolicy: Always
-  tag: main
+  repository: coprocessor
+  pullPolicy: Never
+  tag: local
 
 nameOverride: coprocessor
 fullnameOverride: coprocessor

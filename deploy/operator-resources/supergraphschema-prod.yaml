@@ -4,7 +4,7 @@ metadata:
   name: reference-architecture-prod
   namespace: apollo
 spec:
-  graphRef: ${TF_VAR_apollo_graph_id}@prod
+  graphRef: ${APOLLO_GRAPH_ID}@prod
   selectors:
     - matchExpressions:
         - key: apollo.io/subgraph

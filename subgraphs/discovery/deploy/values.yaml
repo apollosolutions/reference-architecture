@@ -1,9 +1,9 @@
 replicaCount: 3
 
 image:
-  repository: ghcr.io/andywgarcia/reference-architecture/checkout
-  pullPolicy: Always
-  tag: main
+  repository: discovery
+  pullPolicy: Never
+  tag: local
 
 nameOverride: graphql
 fullnameOverride: graphql

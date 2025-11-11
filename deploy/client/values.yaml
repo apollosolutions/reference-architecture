@@ -1,9 +1,9 @@
 replicaCount: 3
 
 image:
-  repository: ghcr.io/${GITHUB_ORG}/reference-architecture/client
-  pullPolicy: Always
-  tag: main
+  repository: client
+  pullPolicy: Never
+  tag: local
 
 nameOverride: web
 fullnameOverride: web
@@ -23,6 +23,7 @@ service:
 
 ingress:
   enabled: true
+  className: nginx
   name: web
   tls: []
 

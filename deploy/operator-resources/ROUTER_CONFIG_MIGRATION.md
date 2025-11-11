@@ -1,188 +1,138 @@
-# Router Configuration Migration Guide
+# Router Configuration Status
 
-This document describes how the router configuration from `deploy/router/values.yaml` was migrated to operator-managed Supergraph CRDs.
+This document tracks the router configuration implementation using the Apollo GraphOS Operator.
 
-## Migration Summary
+## ✅ Completed Tasks
 
-All router configuration has been moved from Helm values (`deploy/router/values.yaml`) into the Supergraph CRD specifications:
-- `deploy/operator-resources/supergraph-dev.yaml` (dev environment)
-- `deploy/operator-resources/supergraph-prod.yaml` (prod environment)
+- [x] **Graph Creation**: Graph created in Apollo GraphOS
+- [x] **Environment Variants**: Dev and prod variants created
+- [x] **Subgraphs Deployment**: All subgraphs deployed with CRDs using inline SDL
+- [x] **Operator Installation**: Apollo GraphOS Operator installed and configured
+- [x] **Router Configuration**: Router config now handled via `spec.routerConfig` in Supergraph CRD ✅
+- [x] **Coprocessor Deployment**: Coprocessor deployed and configured for JWT authentication
+- [x] **Router Log Level**: Set via `APOLLO_ROUTER_LOG` environment variable in Supergraph CRD podTemplate
+- [x] **Ingress Configuration**: Ingress set up for external access via minikube tunnel
+- [x] **Client Application**: Client deployed with nginx proxying GraphQL requests
 
-## Configuration Mapping
+## 🔄 Current Implementation Status
 
-### Core Router Settings (Both Dev and Prod)
+### Router Configuration Method
 
-| Previous Location | New Location | Value |
-|-------------------|--------------|-------|
-| `router.configuration.health_check` | `spec.podTemplate.router.configuration.health_check` | `listen: 0.0.0.0:8080` |
-| `router.configuration.sandbox` | `spec.podTemplate.router.configuration.sandbox` | `enabled: true` |
-| `router.configuration.homepage` | `spec.podTemplate.router.configuration.homepage` | `enabled: false` |
-| `router.configuration.supergraph` | `spec.podTemplate.router.configuration.supergraph` | `introspection: true` |
-| `router.configuration.include_subgraph_errors` | `spec.podTemplate.router.configuration.include_subgraph_errors` | `all: true` |
-| `router.configuration.plugins` | `spec.podTemplate.router.configuration.plugins` | `experimental.expose_query_plan: true` |
+The router configuration is now implemented using the **native operator approach**:
 
-### Authentication & Authorization
+1. **Supergraph CRD**: Managed by Apollo GraphOS Operator
+   - Schema composition and publishing
+   - Basic deployment configuration (replicas, resources, version)
+   - Environment variables (e.g., `APOLLO_ROUTER_LOG=debug`)
+   - **Router configuration via `spec.routerConfig`** ✅
+   - Schema source reference
 
-- **JWKS Authentication**: Points to `http://graphql.users.svc.cluster.local:4001/.well-known/jwks.json`
-- **Authorization Preview Directives**: Enabled for all subgraphs
+### Configuration Files
 
-### Coprocessor Configuration
+| Configuration | Location | Status |
+|--------------|----------|--------|
+| Router Config | `deploy/operator-resources/supergraph-{dev\|prod}.yaml` (spec.routerConfig) | ✅ Native operator support |
+| SupergraphSchema | Created by `07-deploy-operator-resources.sh` | ✅ Operator-managed |
+| Supergraph | Created by `07-deploy-operator-resources.sh` | ✅ Operator-managed |
 
-- **URL**: `http://coprocessor.coprocessor.svc.cluster.local:8081`
-- **Timeout**: 2s
-- **Router Request Headers**: Enabled
-- **Subgraph Request/Response Headers**: Enabled
+## 📋 Configuration Details
 
-### Rhai Scripts
+### Router Configuration (`spec.routerConfig`)
 
-Rhai scripts are handled via ConfigMap and volume mounts:
-- **Scripts Location**: `/dist/rhai` (mounted from ConfigMap)
-- **Main Script**: `main.rhai`
-- **Helper Scripts**: `client_id.rhai`
+Router configuration is now defined directly in the Supergraph CRD via `spec.routerConfig`. Current configuration includes:
 
-The ConfigMap must be created separately:
-```bash
-kubectl create configmap rhai-config --from-file=deploy/router/rhai/ -n apollo
-```
+- ✅ Supergraph listen port (4000)
+- ✅ Introspection enabled
+- ✅ Headers propagation
+- ✅ JWT authentication (JWKS from users subgraph)
+- ✅ Authorization directives enabled
+- ✅ CORS (allow any origin)
+- ✅ Coprocessor configuration
+- ✅ Health check endpoint (8088)
+- ✅ Sandbox enabled
+- ✅ Homepage disabled
 
-### Prod-Only Configuration
+### Updating Router Configuration
 
-The following configurations are only present in `supergraph-prod.yaml`:
+To update router configuration:
 
-#### Persisted Queries
-
-```yaml
-persisted_queries:
-  enabled: true
-  log_unknown: true
-  safelist:
-    enabled: false
-    require_id: false
-```
-
-#### Telemetry
-
-- **Apollo Field-Level Instrumentation**: Sampler 0.5
-- **OTLP Tracing**: gRPC endpoint `http://collector.monitoring:4317`
-- **OTLP Metrics**: gRPC endpoint `http://collector.monitoring:4317`
-- **Service Name**: "router"
-- **Service Namespace**: "router"
-
-## How to Update Router Configuration
-
-To update router configuration without redeploying subgraphs:
-
-1. Edit the appropriate Supergraph CRD file:
-   - Dev: `deploy/operator-resources/supergraph-dev.yaml`
-   - Prod: `deploy/operator-resources/supergraph-prod.yaml`
-
-2. Update the `spec.podTemplate.router.configuration` section
-
-3. Apply the changes:
+1. **Edit the Supergraph resource:**
    ```bash
-   kubectl apply -f deploy/operator-resources/supergraph-{dev|prod}.yaml
+   # Edit the router configuration
+   vim deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml
    ```
 
-4. The operator will automatically trigger a router rollover with the new configuration
-
-## Resources
-
-Dev environment uses minimal resources:
-- CPU: 100m
-- Memory: 256Mi
-- Replicas: 1
-
-Prod environment uses production-grade resources:
-- CPU: 500m
-- Memory: 512Mi
-- Replicas: 3
-
-## Differences from Helm Chart
-
-The operator-managed approach differs from the Helm chart in several ways:
-
-1. **No Helm templates**: Configuration is defined in Kubernetes-native CRDs
-2. **Automatic rollover**: The operator handles rolling out changes to the router
-3. **Declarative**: All configuration is version-controlled in YAML files
-4. **Condition-based**: Can monitor router status via `kubectl get supergraph`
-
-## Troubleshooting
-
-### Router not picking up changes
-
-Check the Supergraph status:
-```bash
-kubectl describe supergraph reference-architecture-{dev|prod} -n apollo
-```
-
-Look for:
-- `SchemaLoaded`: Should be `True`
-- `Progressing`: Shows deployment status
-- `Ready`: Should be `True` when fully deployed
-
-### Rhai scripts not working
-
-Verify the ConfigMap exists and is mounted:
-```bash
-kubectl get configmap rhai-config -n apollo
-kubectl describe pod <router-pod> -n apollo | grep rhai-volume
-```
-
-### Coprocessor connection issues
-
-Ensure coprocessor is running and accessible:
-```bash
-kubectl get pods -n coprocessor
-kubectl get svc -n coprocessor
-```
-
-## Current Configuration Status
-
-The Supergraph CRDs in this repository use a **simplified configuration** that does not include all the advanced router settings from the original Helm chart. This is because the current Apollo GraphOS Operator CRD does not support all configuration fields.
-
-### Supported Configuration
-- ✅ Replicas count
-- ✅ Router version
-- ✅ Resource limits/requests
-- ✅ Schema source (SupergraphSchema resource reference)
-
-### Not Currently Supported in Supergraph CRD
-- ❌ Custom router configuration (JWKS auth, coprocessor, CORS, etc.)
-- ❌ Rhai scripts via ConfigMap volumes
-- ❌ Custom ingress configuration
-- ❌ Service type customization
-- ❌ Telemetry exporters
-- ❌ Advanced authentication/authorization
-
-### Operator API Key Setup
-
-The operator requires an **Operator API key** (not a personal API key). To create one:
-
-1. Go to GraphOS Studio
-2. Navigate to your graph → Settings → API Keys
-3. Create a new API key with "Operator" role
-4. Update the `apollo-api-key` secret with the Operator API key:
+2. **Apply the changes:**
    ```bash
-   kubectl create secret generic apollo-api-key \
-     --from-literal="APOLLO_KEY=<your-operator-api-key>" \
-     -n apollo-operator \
-     --dry-run=client -o yaml | kubectl apply -f -
+   kubectl apply -f deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml
    ```
 
-### TODO: Advanced Router Configuration
+3. **The operator will automatically:**
+   - Update the router deployment with the new configuration
+   - Roll out the changes to all router pods
+   - No manual patching required!
 
-The advanced router configuration (JWKS, coprocessor, Rhai scripts, telemetry, persisted queries) from the original `deploy/router/values.yaml` has not been migrated yet. This would need to be implemented either:
+### Coprocessor
 
-1. Via router configuration YAML file in a ConfigMap (if supported)
-2. Through GraphOS Studio router configuration
-3. By extending the operator to support these fields
-4. By using a custom router deployment instead of the operator-managed one
+- ✅ Deployed and running
+- ✅ Adds "source" header to subgraph requests
+- ✅ JWT validation handled by router's built-in authentication plugin
 
-### Current Status
+## ✅ Operator CRD Support
 
-- Graph is created ✅
-- Dev and prod variants created ✅
-- Subgraphs deployed and CRDs created ✅
-- Operator API key needs to be set up ⚠️
-- Advanced router configuration not yet migrated ⏳
+The Apollo GraphOS Operator CRD now supports:
+- ✅ Custom router configuration YAML via `spec.routerConfig` ✅
+- ✅ Environment variables via `podTemplate.env` ✅
+- ✅ Basic deployment configuration ✅
 
+## 🔧 Maintenance Tasks
+
+### When Updating Router Configuration
+
+1. Edit `deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml`
+2. Update the `spec.routerConfig` section
+3. Apply: `kubectl apply -f deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml`
+4. The operator handles the rest automatically!
+
+## 🐛 Troubleshooting
+
+### Router Not Picking Up Configuration Changes
+
+1. Verify Supergraph resource has routerConfig:
+   ```bash
+   kubectl get supergraph reference-architecture-${ENVIRONMENT} -n apollo -o yaml | grep -A 50 routerConfig
+   ```
+
+2. Check router deployment status:
+   ```bash
+   kubectl get deployment reference-architecture-${ENVIRONMENT} -n apollo
+   kubectl rollout status deployment/reference-architecture-${ENVIRONMENT} -n apollo
+   ```
+
+3. Check router logs:
+   ```bash
+   kubectl logs -n apollo deployment/reference-architecture-${ENVIRONMENT} -f
+   ```
+
+### Coprocessor Issues
+
+1. Verify coprocessor is running:
+   ```bash
+   kubectl get pods -n apollo -l app.kubernetes.io/name=coprocessor
+   ```
+
+2. Check coprocessor service:
+   ```bash
+   kubectl get svc coprocessor -n apollo
+   ```
+
+3. Verify router config has correct coprocessor URL:
+   ```bash
+   kubectl get supergraph reference-architecture-${ENVIRONMENT} -n apollo -o yaml | grep coprocessor
+   ```
+
+## 📝 Notes
+
+- Router configuration is now fully declarative via the Supergraph CRD
+- No manual patching required for router configuration
+- Configuration changes are automatically applied by the operator
