@@ -61,7 +61,7 @@ export APOLLO_KEY="your-apollo-personal-api-key"
 export ENVIRONMENT="dev"
 ```
 
-The `ENVIRONMENT` variable is required and allows you to create multiple environments. Each environment will have its own Apollo GraphOS variant.
+The `ENVIRONMENT` variable is required and allows you to create multiple environments. Each environment will reference its own Apollo GraphOS variant (e.g., `@dev`, `@prod`) in the SupergraphSchema CRD. Variants are created automatically when schemas are first published to them.
 
 **Note:** When deploying subgraphs, the scripts will look for environment-specific values files at `subgraphs/{subgraph}/deploy/environments/${ENVIRONMENT}.yaml`. If this file exists, it will be used to override the default `values.yaml`. If it doesn't exist, the default `values.yaml` will be used. The repository includes `dev.yaml` and `prod.yaml` files for all subgraphs. If you create a custom environment name, you can optionally create matching values files for environment-specific configurations.
 
@@ -89,10 +89,11 @@ This script:
 This script:
 - Creates an Apollo GraphOS graph
 - Creates an Operator API key
-- Creates a variant for your environment
 - Saves configuration to `.env`
 
 **Note:** Make sure your `.env` file has `APOLLO_KEY` set before running this script.
+
+**Note:** Variants (e.g., `@dev`, `@prod`) are referenced in the SupergraphSchema CRD and will be created automatically when schemas are first published to those variants.
 
 ### Script 03: Setup Kubernetes Cluster
 
@@ -184,7 +185,7 @@ This script:
 - Determines and saves the router URL to `.env` file
 - **Note:** The router does not use an Ingress resource - the client's nginx proxies to it internally. The ingress controller is needed for the client's Ingress.
 
-### Script 09: Deploy Client (Optional)
+### Script 09: Deploy Client
 
 ```bash
 ./scripts/minikube/09-deploy-client.sh
@@ -194,11 +195,15 @@ This script:
 - Builds and deploys the client application
 - Sets up ingress for client access
 
+**Note:** The client is required if you want to access the router via the ingress controller (minikube tunnel or NodePort). If you only need direct router access, you can use port-forward (Option 2 in Step 4) and skip this script.
+
 ## Step 4: Access Your Supergraph
 
 After running all scripts, you can access your supergraph in several ways:
 
-### Option 1: Using Minikube Tunnel (recommended for LoadBalancer access)
+### Option 1: Using Minikube Tunnel (requires Script 09)
+
+**Note:** This option requires the client application to be deployed (Script 09) because it uses the client's Ingress resource.
 
 The ingress controller has been configured as a LoadBalancer service. To access it via `minikube tunnel`:
 
@@ -206,20 +211,25 @@ The ingress controller has been configured as a LoadBalancer service. To access 
 minikube tunnel
 ```
 
+**Troubleshooting if tunnel hangs:**
+- Check if tunnel is already running: `ps aux | grep 'minikube tunnel'`
+- Stop existing tunnel: `pkill -f 'minikube tunnel'`
+- Try running with explicit cleanup: `minikube tunnel --cleanup`
+- On macOS, if sudo password isn't prompted, try: `sudo minikube tunnel`
+
 **Important notes:**
-- Enter your sudo password when prompted
 - You may see a message "Starting tunnel for service router" - **this can be safely ignored**
 - The "router" is an Ingress resource (not a service), so it doesn't need tunneling
 - Only the `ingress-nginx-controller` LoadBalancer service needs tunneling
 - Wait for the "Status: running" message
-- Access the router at: `http://127.0.0.1/`
+- Access the client UI at: `http://127.0.0.1/`
 
 **Why you see "router" in the tunnel output:**
 The ingress controller automatically sets a LoadBalancer status on Ingress resources, which makes `minikube tunnel` think it needs to tunnel them. However, since the ingress controller is already being tunneled, the router is accessible through it. You can safely ignore this message.
 
-### Option 2: Using Port Forwarding
+### Option 2: Using Port Forwarding (no client required)
 
-Port forward directly to the router service:
+Port forward directly to the router service. This method does not require the client application:
 
 ```bash
 kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80
@@ -229,7 +239,9 @@ Then access at `http://localhost:4000` in your browser.
 
 **Note:** Keep the port-forward command running in a terminal while you access the router.
 
-### Option 3: Using Ingress via NodePort
+### Option 3: Using Ingress via NodePort (requires Script 09)
+
+**Note:** This option requires the client application to be deployed (Script 09) because it uses the client's Ingress resource.
 
 Get the Minikube IP and ingress controller NodePort:
 
@@ -257,51 +269,7 @@ Or test the health endpoint (if accessible on the main port):
 curl http://localhost:4000/health
 ```
 
-## Step 5: Updating Router Configuration
-
-Router configuration is now handled directly in the Supergraph CRD via `spec.routerConfig`. To update the router configuration:
-
-### Router Configuration via Supergraph CRD
-
-The Apollo GraphOS Operator supports router configuration natively via the `spec.routerConfig` property in the Supergraph CRD. This means:
-
-1. **No manual patching required** - The operator handles everything automatically
-2. **Declarative configuration** - All router settings are in the Supergraph YAML
-3. **Automatic rollout** - Changes are applied automatically when you update the CRD
-
-### Updating Router Configuration
-
-To update the router configuration:
-
-1. **Edit the Supergraph resource:**
-   ```bash
-   # Edit the router configuration
-   vim deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml
-   ```
-
-2. **Update the `spec.routerConfig` section** with your desired settings:
-   ```yaml
-   spec:
-     routerConfig:
-       supergraph:
-         listen: 0.0.0.0:4000
-         introspection: true
-       # ... other router settings
-   ```
-
-3. **Apply the changes:**
-   ```bash
-   kubectl apply -f deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml
-   ```
-
-4. **The operator automatically:**
-   - Updates the router deployment with the new configuration
-   - Rolls out the changes to all router pods
-   - No manual patching or restarts needed!
-
-**Note:** Router configuration is now managed entirely through the Supergraph CRD. No additional scripts are needed.
-
-## Step 6: Logging Into the Client Application
+## Step 5: Logging Into the Client Application
 
 If you deployed the client application (script 09), you can log in using the following test credentials:
 
@@ -356,7 +324,7 @@ source .env
 ```
 
 Each environment will have:
-- Its own Apollo GraphOS variant
+- Its own Apollo GraphOS variant (created automatically when schemas are published)
 - Separate Kubernetes resources (namespaces, services, etc.)
 - Its own router instance
 
@@ -401,34 +369,28 @@ kubectl logs -n apollo deployment/reference-architecture-${ENVIRONMENT}
 
 If the router is not picking up configuration changes:
 
-1. **Verify ConfigMaps exist:**
+1. **Verify routerConfig in Supergraph CRD:**
    ```bash
-   kubectl get configmap router-config -n apollo
    kubectl get supergraph reference-architecture-${ENVIRONMENT} -n apollo -o yaml | grep -A 50 routerConfig
    ```
 
-2. **Check volume mounts:**
+2. **Check router deployment status:**
    ```bash
-   kubectl describe deployment reference-architecture-${ENVIRONMENT} -n apollo | grep -A 10 "Volumes:"
-   kubectl describe pod <router-pod-name> -n apollo | grep -A 10 "Mounts:"
+   kubectl describe deployment reference-architecture-${ENVIRONMENT} -n apollo
+   kubectl get pods -n apollo
    ```
 
-3. **Verify container arguments:**
-   ```bash
-   kubectl get deployment reference-architecture-${ENVIRONMENT} -n apollo -o jsonpath='{.spec.template.spec.containers[0].args}'
-   ```
-   
-   Should include `--config /etc/router/router.yaml`
-
-4. **Check router logs for configuration errors:**
+3. **Check router logs for configuration errors:**
    ```bash
    kubectl logs -n apollo deployment/reference-architecture-${ENVIRONMENT} | grep -i "config\|error"
    ```
 
-5. **Re-apply router configuration:**
+4. **Re-apply router configuration:**
    ```bash
    kubectl apply -f deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml
    ```
+
+For more details on updating router configuration, see the [Operator Guide](./operator-guide.md#updating-router-configuration).
 
 ### Router pods in CrashLoopBackOff
 
@@ -458,6 +420,34 @@ Ensure ingress addon is enabled:
 minikube addons enable ingress
 kubectl get pods -n ingress-nginx
 ```
+
+### Minikube tunnel hangs or doesn't prompt for password
+
+If `minikube tunnel` hangs without prompting for your sudo password:
+
+1. **Check if tunnel is already running:**
+   ```bash
+   ps aux | grep 'minikube tunnel'
+   ```
+
+2. **Stop any existing tunnel processes:**
+   ```bash
+   pkill -f 'minikube tunnel'
+   ```
+
+3. **Try running with cleanup flag:**
+   ```bash
+   minikube tunnel --cleanup
+   ```
+
+4. **On macOS, try running with sudo:**
+   ```bash
+   sudo minikube tunnel
+   ```
+
+5. **Alternative: Use NodePort or port-forward instead:**
+   - NodePort: Access via `http://$(minikube ip):$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')`
+   - Port-forward: `kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80`
 
 ## Next Steps
 

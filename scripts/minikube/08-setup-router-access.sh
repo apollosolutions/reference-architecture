@@ -55,37 +55,18 @@ kubectl wait --namespace ingress-nginx \
 echo "Configuring ingress controller for minikube tunnel..."
 kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"LoadBalancer"}}' 2>/dev/null || true
 
-# Note: We don't create a router ingress here because:
-# 1. The client's nginx will proxy /graphql requests to the router service internally
-# 2. This avoids ingress conflicts (both router and client can't use path /)
-# 3. The router is accessed via Kubernetes service DNS from within the cluster
-# The ingress controller is needed for the CLIENT's Ingress resource, not the router
-
-echo "Note: Router ingress is not needed - the client's nginx will proxy /graphql requests to the router service"
-echo "      The ingress controller is required for the client application's Ingress resource"
-
 # Get router URL - use localhost for minikube tunnel (LoadBalancer) or NodePort fallback
-echo "Getting router URL..."
 MINIKUBE_IP=$(minikube ip)
 INGRESS_NODEPORT=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "")
-
-# Check if ingress controller is LoadBalancer (for minikube tunnel)
 INGRESS_TYPE=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.type}' 2>/dev/null || echo "")
 
-# Use localhost for LoadBalancer (minikube tunnel), or NodePort, or default to localhost:4000 for port-forward
-# Note: The client's nginx will proxy /graphql requests to the router
+# Determine router URL based on ingress type
 if [ "$INGRESS_TYPE" == "LoadBalancer" ]; then
     ROUTER_URL="http://127.0.0.1/graphql"
-    echo "Using localhost URL for minikube tunnel: $ROUTER_URL"
-    echo "Note: Run 'minikube tunnel' in a separate terminal to access the router"
-    echo "Note: The client's nginx will proxy /graphql requests to the router service"
 elif [ -n "$INGRESS_NODEPORT" ]; then
     ROUTER_URL="http://${MINIKUBE_IP}:${INGRESS_NODEPORT}/graphql"
-    echo "Using ingress NodePort URL: $ROUTER_URL"
 else
-    # Default to localhost for port-forward (user will need to run port-forward separately)
     ROUTER_URL="http://localhost:4000/graphql"
-    echo "Using default localhost URL (use 'kubectl port-forward' to access): $ROUTER_URL"
 fi
 
 # Save to .env file
@@ -96,7 +77,6 @@ fi
 
 # Remove old ROUTER_URL if it exists and add new one
 if grep -q "^export ROUTER_URL=" "$ENV_FILE"; then
-    # Use a temp file for sed compatibility across platforms
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' "s|^export ROUTER_URL=.*|export ROUTER_URL=\"$ROUTER_URL\"|" "$ENV_FILE"
     else
@@ -108,58 +88,41 @@ else
     echo "export ROUTER_URL=\"$ROUTER_URL\"" >> "$ENV_FILE"
 fi
 
-echo "Router URL saved to .env file: $ROUTER_URL"
-
-# Get the NodePort for the ingress controller (for reference)
-NODEPORT=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
-
+# Output summary
 echo ""
 echo "✓ Router access configured successfully!"
 echo ""
-echo "Router URL saved to .env file: $ROUTER_URL"
+echo "Router URL: $ROUTER_URL (saved to .env)"
 echo ""
+
 if [ "$INGRESS_TYPE" == "LoadBalancer" ]; then
-    echo "⚠️  IMPORTANT: The router URL has been set to $ROUTER_URL for minikube tunnel."
-    echo "   You MUST run 'minikube tunnel' for the router to be accessible."
-    echo "   If you prefer a different access method, update ROUTER_URL in .env file."
+    echo "⚠️  Next step: Run 'minikube tunnel' in a separate terminal to access the router"
     echo ""
-fi
-echo "To access the router, use one of these methods:"
-echo ""
-if [ "$INGRESS_TYPE" == "LoadBalancer" ]; then
-echo "Option 1: Use minikube tunnel (REQUIRED - URL is set in .env for this method):"
-echo "  1. In a separate terminal, run: minikube tunnel"
-echo "  2. Enter your sudo password when prompted"
-echo "  3. You may see 'Starting tunnel for service router' - this can be ignored"
-echo "  4. Wait for 'Status: running' message"
-echo "  5. Access the client UI at: http://127.0.0.1/"
-echo "  6. GraphQL requests will be proxied to the router via /graphql"
-echo ""
-if [ -n "$NODEPORT" ]; then
-    echo "Option 2: Access via NodePort (requires updating ROUTER_URL in .env):"
-    echo "  Client UI: http://${MINIKUBE_IP}:${NODEPORT}/"
-    echo "  GraphQL: http://${MINIKUBE_IP}:${NODEPORT}/graphql"
-    echo "  Then update .env: export ROUTER_URL=\"http://${MINIKUBE_IP}:${NODEPORT}/graphql\""
+    echo "Access methods:"
+    echo "  1. minikube tunnel (recommended):"
+    echo "     • Run: minikube tunnel"
+    echo "     • If it hangs, check if tunnel is already running: ps aux | grep 'minikube tunnel'"
+    echo "     • Stop existing tunnel: pkill -f 'minikube tunnel'"
+    echo "     • Access client UI at: http://127.0.0.1/"
+    echo "     • GraphQL requests proxied via /graphql"
+    if [ -n "$INGRESS_NODEPORT" ]; then
+        echo ""
+        echo "  2. NodePort (no tunnel needed):"
+        echo "     • Client UI: http://${MINIKUBE_IP}:${INGRESS_NODEPORT}/"
+        echo "     • Update .env: export ROUTER_URL=\"http://${MINIKUBE_IP}:${INGRESS_NODEPORT}/graphql\""
+    fi
     echo ""
-fi
-echo "Option 3: Port forward (requires updating ROUTER_URL in .env):"
-echo "  kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80"
-echo "  Then update .env: export ROUTER_URL=\"http://localhost:4000/graphql\""
-    echo ""
+    echo "  3. Port forward (no tunnel needed):"
+    echo "     • Run: kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80"
+    echo "     • Update .env: export ROUTER_URL=\"http://localhost:4000/graphql\""
 else
-    echo "Option 1: Access via NodePort:"
-    echo "  http://${MINIKUBE_IP}:${NODEPORT}"
-    echo ""
-    echo "Option 2: Port forward:"
-    echo "  kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80"
-    echo "  Then access at: http://localhost:4000"
-    echo ""
+    echo "Access methods:"
+    echo "  1. NodePort: http://${MINIKUBE_IP}:${INGRESS_NODEPORT}"
+    echo "  2. Port forward: kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80"
 fi
-echo "Note: The ingress controller service has been configured as LoadBalancer"
-echo "to support minikube tunnel. The router is accessed via the client's nginx proxy."
+
 echo ""
-echo "The router URL has been saved to .env and will be used by the client deployment."
-echo ""
-echo "Next step: Run 09-deploy-client.sh to deploy the client application (optional)"
+echo "Next: Run 09-deploy-client.sh to deploy the client application"
+echo "      (Required for ingress access; optional if using port-forward)"
 
 

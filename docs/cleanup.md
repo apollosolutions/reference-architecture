@@ -6,7 +6,7 @@ This guide covers cleaning up all resources deployed to your local Minikube clus
 
 ## Delete Operator-Managed Resources
 
-Before deleting Kubernetes resources, first remove the operator-managed CRDs. Make sure you have your `ENVIRONMENT` variable set (or load it from `.env`):
+Before deleting Kubernetes resources, first remove the operator-managed CRDs. The operator creates and manages these resources, so they should be deleted before Helm releases. Make sure you have your `ENVIRONMENT` variable set (or load it from `.env`):
 
 ```bash
 if [ -f .env ]; then
@@ -17,19 +17,19 @@ ENVIRONMENT=${ENVIRONMENT:-dev}
 RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
 ```
 
-Delete operator-managed resources:
+Delete operator-managed CRDs:
 
 ```bash
 kubectl delete supergraphs ${RESOURCE_NAME} -n apollo || true
 kubectl delete supergraphschemas ${RESOURCE_NAME} -n apollo || true
-kubectl delete ingress router -n apollo || true
-kubectl delete ingress client -n client || true
 kubectl delete subgraph --all --all-namespaces || true
 ```
 
+**Note:** The client's Ingress resource is managed by Helm and will be automatically deleted when you uninstall the Helm release in the next step.
+
 ## Uninstall Helm Releases
 
-Uninstall all Helm releases:
+Uninstall all Helm releases. This will automatically delete all resources created by Helm, including deployments, services, ConfigMaps, and Ingress resources:
 
 ```bash
 helm uninstall client -n client || true
@@ -41,7 +41,7 @@ done
 
 ## Delete Namespaces
 
-Delete all application namespaces:
+After deleting CRDs and uninstalling Helm releases, delete all application namespaces. This will remove any remaining resources:
 
 ```bash
 kubectl delete namespace checkout discovery inventory orders products reviews shipping users || true

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Script 02: Setup Apollo GraphOS Graph
-# This script creates an Apollo GraphOS graph and variants, and generates API keys
+# This script creates an Apollo GraphOS graph and generates API keys
 
 echo "=== Step 02: Setting up Apollo GraphOS Graph ==="
 
