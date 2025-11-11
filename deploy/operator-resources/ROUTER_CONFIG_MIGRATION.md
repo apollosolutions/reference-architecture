@@ -12,7 +12,7 @@ This document tracks the migration of router configuration from Helm values to o
 - [x] **Rhai Scripts ConfigMap**: Created `rhai-scripts` ConfigMap with logging scripts
 - [x] **Router Deployment Patching**: Implemented script to patch router deployment with ConfigMap volumes and args
 - [x] **Coprocessor Deployment**: Coprocessor deployed and configured for JWT authentication
-- [x] **Router Log Level**: Set to debug via `--log=debug` argument
+- [x] **Router Log Level**: Set to debug via `APOLLO_ROUTER_LOG` environment variable in Supergraph CRD podTemplate
 - [x] **Ingress Configuration**: Ingress set up for external access via minikube tunnel
 - [x] **Client Application**: Client deployed with nginx proxying GraphQL requests
 
@@ -25,6 +25,7 @@ The router configuration is currently implemented using a **hybrid approach**:
 1. **Supergraph CRD**: Managed by Apollo GraphOS Operator
    - Schema composition and publishing
    - Basic deployment configuration (replicas, resources, version)
+   - Environment variables (e.g., `APOLLO_ROUTER_LOG=debug`)
    - Schema source reference
 
 2. **ConfigMap + Manual Patching**: Custom router configuration
@@ -43,6 +44,12 @@ The router configuration is currently implemented using a **hybrid approach**:
 | Supergraph | Created by `07-deploy-operator-resources.sh` | ✅ Operator-managed (patched) |
 
 ## 📋 Configuration Details
+
+### Log Level Configuration
+
+- ✅ Set via `APOLLO_ROUTER_LOG=debug` environment variable in Supergraph CRD `podTemplate.env`
+- ✅ Configured declaratively in the CRD (no patching needed)
+- ✅ Applied automatically by the operator when creating/updating the deployment
 
 ### Router Configuration (`router-config.yaml`)
 
@@ -79,10 +86,12 @@ Current configuration includes:
 The Apollo GraphOS Operator CRD does not natively support:
 - ❌ Custom router configuration YAML in Supergraph CRD
 - ❌ ConfigMap volumes for router configuration
-- ❌ Custom container args (like `--config` and `--log`)
+- ❌ Custom container args (like `--config`)
 - ❌ Rhai scripts via ConfigMap volumes
 
-**Workaround**: We patch the deployment manually after the operator creates it.
+**Note**: Environment variables (like `APOLLO_ROUTER_LOG`) are supported via `podTemplate.env` ✅
+
+**Workaround**: We patch the deployment manually after the operator creates it for unsupported features.
 
 ### Current Workarounds
 
@@ -96,10 +105,6 @@ The Apollo GraphOS Operator CRD does not natively support:
    - Created as ConfigMap (`rhai-scripts`)
    - Mounted via volume at `/etc/rhai`
    - Referenced in router config YAML
-   - Applied via `scripts/minikube/08-apply-router-config.sh`
-
-3. **Log Level**:
-   - Set via `--log=debug` argument
    - Applied via `scripts/minikube/08-apply-router-config.sh`
 
 ## 🔧 Maintenance Tasks

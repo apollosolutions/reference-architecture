@@ -90,25 +90,16 @@ sleep 5
 # The router configuration is loaded from the ConfigMap and mounted as a volume
 # The router will use the --config flag to reference the mounted file
 echo "Deploying Supergraph..."
-cat <<EOF | kubectl apply -f -
-apiVersion: apollographql.com/v1alpha2
-kind: Supergraph
-metadata:
-  name: ${RESOURCE_NAME}
-  namespace: apollo
-spec:
-  replicas: 3
-  podTemplate:
-    routerVersion: 2.7.0
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-  schema:
-    resource:
-      name: ${RESOURCE_NAME}
-      namespace: apollo
-EOF
+
+# Check for environment-specific Supergraph file first, then use template
+SUPERGRAPH_FILE="deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml"
+if [ -f "${SUPERGRAPH_FILE}" ]; then
+    echo "Using environment-specific Supergraph file: ${SUPERGRAPH_FILE}"
+    kubectl apply -f "${SUPERGRAPH_FILE}"
+else
+    echo "Using Supergraph template: deploy/operator-resources/supergraph.yaml.template"
+    sed "s/\${RESOURCE_NAME}/${RESOURCE_NAME}/g" deploy/operator-resources/supergraph.yaml.template | kubectl apply -f -
+fi
 
 echo "Supergraph deployed"
 

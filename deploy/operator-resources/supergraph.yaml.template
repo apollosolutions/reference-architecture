@@ -1,7 +1,7 @@
 apiVersion: apollographql.com/v1alpha2
 kind: Supergraph
 metadata:
-  name: reference-architecture-dev
+  name: ${RESOURCE_NAME}
   namespace: apollo
 spec:
   replicas: 3
@@ -16,6 +16,6 @@ spec:
         memory: 256Mi
   schema:
     resource:
-      name: reference-architecture-dev
+      name: ${RESOURCE_NAME}
       namespace: apollo
 

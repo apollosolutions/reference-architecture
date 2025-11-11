@@ -7,6 +7,9 @@ spec:
   replicas: 3
   podTemplate:
     routerVersion: 2.3.0
+    env:
+      - name: APOLLO_ROUTER_LOG
+        value: "warn"
     resources:
       requests:
         cpu: 500m

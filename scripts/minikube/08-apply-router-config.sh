@@ -386,46 +386,6 @@ else
     echo "  Added --config arguments"
 fi
 
-# Add --log=debug argument if it doesn't exist
-echo "Checking for --log argument..."
-CURRENT_ARGS=$(kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].args[*]}' || echo "")
-if [[ ! "$CURRENT_ARGS" =~ "--log" ]]; then
-    echo "  Adding --log=debug argument..."
-    kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
-        {
-            "op": "add",
-            "path": "/spec/template/spec/containers/0/args/-",
-            "value": "--log=debug"
-        }
-    ]'
-    echo "  Added --log=debug argument"
-else
-    echo "  --log argument already exists, checking if it's set to debug..."
-    ARGS_JSON=$(kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].args}' || echo "[]")
-    ARGS_LIST=$(echo "$ARGS_JSON" | grep -o '"[^"]*"' | tr -d '"' | tr '\n' ' ')
-    LOG_INDEX=-1
-    INDEX=0
-    for arg in $ARGS_LIST; do
-        if [[ "$arg" =~ "--log" ]]; then
-            LOG_INDEX=$INDEX
-            break
-        fi
-        INDEX=$((INDEX + 1))
-    done
-    
-    if [[ $LOG_INDEX -ge 0 ]]; then
-        echo "  Replacing existing --log argument with --log=debug..."
-        kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p="[
-            {
-                \"op\": \"replace\",
-                \"path\": \"/spec/template/spec/containers/0/args/$LOG_INDEX\",
-                \"value\": \"--log=debug\"
-            }
-        ]"
-        echo "  Updated --log argument to debug"
-    fi
-fi
-
 echo "Router deployment patched"
 
 # Wait for rollout to complete
@@ -442,7 +402,7 @@ echo ""
 echo "Router configuration has been applied via ConfigMap:"
 echo "  ConfigMap: router-config (contains router.yaml)"
 echo "  Mounted at: /etc/router/router.yaml"
-echo "  Router args: --config /etc/router/router.yaml --log=debug"
+echo "  Router args: --config /etc/router/router.yaml"
 echo ""
 echo "Rhai scripts have been mounted:"
 echo "  ConfigMap: rhai-scripts (contains main.rhai)"
