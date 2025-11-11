@@ -234,13 +234,21 @@ kubectl logs -n apollo deployment/reference-architecture-{dev|prod}
 
 ## Updating Router Configuration
 
+**Note:** The router configuration is managed separately from the Supergraph CRD. See [Updating Router Configuration](../docs/setup.md#step-5-updating-router-configuration) in the setup guide for details.
+
+The Apollo GraphOS Operator's `Supergraph` CRD does not support custom router configuration YAML directly. Instead, we use a hybrid approach:
+
+1. The operator creates the router deployment with basic settings
+2. Script 08 patches the deployment to mount custom configuration via ConfigMap
+3. Configuration updates require updating the ConfigMap and restarting the deployment
+
 To update router configuration without changing subgraphs:
 
-```bash
-kubectl edit supergraph reference-architecture-dev -n apollo
-```
+1. Edit `deploy/operator-resources/router-config.yaml`
+2. Update the ConfigMap: `kubectl create configmap router-config --from-file=router.yaml=deploy/operator-resources/router-config.yaml -n apollo --dry-run=client -o yaml | kubectl apply -f -`
+3. Restart the deployment: `kubectl rollout restart deployment/reference-architecture-${ENVIRONMENT} -n apollo`
 
-Changes are applied via rolling update - the operator manages the rollout.
+For more details, see the [Router Configuration Migration Guide](../deploy/operator-resources/ROUTER_CONFIG_MIGRATION.md).
 
 ## Best Practices
 

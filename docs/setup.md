@@ -270,9 +270,80 @@ Or test the health endpoint (if accessible on the main port):
 curl http://localhost:4000/health
 ```
 
-## Step 5: Logging Into the Client Application
+## Step 5: Updating Router Configuration
 
-If you deployed the client application (script 08), you can log in using the following test credentials:
+The router configuration is stored in `deploy/operator-resources/router-config.yaml`. To update the router configuration:
+
+### Why We Patch the Deployment
+
+The Apollo GraphOS Operator's `Supergraph` CRD does not natively support custom router configuration YAML, ConfigMap volumes, or custom container arguments. Therefore, we use a **hybrid approach**:
+
+1. The operator creates the router deployment with basic settings
+2. Script 08 (`08-apply-router-config.sh`) patches the deployment to:
+   - Mount the `router-config` ConfigMap as a volume
+   - Add `--config /etc/router/router.yaml` argument
+   - Mount the `rhai-scripts` ConfigMap for custom scripts
+   - Set log level via environment variable (`APOLLO_ROUTER_LOG`)
+
+This patching approach is necessary because the operator doesn't support these advanced configuration options directly in the CRD.
+
+### Updating Router Configuration
+
+To update the router configuration:
+
+1. **Edit the configuration file:**
+   ```bash
+   # Edit the router configuration
+   vim deploy/operator-resources/router-config.yaml
+   ```
+
+2. **Update the ConfigMap:**
+   ```bash
+   kubectl create configmap router-config \
+       --from-file=router.yaml=deploy/operator-resources/router-config.yaml \
+       -n apollo --dry-run=client -o yaml | kubectl apply -f -
+   ```
+
+3. **Restart the router deployment:**
+   ```bash
+   kubectl rollout restart deployment/reference-architecture-${ENVIRONMENT} -n apollo
+   ```
+
+4. **Wait for rollout to complete:**
+   ```bash
+   kubectl rollout status deployment/reference-architecture-${ENVIRONMENT} -n apollo
+   ```
+
+### Updating Rhai Scripts
+
+To update the Rhai scripts:
+
+1. **Edit the script file:**
+   ```bash
+   vim deploy/operator-resources/rhai/main.rhai
+   ```
+
+2. **Update the ConfigMap:**
+   ```bash
+   kubectl create configmap rhai-scripts \
+       --from-file=main.rhai=deploy/operator-resources/rhai/main.rhai \
+       -n apollo --dry-run=client -o yaml | kubectl apply -f -
+   ```
+
+3. **Restart the router deployment:**
+   ```bash
+   kubectl rollout restart deployment/reference-architecture-${ENVIRONMENT} -n apollo
+   ```
+
+**Note:** If you need to re-apply the router configuration patching (e.g., after operator updates the deployment), you can re-run script 08:
+
+```bash
+./scripts/minikube/08-apply-router-config.sh
+```
+
+## Step 6: Logging Into the Client Application
+
+If you deployed the client application (script 10), you can log in using the following test credentials:
 
 ### Test Users
 
@@ -366,6 +437,62 @@ Check router status:
 kubectl describe supergraph reference-architecture-${ENVIRONMENT} -n apollo
 kubectl logs -n apollo deployment/reference-architecture-${ENVIRONMENT}
 ```
+
+### Router configuration not applied
+
+If the router is not picking up configuration changes:
+
+1. **Verify ConfigMaps exist:**
+   ```bash
+   kubectl get configmap router-config -n apollo
+   kubectl get configmap rhai-scripts -n apollo
+   ```
+
+2. **Check volume mounts:**
+   ```bash
+   kubectl describe deployment reference-architecture-${ENVIRONMENT} -n apollo | grep -A 10 "Volumes:"
+   kubectl describe pod <router-pod-name> -n apollo | grep -A 10 "Mounts:"
+   ```
+
+3. **Verify container arguments:**
+   ```bash
+   kubectl get deployment reference-architecture-${ENVIRONMENT} -n apollo -o jsonpath='{.spec.template.spec.containers[0].args}'
+   ```
+   
+   Should include `--config /etc/router/router.yaml`
+
+4. **Check router logs for configuration errors:**
+   ```bash
+   kubectl logs -n apollo deployment/reference-architecture-${ENVIRONMENT} | grep -i "config\|error"
+   ```
+
+5. **Re-apply router configuration:**
+   ```bash
+   ./scripts/minikube/08-apply-router-config.sh
+   ```
+
+### Router pods in CrashLoopBackOff
+
+If router pods are crashing:
+
+1. **Check pod logs:**
+   ```bash
+   kubectl logs -n apollo deployment/reference-architecture-${ENVIRONMENT} --previous
+   ```
+
+2. **Common causes:**
+   - Invalid YAML in `router-config.yaml` (check syntax)
+   - Missing ConfigMap (verify ConfigMaps exist)
+   - Volume mount path incorrect (should be `/etc/router`)
+   - Configuration file not found (check `--config` argument)
+
+3. **Verify configuration syntax:**
+   ```bash
+   # Check if router-config.yaml is valid YAML
+   kubectl create configmap router-config \
+       --from-file=router.yaml=deploy/operator-resources/router-config.yaml \
+       -n apollo --dry-run=client -o yaml | kubectl apply -f - --dry-run=client
+   ```
 
 ### Ingress not working
 

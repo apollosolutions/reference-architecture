@@ -152,11 +152,6 @@ The Apollo GraphOS Operator CRD does not natively support:
   - Container args
   - Rhai scripts
 
-### Documentation Updates Needed
-
-- [ ] Update `docs/setup.md` with router configuration update procedures
-- [ ] Add troubleshooting guide for router configuration issues
-- [ ] Document the patching approach and why it's necessary
 
 ## 🐛 Troubleshooting
 
