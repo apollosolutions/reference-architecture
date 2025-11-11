@@ -71,180 +71,63 @@ fi
 # Patch the router deployment to mount the ConfigMap and use it
 echo "Patching router deployment to use ConfigMap..."
 
-# Check if operator's ConfigMap volume exists and replace it with ours
-# The operator creates a volume that points to a ConfigMap with name pattern reference-architecture-*-config-*
+# IMPORTANT: We do NOT modify the operator's ConfigMap (it contains the supergraph schema).
+# Instead, we add our own ConfigMap for router configuration alongside the operator's ConfigMap.
+# The operator's ConfigMap is managed by the operator and should not be modified directly.
+
+# Check if operator's ConfigMap volume exists (for informational purposes)
 VOLUMES_JSON=$(kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.volumes}' || echo "[]")
-VOLUME_INDEX=-1
-INDEX=0
 OPERATOR_CONFIGMAP_FOUND=false
-VOLUME_NAME=""
+OPERATOR_VOLUME_NAME=""
 
 # Check each volume to see if it points to the operator's ConfigMap
 for vol_json in $(echo "$VOLUMES_JSON" | jq -c '.[]'); do
     CONFIGMAP_NAME=$(echo "$vol_json" | jq -r '.configMap.name // ""')
     if [[ -n "$CONFIGMAP_NAME" && "$CONFIGMAP_NAME" =~ ^reference-architecture.*-config- ]]; then
-        VOLUME_INDEX=$INDEX
         OPERATOR_CONFIGMAP_FOUND=true
-        VOLUME_NAME=$(echo "$vol_json" | jq -r '.name')
-        echo "  Found operator ConfigMap volume '$VOLUME_NAME' pointing to '$CONFIGMAP_NAME'"
+        OPERATOR_VOLUME_NAME=$(echo "$vol_json" | jq -r '.name')
+        echo "  Found operator ConfigMap volume '$OPERATOR_VOLUME_NAME' pointing to '$CONFIGMAP_NAME' (keeping it intact)"
         break
     fi
-    INDEX=$((INDEX + 1))
 done
 
-if [[ "$OPERATOR_CONFIGMAP_FOUND" == "true" ]]; then
-    echo "  Replacing with our router-config ConfigMap..."
-    
-    if [[ $VOLUME_INDEX -ge 0 ]]; then
-        # Replace the operator's ConfigMap volume with ours
-        kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p="[
-            {
-                \"op\": \"replace\",
-                \"path\": \"/spec/template/spec/volumes/$VOLUME_INDEX\",
-                \"value\": {
-                    \"name\": \"router-config\",
-                    \"configMap\": {
-                        \"name\": \"router-config\"
-                    }
+# Add our router-config volume (don't replace the operator's)
+if ! kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.volumes[*].name}' | grep -q "router-config"; then
+    echo "  Adding router-config volume (alongside operator's ConfigMap)..."
+    kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
+        {
+            "op": "add",
+            "path": "/spec/template/spec/volumes/-",
+            "value": {
+                "name": "router-config",
+                "configMap": {
+                    "name": "router-config"
                 }
             }
-        ]" && echo "  Replaced operator ConfigMap volume with router-config" || {
-            echo "  Warning: Failed to replace volume, trying add instead..."
-            # Fallback: add our volume (will have both, but ours will be used if mounted)
-            kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
-                {
-                    "op": "add",
-                    "path": "/spec/template/spec/volumes/-",
-                    "value": {
-                        "name": "router-config",
-                        "configMap": {
-                            "name": "router-config"
-                        }
-                    }
-                }
-            ]'
         }
-    else
-        # Couldn't find index, just add ours
-        echo "  Could not find operator volume index, adding router-config volume..."
-        kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
-            {
-                "op": "add",
-                "path": "/spec/template/spec/volumes/-",
-                "value": {
-                    "name": "router-config",
-                    "configMap": {
-                        "name": "router-config"
-                    }
-                }
-            }
-        ]'
-    fi
+    ]'
+    echo "  Added router-config volume"
 else
-    # No operator volume found, check if our volume exists
-    if ! kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.volumes[*].name}' | grep -q "router-config"; then
-        kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
-            {
-                "op": "add",
-                "path": "/spec/template/spec/volumes/-",
-                "value": {
-                    "name": "router-config",
-                    "configMap": {
-                        "name": "router-config"
-                    }
-                }
-            }
-        ]'
-        echo "  Added router-config volume"
-    else
-        echo "  router-config volume already exists"
-    fi
+    echo "  router-config volume already exists"
 fi
 
-# Check if volumeMount already exists, if not add it
-# Also check if operator's volumeMount exists and replace it
-MOUNTS_JSON=$(kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].volumeMounts}' || echo "[]")
-MOUNT_INDEX=-1
-INDEX=0
-OPERATOR_MOUNT_FOUND=false
-
-# Find volumeMount that matches the operator's volume name or has wrong mount path
-# Also check if there's a mount at /app (operator's default path) that needs replacing
-for mount_json in $(echo "$MOUNTS_JSON" | jq -c '.[]'); do
-    MOUNT_NAME=$(echo "$mount_json" | jq -r '.name')
-    MOUNT_PATH=$(echo "$mount_json" | jq -r '.mountPath')
-    # Check if this mount points to the operator's volume name, or if it's mounted at /app (operator's default)
-    if [[ -n "$VOLUME_NAME" && "$MOUNT_NAME" == "$VOLUME_NAME" ]] || [[ "$MOUNT_PATH" == "/app" ]]; then
-        MOUNT_INDEX=$INDEX
-        OPERATOR_MOUNT_FOUND=true
-        echo "  Found volumeMount '$MOUNT_NAME' at path '$MOUNT_PATH'"
-        break
-    fi
-    INDEX=$((INDEX + 1))
-done
-
-if [[ "$OPERATOR_MOUNT_FOUND" == "true" ]]; then
-    echo "  Replacing with router-config volumeMount at /etc/router..."
-    
-    if [[ $MOUNT_INDEX -ge 0 ]]; then
-        # Replace the operator's volumeMount with ours
-        kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p="[
-            {
-                \"op\": \"replace\",
-                \"path\": \"/spec/template/spec/containers/0/volumeMounts/$MOUNT_INDEX\",
-                \"value\": {
-                    \"name\": \"router-config\",
-                    \"mountPath\": \"/etc/router\",
-                    \"readOnly\": true
-                }
+# Add volumeMount for router-config (keep operator's mount intact)
+echo "Adding router-config volumeMount..."
+if ! kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].volumeMounts[*].name}' | grep -q "router-config"; then
+    kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
+        {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/volumeMounts/-",
+            "value": {
+                "name": "router-config",
+                "mountPath": "/etc/router",
+                "readOnly": true
             }
-        ]" && echo "  Replaced operator volumeMount with router-config" || {
-            echo "  Warning: Failed to replace volumeMount, trying add instead..."
-            kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
-                {
-                    "op": "add",
-                    "path": "/spec/template/spec/containers/0/volumeMounts/-",
-                    "value": {
-                        "name": "router-config",
-                        "mountPath": "/etc/router",
-                        "readOnly": true
-                    }
-                }
-            ]'
         }
-    else
-        # Couldn't find index, just add ours
-        echo "  Could not find operator mount index, adding router-config volumeMount..."
-        kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
-            {
-                "op": "add",
-                "path": "/spec/template/spec/containers/0/volumeMounts/-",
-                "value": {
-                    "name": "router-config",
-                    "mountPath": "/etc/router",
-                    "readOnly": true
-                }
-            }
-        ]'
-    fi
+    ]'
+    echo "  Added router-config volumeMount at /etc/router"
 else
-    # No operator mount found, check if our mount exists
-    if ! kubectl get deployment ${DEPLOYMENT_NAME} -n apollo -o jsonpath='{.spec.template.spec.containers[0].volumeMounts[*].name}' | grep -q "router-config"; then
-        kubectl patch deployment ${DEPLOYMENT_NAME} -n apollo --type='json' -p='[
-            {
-                "op": "add",
-                "path": "/spec/template/spec/containers/0/volumeMounts/-",
-                "value": {
-                    "name": "router-config",
-                    "mountPath": "/etc/router",
-                    "readOnly": true
-                }
-            }
-        ]'
-        echo "  Added router-config volumeMount"
-    else
-        echo "  router-config volumeMount already exists"
-    fi
+    echo "  router-config volumeMount already exists"
 fi
 
 # Add Rhai scripts volume and volumeMount
@@ -403,6 +286,9 @@ echo "Router configuration has been applied via ConfigMap:"
 echo "  ConfigMap: router-config (contains router.yaml)"
 echo "  Mounted at: /etc/router/router.yaml"
 echo "  Router args: --config /etc/router/router.yaml"
+echo ""
+echo "Note: The operator's ConfigMap (containing the supergraph schema) is kept intact."
+echo "      Both ConfigMaps are mounted separately - operator's for schema, ours for config."
 echo ""
 echo "Rhai scripts have been mounted:"
 echo "  ConfigMap: rhai-scripts (contains main.rhai)"
