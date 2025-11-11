@@ -45,24 +45,6 @@ kubectl create namespace apollo --dry-run=client -o yaml | kubectl apply -f -
 # Resource name based on environment
 RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
 
-# Create router configuration ConfigMap
-echo "Creating router configuration ConfigMap..."
-kubectl create configmap router-config \
-    --from-file=router.yaml=deploy/operator-resources/router-config.yaml \
-    -n apollo \
-    --dry-run=client -o yaml | kubectl apply -f -
-
-echo "Router configuration ConfigMap created"
-
-# Create Rhai scripts ConfigMap
-echo "Creating Rhai scripts ConfigMap..."
-kubectl create configmap rhai-scripts \
-    --from-file=main.rhai=deploy/operator-resources/rhai/main.rhai \
-    -n apollo \
-    --dry-run=client -o yaml | kubectl apply -f -
-
-echo "Rhai scripts ConfigMap created"
-
 # Deploy SupergraphSchema
 echo "Deploying SupergraphSchema..."
 
@@ -83,9 +65,8 @@ echo "SupergraphSchema deployed"
 echo "Waiting for schema composition..."
 sleep 5
 
-# Deploy Supergraph with ConfigMap-mounted router configuration
-# The router configuration is loaded from the ConfigMap and mounted as a volume
-# The router will use the --config flag to reference the mounted file
+# Deploy Supergraph
+# Router configuration is now included in the Supergraph CRD via spec.routerConfig
 echo "Deploying Supergraph..."
 
 # Check for environment-specific Supergraph file first, then use template
@@ -129,5 +110,5 @@ echo "Monitor router status with:"
 echo "  kubectl get supergraphs -n apollo"
 echo "  kubectl get pods -n apollo"
 echo ""
-echo "Next step: Run 08-apply-router-config.sh to configure the router with custom settings"
+echo "Next step: Run 08-deploy-ingress.sh to setup external access"
 

@@ -54,7 +54,3 @@ sandbox:
 homepage:
   enabled: false
 
-rhai:
-  scripts: "/etc/rhai"
-  main: "main.rhai"
-

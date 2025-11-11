@@ -158,9 +158,8 @@ This script:
 ```
 
 This script:
-- Creates the router-config ConfigMap
 - Deploys SupergraphSchema CRD (triggers composition)
-- Deploys Supergraph CRD (deploys the Apollo Router)
+- Deploys Supergraph CRD with router configuration (deploys the Apollo Router)
 - Waits for the router deployment to be created
 
 **Note:** The coprocessor (script 06) must be deployed before running this script.
@@ -173,23 +172,10 @@ kubectl get pods -n apollo
 kubectl describe supergraph reference-architecture-${ENVIRONMENT} -n apollo
 ```
 
-### Script 08: Apply Router Configuration
+### Script 08: Deploy Ingress
 
 ```bash
-./scripts/minikube/08-apply-router-config.sh
-```
-
-This script:
-- Patches the router deployment to mount the router-config ConfigMap
-- Configures the router to use custom settings (coprocessor, CORS, etc.)
-- Waits for the router rollout to complete
-
-**Note:** Script 07 must be run first to create the Supergraph and ConfigMap.
-
-### Script 09: Deploy Ingress
-
-```bash
-./scripts/minikube/09-deploy-ingress.sh
+./scripts/minikube/08-deploy-ingress.sh
 ```
 
 This script:
@@ -197,10 +183,10 @@ This script:
 - Configures the ingress controller as LoadBalancer for `minikube tunnel` support
 - Provides access URLs for the router
 
-### Script 10: Deploy Client (Optional)
+### Script 09: Deploy Client (Optional)
 
 ```bash
-./scripts/minikube/10-deploy-client.sh
+./scripts/minikube/09-deploy-client.sh
 ```
 
 This script:
@@ -272,78 +258,51 @@ curl http://localhost:4000/health
 
 ## Step 5: Updating Router Configuration
 
-The router configuration is stored in `deploy/operator-resources/router-config.yaml`. To update the router configuration:
+Router configuration is now handled directly in the Supergraph CRD via `spec.routerConfig`. To update the router configuration:
 
-### Why We Patch the Deployment
+### Router Configuration via Supergraph CRD
 
-The Apollo GraphOS Operator's `Supergraph` CRD does not natively support custom router configuration YAML, ConfigMap volumes, or custom container arguments. Therefore, we use a **hybrid approach**:
+The Apollo GraphOS Operator supports router configuration natively via the `spec.routerConfig` property in the Supergraph CRD. This means:
 
-1. The operator creates the router deployment with basic settings
-2. Script 08 (`08-apply-router-config.sh`) patches the deployment to:
-   - Mount the `router-config` ConfigMap as a volume
-   - Add `--config /etc/router/router.yaml` argument
-   - Mount the `rhai-scripts` ConfigMap for custom scripts
-   - Set log level via environment variable (`APOLLO_ROUTER_LOG`)
-
-This patching approach is necessary because the operator doesn't support these advanced configuration options directly in the CRD.
+1. **No manual patching required** - The operator handles everything automatically
+2. **Declarative configuration** - All router settings are in the Supergraph YAML
+3. **Automatic rollout** - Changes are applied automatically when you update the CRD
 
 ### Updating Router Configuration
 
 To update the router configuration:
 
-1. **Edit the configuration file:**
+1. **Edit the Supergraph resource:**
    ```bash
    # Edit the router configuration
-   vim deploy/operator-resources/router-config.yaml
+   vim deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml
    ```
 
-2. **Update the ConfigMap:**
+2. **Update the `spec.routerConfig` section** with your desired settings:
+   ```yaml
+   spec:
+     routerConfig:
+       supergraph:
+         listen: 0.0.0.0:4000
+         introspection: true
+       # ... other router settings
+   ```
+
+3. **Apply the changes:**
    ```bash
-   kubectl create configmap router-config \
-       --from-file=router.yaml=deploy/operator-resources/router-config.yaml \
-       -n apollo --dry-run=client -o yaml | kubectl apply -f -
+   kubectl apply -f deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml
    ```
 
-3. **Restart the router deployment:**
-   ```bash
-   kubectl rollout restart deployment/reference-architecture-${ENVIRONMENT} -n apollo
-   ```
+4. **The operator automatically:**
+   - Updates the router deployment with the new configuration
+   - Rolls out the changes to all router pods
+   - No manual patching or restarts needed!
 
-4. **Wait for rollout to complete:**
-   ```bash
-   kubectl rollout status deployment/reference-architecture-${ENVIRONMENT} -n apollo
-   ```
-
-### Updating Rhai Scripts
-
-To update the Rhai scripts:
-
-1. **Edit the script file:**
-   ```bash
-   vim deploy/operator-resources/rhai/main.rhai
-   ```
-
-2. **Update the ConfigMap:**
-   ```bash
-   kubectl create configmap rhai-scripts \
-       --from-file=main.rhai=deploy/operator-resources/rhai/main.rhai \
-       -n apollo --dry-run=client -o yaml | kubectl apply -f -
-   ```
-
-3. **Restart the router deployment:**
-   ```bash
-   kubectl rollout restart deployment/reference-architecture-${ENVIRONMENT} -n apollo
-   ```
-
-**Note:** If you need to re-apply the router configuration patching (e.g., after operator updates the deployment), you can re-run script 08:
-
-```bash
-./scripts/minikube/08-apply-router-config.sh
-```
+**Note:** Router configuration is now managed entirely through the Supergraph CRD. No additional scripts are needed.
 
 ## Step 6: Logging Into the Client Application
 
-If you deployed the client application (script 10), you can log in using the following test credentials:
+If you deployed the client application (script 09), you can log in using the following test credentials:
 
 ### Test Users
 
@@ -381,7 +340,7 @@ To create a new environment (e.g., "prod"):
 export ENVIRONMENT="prod"
 ```
 
-2. Run scripts 02-10 again with the new environment:
+2. Run scripts 02-09 again with the new environment:
 
 ```bash
 ./scripts/minikube/02-setup-apollo-graph.sh
@@ -391,9 +350,8 @@ source .env
 ./scripts/minikube/05-deploy-subgraphs.sh
 ./scripts/minikube/06-deploy-coprocessor.sh
 ./scripts/minikube/07-deploy-operator-resources.sh
-./scripts/minikube/08-apply-router-config.sh
-./scripts/minikube/09-deploy-ingress.sh
-./scripts/minikube/10-deploy-client.sh
+./scripts/minikube/08-deploy-ingress.sh
+./scripts/minikube/09-deploy-client.sh
 ```
 
 Each environment will have:
@@ -445,7 +403,7 @@ If the router is not picking up configuration changes:
 1. **Verify ConfigMaps exist:**
    ```bash
    kubectl get configmap router-config -n apollo
-   kubectl get configmap rhai-scripts -n apollo
+   kubectl get supergraph reference-architecture-${ENVIRONMENT} -n apollo -o yaml | grep -A 50 routerConfig
    ```
 
 2. **Check volume mounts:**
@@ -468,7 +426,7 @@ If the router is not picking up configuration changes:
 
 5. **Re-apply router configuration:**
    ```bash
-   ./scripts/minikube/08-apply-router-config.sh
+   kubectl apply -f deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml
    ```
 
 ### Router pods in CrashLoopBackOff
@@ -481,17 +439,14 @@ If router pods are crashing:
    ```
 
 2. **Common causes:**
-   - Invalid YAML in `router-config.yaml` (check syntax)
-   - Missing ConfigMap (verify ConfigMaps exist)
-   - Volume mount path incorrect (should be `/etc/router`)
-   - Configuration file not found (check `--config` argument)
+   - Invalid YAML in `spec.routerConfig` (check syntax in Supergraph CRD)
+   - Schema composition issues (check SupergraphSchema status)
+   - Missing coprocessor (verify coprocessor is running)
 
 3. **Verify configuration syntax:**
    ```bash
-   # Check if router-config.yaml is valid YAML
-   kubectl create configmap router-config \
-       --from-file=router.yaml=deploy/operator-resources/router-config.yaml \
-       -n apollo --dry-run=client -o yaml | kubectl apply -f - --dry-run=client
+   # Check if Supergraph CRD has valid routerConfig
+   kubectl get supergraph reference-architecture-${ENVIRONMENT} -n apollo -o yaml | grep -A 50 routerConfig
    ```
 
 ### Ingress not working

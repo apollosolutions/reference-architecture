@@ -5,8 +5,7 @@ This repository contains a reference architecture utilizing [Kubernetes](https:/
 Once the architecture is fully stood up, you'll have: 
 
 - An Apollo Router running and managed by the [Apollo GraphOS Operator](https://www.apollographql.com/docs/apollo-operator/), utilizing:
-  - [A coprocessor for handling customizations outside of the router](https://www.apollographql.com/docs/router/customizations/coprocessor) (tracked, not deployed yet)
-  - [Rhai scripts to do basic customizations within the router container](https://www.apollographql.com/docs/router/customizations/rhai) (tracked, not deployed yet)
+  - [A coprocessor for handling customizations outside of the router](https://www.apollographql.com/docs/router/customizations/coprocessor)
   - [Authorization/Authentication directives](https://www.apollographql.com/docs/router/configuration/authorization)
 - Eight subgraphs, each handling a portion of the overall supergraph schema, with schemas automatically published to GraphOS via the operator using inline SDL
 - A React-based frontend application utilizing Apollo Client (optional)

@@ -1,10 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-# Script 10: Deploy Client
+# Script 09: Deploy Client
 # This script deploys the client application (optional)
 
-echo "=== Step 10: Deploying Client Application ==="
+echo "=== Step 09: Deploying Client Application ==="
 
 # Load environment variables from .env if it exists
 if [ -f .env ]; then
@@ -41,7 +41,7 @@ fi
 # Get router URL from .env file
 if [[ -z "${ROUTER_URL:-}" ]]; then
     echo "Error: ROUTER_URL is not set"
-    echo "Please run 09-deploy-ingress.sh first to set up the router URL"
+    echo "Please run 08-deploy-ingress.sh first to set up the router URL"
     exit 1
 fi
 
