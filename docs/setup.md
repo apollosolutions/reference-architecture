@@ -172,16 +172,17 @@ kubectl get pods -n apollo
 kubectl describe supergraph reference-architecture-${ENVIRONMENT} -n apollo
 ```
 
-### Script 08: Deploy Ingress
+### Script 08: Setup Router Access
 
 ```bash
-./scripts/minikube/08-deploy-ingress.sh
+./scripts/minikube/08-setup-router-access.sh
 ```
 
 This script:
-- Deploys an Ingress resource for external access
+- Enables and configures the ingress controller addon (required for the client application's Ingress resource)
 - Configures the ingress controller as LoadBalancer for `minikube tunnel` support
-- Provides access URLs for the router
+- Determines and saves the router URL to `.env` file
+- **Note:** The router does not use an Ingress resource - the client's nginx proxies to it internally. The ingress controller is needed for the client's Ingress.
 
 ### Script 09: Deploy Client (Optional)
 
@@ -350,7 +351,7 @@ source .env
 ./scripts/minikube/05-deploy-subgraphs.sh
 ./scripts/minikube/06-deploy-coprocessor.sh
 ./scripts/minikube/07-deploy-operator-resources.sh
-./scripts/minikube/08-deploy-ingress.sh
+./scripts/minikube/08-setup-router-access.sh
 ./scripts/minikube/09-deploy-client.sh
 ```
 

@@ -110,5 +110,5 @@ echo "Monitor router status with:"
 echo "  kubectl get supergraphs -n apollo"
 echo "  kubectl get pods -n apollo"
 echo ""
-echo "Next step: Run 08-deploy-ingress.sh to setup external access"
+echo "Next step: Run 08-setup-router-access.sh to configure external access"
 
