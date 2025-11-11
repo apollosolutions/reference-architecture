@@ -79,22 +79,15 @@ for subgraph in "${SUBGRAPHS[@]}"; do
     # Read schema and indent for YAML (6 spaces to be indented relative to 'sdl:')
     SCHEMA_CONTENT=$(cat "$SCHEMA_FILE" | sed 's/^/      /')
     
-    # Create Subgraph CRD YAML
-    cat <<EOF | kubectl apply -f -
-apiVersion: apollographql.com/v1alpha2
-kind: Subgraph
-metadata:
-  name: ${subgraph}
-  namespace: ${subgraph}
-  labels:
-    app: ${subgraph}
-    apollo.io/subgraph: "true"
-spec:
-  endpoint: http://graphql.${subgraph}.svc.cluster.local:4001
-  schema:
-    sdl: |
-${SCHEMA_CONTENT}
-EOF
+    # Create Subgraph CRD YAML using template
+    # Replace SUBGRAPH_NAME, then replace SCHEMA_CONTENT placeholder with actual schema
+    TEMP_TEMPLATE=$(mktemp)
+    TEMP_SCHEMA=$(mktemp)
+    echo "$SCHEMA_CONTENT" > "$TEMP_SCHEMA"
+    sed "s/\${SUBGRAPH_NAME}/${subgraph}/g" deploy/operator-resources/subgraph.yaml.template > "$TEMP_TEMPLATE"
+    # Replace the SCHEMA_CONTENT placeholder line with the actual schema content using sed
+    sed "/\${SCHEMA_CONTENT}/r $TEMP_SCHEMA" "$TEMP_TEMPLATE" | sed '/\${SCHEMA_CONTENT}/d' | kubectl apply -f -
+    rm -f "$TEMP_TEMPLATE" "$TEMP_SCHEMA"
     
     echo "✓ ${subgraph} deployed successfully"
 done

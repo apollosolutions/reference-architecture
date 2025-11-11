@@ -68,14 +68,7 @@ helm upgrade --install --atomic apollo-operator \
     -n apollo-operator \
     --create-namespace \
     --wait \
-    -f - <<EOF
-apiKey:
-  secretName: apollo-api-key
-config:
-  controllers:
-    supergraph:
-      apiKeySecret: apollo-api-key
-EOF
+    -f deploy/operator-resources/operator-values.yaml
 
 echo "Apollo GraphOS Operator installed successfully"
 

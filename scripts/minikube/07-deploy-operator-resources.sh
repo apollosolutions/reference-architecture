@@ -65,20 +65,17 @@ echo "Rhai scripts ConfigMap created"
 
 # Deploy SupergraphSchema
 echo "Deploying SupergraphSchema..."
-cat <<EOF | kubectl apply -f -
-apiVersion: apollographql.com/v1alpha2
-kind: SupergraphSchema
-metadata:
-  name: ${RESOURCE_NAME}
-  namespace: apollo
-spec:
-  graphRef: ${APOLLO_GRAPH_ID}@${ENVIRONMENT}
-  selectors:
-    - matchExpressions:
-        - key: apollo.io/subgraph
-          operator: Exists
-  partial: false
-EOF
+
+# Use environment-specific SupergraphSchema file
+SUPERGRAPHSCHEMA_FILE="deploy/operator-resources/supergraphschema-${ENVIRONMENT}.yaml"
+if [ -f "${SUPERGRAPHSCHEMA_FILE}" ]; then
+    echo "Using environment-specific SupergraphSchema file: ${SUPERGRAPHSCHEMA_FILE}"
+    sed "s/\${APOLLO_GRAPH_ID}/${APOLLO_GRAPH_ID}/g" "${SUPERGRAPHSCHEMA_FILE}" | kubectl apply -f -
+else
+    echo "Error: SupergraphSchema file not found for environment: ${ENVIRONMENT}"
+    echo "Expected file: ${SUPERGRAPHSCHEMA_FILE}"
+    exit 1
+fi
 
 echo "SupergraphSchema deployed"
 
