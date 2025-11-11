@@ -10,6 +10,12 @@ This file tracks future improvements and features for the reference architecture
   - Add deployment scripts
   - Update documentation
 
+- [ ] Add local router development workflow
+  - Document how to run router locally for faster iteration
+  - Set up local router configuration that matches Kubernetes setup
+  - Create scripts/guide for local router development without Kubernetes
+  - Enable testing router config changes locally before deploying
+
 ## Monitoring & Observability
 
 - [ ] Implement Zipkin for distributed tracing
