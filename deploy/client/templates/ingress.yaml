@@ -23,9 +23,15 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  defaultBackend:
-    service:
-      name: {{ .Values.ingress.name }}
-      port:
-        number: {{ $svcPort }}
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.ingress.name }}
+                port:
+                  number: {{ $svcPort }}
 {{- end }}

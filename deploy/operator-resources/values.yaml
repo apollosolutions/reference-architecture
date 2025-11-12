@@ -1,0 +1,6 @@
+apiKey:
+  secretName: apollo-api-key
+config:
+  controllers:
+    supergraph:
+      apiKeySecret: apollo-api-key

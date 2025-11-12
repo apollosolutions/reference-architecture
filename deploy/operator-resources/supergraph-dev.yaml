@@ -1,0 +1,58 @@
+apiVersion: apollographql.com/v1alpha2
+kind: Supergraph
+metadata:
+  name: reference-architecture-dev
+  namespace: apollo
+spec:
+  replicas: 3
+  podTemplate:
+    routerVersion: 2.7.0
+    env:
+      - name: APOLLO_ROUTER_LOG
+        value: "debug"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+  schema:
+    resource:
+      name: reference-architecture-dev
+      namespace: apollo
+  routerConfig:
+    supergraph:
+      listen: 0.0.0.0:4000
+      introspection: true
+    headers:
+      all:
+        request:
+          - propagate:
+              matching: .*
+    authentication:
+      router:
+        jwt:
+          jwks:
+            - url: http://graphql.users.svc.cluster.local:4001/.well-known/jwks.json
+    authorization:
+      directives:
+        enabled: true
+    cors:
+      allow_any_origin: true
+    coprocessor:
+      url: http://coprocessor.apollo.svc.cluster.local:8081
+      timeout: 2s
+      router:
+        request:
+          headers: true
+      subgraph:
+        all:
+          request:
+            headers: true
+          response:
+            headers: true
+    health_check:
+      listen: 0.0.0.0:8088
+    sandbox:
+      enabled: true
+    homepage:
+      enabled: false
+

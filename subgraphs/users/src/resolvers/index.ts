@@ -49,28 +49,34 @@ export const resolvers: Resolvers = {
   },
   Mutation: {
     async login(_, { username, password, scopes }) {
-      let user = getUserbyUsername(username)
-      if (!user || password === "") {
-        return {
-          reason: "user not found"
+      try {
+        let user = getUserbyUsername(username)
+        if (!user || password === "") {
+          return {
+            reason: "user not found"
+          }
         }
-      }
-      const privateKeyText = await readFile("./keys/private_key.pem", {
-        encoding: "utf8"
-      });
+        const privateKeyText = await readFile("./keys/private_key.pem", {
+          encoding: "utf8"
+        });
 
-      const alg = "ES256";
-      const privateKey = createPrivateKey(privateKeyText);
-      const token = await new jose.SignJWT({
-        sub: user.id,
-        scope: scopes.join(' '),
-        username,
-      }).setProtectedHeader({ alg }).setIssuedAt().setExpirationTime('2h').sign(privateKey);
+        const alg = "ES256";
+        const privateKey = createPrivateKey(privateKeyText);
+        const scopesArray = (scopes && Array.isArray(scopes)) ? scopes : [];
+        const token = await new jose.SignJWT({
+          sub: user.id,
+          scope: scopesArray.join(' '),
+          username,
+        }).setProtectedHeader({ alg }).setIssuedAt().setExpirationTime('2h').sign(privateKey);
 
-      return {
-        token,
-        user,
-        scopes
+        return {
+          token,
+          user,
+          scopes: scopesArray
+        }
+      } catch (error) {
+        console.error("Login error:", error);
+        throw new GraphQLError(`Login failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   },

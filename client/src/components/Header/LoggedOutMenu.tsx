@@ -18,6 +18,9 @@ export default function LoggedOutMenu() {
         size={'sm'}
         mr={4}
         leftIcon={<AddIcon />}
+        as={Link}
+        to="/login"
+        title="Please log in to view your cart"
       >
         <ShoppingCart />
       </Button>

@@ -40,7 +40,7 @@ const USER_PROFILE = gql`
 `
 const USER_PROFILE_FULL = gql`
   query UserProfileFull {
-    user {
+    me {
       id
       cart {
         userId
@@ -128,7 +128,7 @@ const LOGIN = gql`
   mutation Mutation(
     $username: String!
     $password: String!
-    $scopes: [String!]!
+    $scopes: [String!]
   ) {
     login(username: $username, password: $password, scopes: $scopes) {
       ... on LoginSuccessful {
@@ -146,6 +146,19 @@ const LOGIN = gql`
     }
   }
 `
+
+const ADD_VARIANT_TO_CART = gql`
+  mutation AddVariantToCart($variantId: ID!, $quantity: Int) {
+    cart {
+      addVariantToCart(variantId: $variantId, quantity: $quantity) {
+        successful
+        message
+      }
+    }
+  }
+`
+
 export const MUTATIONS = {
   LOGIN,
+  ADD_VARIANT_TO_CART,
 }

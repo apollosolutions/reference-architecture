@@ -1,0 +1,21 @@
+apiVersion: apollographql.com/v1alpha2
+kind: Supergraph
+metadata:
+  name: ${RESOURCE_NAME}
+  namespace: apollo
+spec:
+  replicas: 3
+  podTemplate:
+    routerVersion: 2.7.0
+    env:
+      - name: APOLLO_ROUTER_LOG
+        value: "debug"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+  schema:
+    resource:
+      name: ${RESOURCE_NAME}
+      namespace: apollo
+
