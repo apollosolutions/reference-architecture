@@ -14,10 +14,6 @@ COPY schema.graphql .
 
 RUN npm run build
 
-# Copy schema to /app directory for operator to access
-RUN mkdir -p /app
-COPY schema.graphql /app/schema.graphql
-
 EXPOSE 4001
 
 CMD [ "node", "--require","./dist/tracing.js","./dist/index.js" ]
