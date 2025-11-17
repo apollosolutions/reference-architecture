@@ -57,12 +57,61 @@ if [ ! -d "client" ]; then
     exit 0
 fi
 
+# Configure docker to use Minikube's Docker daemon
+echo "Configuring Docker to use Minikube's daemon..."
+eval $(minikube docker-env)
+
+# Check if local registry is enabled
+REGISTRY_URL=""
+IMAGE_TAG="local"
+HELM_IMAGE_OVERRIDES=""
+if [[ "${USE_LOCAL_REGISTRY:-}" == "true" ]]; then
+    # Verify registry service exists (Minikube addon is in kube-system namespace)
+    if ! kubectl get svc registry -n kube-system &>/dev/null; then
+        echo "Error: Registry service not found. Please run 03a-setup-registry.sh first"
+        exit 1
+    fi
+    
+    # Get registry ClusterIP and port dynamically
+    REGISTRY_CLUSTER_IP=$(kubectl get svc registry -n kube-system -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
+    # Get the HTTP port (not HTTPS port 443)
+    REGISTRY_PORT=$(kubectl get svc registry -n kube-system -o jsonpath='{.spec.ports[?(@.name=="http")].port}' 2>/dev/null || echo "")
+    
+    if [ -z "$REGISTRY_CLUSTER_IP" ]; then
+        echo "Error: Could not get registry ClusterIP"
+        exit 1
+    fi
+    
+    # Error if port cannot be determined
+    if [ -z "$REGISTRY_PORT" ] || [ "$REGISTRY_PORT" == "null" ]; then
+        echo "Error: Could not determine registry port"
+        echo "  Please ensure the registry addon is properly enabled"
+        exit 1
+    fi
+    
+    # Use ClusterIP for image references
+    REGISTRY_URL="${REGISTRY_CLUSTER_IP}:${REGISTRY_PORT}"
+    
+    # Read image tag from file (created by script 04)
+    if [ -f ".image-tag" ]; then
+        IMAGE_TAG=$(head -n 1 .image-tag | tr -d '[:space:]')
+        if [ -z "$IMAGE_TAG" ] || [ ${#IMAGE_TAG} -lt 8 ]; then
+            echo "Warning: Invalid image tag in .image-tag, using 'local'"
+            IMAGE_TAG="local"
+        fi
+    fi
+    
+    echo "Local registry enabled. Will use registry image: ${REGISTRY_URL}/client:${IMAGE_TAG}"
+    HELM_IMAGE_OVERRIDES="--set image.repository=${REGISTRY_URL}/client --set image.tag=${IMAGE_TAG} --set image.pullPolicy=IfNotPresent"
+else
+    echo "Using local Docker image (not using registry)"
+fi
+
 # Build client with BACKEND_URL if Dockerfile supports it
 RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
 if [ -f "client/Dockerfile" ] && grep -q "BACKEND_URL" "client/Dockerfile"; then
     echo "Building client image with BACKEND_URL=$BACKEND_URL..."
     echo "Note: The client's nginx will proxy /graphql requests to the router service"
-    eval $(minikube docker-env)
     # Backup original nginx config
     cp client/docker/nginx/conf.d/default.conf client/docker/nginx/conf.d/default.conf.bak
     # Replace placeholder with actual service name (handle both macOS and Linux sed)
@@ -80,12 +129,33 @@ if [ -f "client/Dockerfile" ] && grep -q "BACKEND_URL" "client/Dockerfile"; then
     docker build --no-cache --build-arg BACKEND_URL="$BACKEND_URL" -t client:local client
     # Restore original nginx config
     mv client/docker/nginx/conf.d/default.conf.bak client/docker/nginx/conf.d/default.conf
+else
+    # Build client image even if BACKEND_URL is not in Dockerfile
+    echo "Building client image..."
+    docker build -t client:local client
+fi
+
+# If registry is enabled, tag and push the image
+if [ -n "$REGISTRY_URL" ]; then
+    echo "Tagging client image for registry with tag: ${IMAGE_TAG}..."
+    docker tag "client:local" "${REGISTRY_URL}/client:${IMAGE_TAG}"
+    docker tag "client:local" "${REGISTRY_URL}/client:local"
+    
+    echo "Pushing client image to registry..."
+    if docker push "${REGISTRY_URL}/client:${IMAGE_TAG}"; then
+        echo "✓ Successfully pushed client:${IMAGE_TAG} to registry"
+        docker push "${REGISTRY_URL}/client:local" || true
+    else
+        echo "✗ Failed to push client to registry"
+        exit 1
+    fi
 fi
 
 # Install using Helm
 echo "Deploying client..."
 helm upgrade --install client "deploy/client" \
     -n client \
+    $HELM_IMAGE_OVERRIDES \
     --wait
 
 # Force pod restart to pick up new image

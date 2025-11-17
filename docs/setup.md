@@ -107,6 +107,44 @@ This script:
 - Creates the operator API key secret
 - Installs the Apollo GraphOS Operator via Helm
 
+### Script 03a: Setup Local OCI Registry (Optional)
+
+This script is optional and only needed if you want to use OCI images for storing subgraph and supergraph schemas in a local registry.
+
+```bash
+source .env
+./scripts/minikube/03a-setup-registry.sh
+```
+
+**To enable this feature:**
+
+1. Add to your `.env` file:
+   ```bash
+   export USE_LOCAL_REGISTRY="true"
+   ```
+
+2. Run Script 03a after Script 03:
+   ```bash
+   ./scripts/minikube/03a-setup-registry.sh
+   ```
+
+This script:
+- Deploys a local OCI registry inside Minikube
+- Exposes the registry as a Kubernetes service
+- Configures Minikube's Docker daemon to allow insecure registry access
+- Sets up registry at: `registry.registry.svc.cluster.local:5000`
+
+**When to use OCI registry:**
+- When you want the operator to automatically push composed supergraph schemas to a registry
+- When you want subgraph schemas stored as OCI images instead of inline SDL
+- For testing OCI-based workflows before moving to production registries
+
+**When not to use OCI registry:**
+- For simple local development with inline SDL schemas (default)
+- When you don't need registry-based schema storage
+
+If `USE_LOCAL_REGISTRY` is not set to `"true"`, the script will skip setup and all other scripts will use the default behavior (inline SDL schemas and local Docker images).
+
 ### Script 04: Build Docker Images
 
 ```bash
@@ -117,6 +155,7 @@ This script:
 - Configures Docker to use Minikube's Docker daemon
 - Builds all subgraph images locally
 - Tags images as `{subgraph}:local`
+- If `USE_LOCAL_REGISTRY=true`, also pushes images to the local registry
 - Builds coprocessor and client images (for future use)
 
 ### Script 05: Deploy Subgraphs
@@ -127,8 +166,12 @@ This script:
 
 This script:
 - Deploys each subgraph using Helm charts
-- Creates Subgraph CRDs with inline SDL schemas
-- Configures images to use local builds
+- If `USE_LOCAL_REGISTRY=true`:
+  - Uses registry images for deployments
+  - Creates Subgraph CRDs with OCI image schema references
+- If `USE_LOCAL_REGISTRY` is not set (default):
+  - Creates Subgraph CRDs with inline SDL schemas
+  - Configures images to use local builds
 
 Monitor subgraph deployment:
 
@@ -160,7 +203,11 @@ This script:
 
 This script:
 - Deploys SupergraphSchema CRD (triggers composition)
-- Deploys Supergraph CRD with router configuration (deploys the Apollo Router)
+- If `USE_LOCAL_REGISTRY=true`:
+  - Deploys Supergraph CRD with OCI image schema reference
+  - Operator will automatically push composed schema to the registry
+- If `USE_LOCAL_REGISTRY` is not set (default):
+  - Deploys Supergraph CRD with resource-based schema reference
 - Waits for the router deployment to be created
 
 **Note:** The coprocessor (script 06) must be deployed before running this script.

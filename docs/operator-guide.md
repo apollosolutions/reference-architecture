@@ -253,6 +253,84 @@ spec:
 
 The operator handles the rollout automatically - no manual patching or restarts needed!
 
+## Using OCI Images for Schema Storage
+
+The reference architecture supports an optional local OCI registry for storing subgraph and supergraph schemas as OCI images. This enables the operator to automatically push composed schemas to a registry, which can be useful for testing OCI-based workflows or preparing for production registries.
+
+### Enabling OCI Registry
+
+To enable the local OCI registry:
+
+1. Set the environment variable in your `.env` file:
+   ```bash
+   export USE_LOCAL_REGISTRY="true"
+   ```
+
+2. Run the registry setup script after Script 03:
+   ```bash
+   ./scripts/minikube/03a-setup-registry.sh
+   ```
+
+This deploys a local registry inside Minikube at `registry.registry.svc.cluster.local:5000`.
+
+### How It Works
+
+When `USE_LOCAL_REGISTRY=true`:
+
+1. **Subgraph Images**: Script 04 pushes all subgraph images to the registry after building them.
+
+2. **Subgraph CRDs**: Script 05 creates Subgraph CRDs with OCI image schema references:
+   ```yaml
+   spec:
+     schema:
+       ociImage:
+         reference: registry.registry.svc.cluster.local:5000/products:local
+         path: /app/schema.graphql
+   ```
+   The operator extracts the schema from the OCI image at the specified path.
+
+3. **Supergraph CRDs**: Script 07 uses OCI-based Supergraph files that reference registry images:
+   ```yaml
+   spec:
+     schema:
+       image:
+         name: registry.registry.svc.cluster.local:5000/supergraph-schema:dev
+         pullPolicy: Always
+   ```
+   The operator automatically pushes the composed supergraph schema to this registry location as an OCI artifact.
+
+### Default Behavior (No Registry)
+
+When `USE_LOCAL_REGISTRY` is not set or not `"true"`:
+
+- Subgraph CRDs use inline SDL schemas
+- Supergraph CRDs use resource references to SupergraphSchema
+- Images are built locally and used directly from Minikube's Docker daemon
+- No registry is deployed or used
+
+### Verifying Registry Images
+
+To check what images are in the registry:
+
+```bash
+# List images in the registry (requires registry API access)
+kubectl run registry-client --image=curlimages/curl --rm -it --restart=Never -- \
+  curl http://registry.registry.svc.cluster.local:5000/v2/_catalog
+```
+
+### When to Use OCI Registry
+
+**Use OCI registry when:**
+- Testing OCI-based workflows before moving to production
+- You want schemas stored as OCI artifacts instead of inline SDL
+- Preparing for production registries (Docker Hub, ECR, GCR, etc.)
+- You need versioned schema artifacts in a registry
+
+**Use default (inline SDL) when:**
+- Simple local development
+- You don't need registry-based storage
+- Faster iteration without registry overhead
+
 ## Best Practices
 
 1. **Version Schemas**: Keep track of schema versions in your container images

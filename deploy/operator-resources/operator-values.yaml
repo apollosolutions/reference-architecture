@@ -4,4 +4,9 @@ config:
   controllers:
     supergraph:
       apiKeySecret: apollo-api-key
-
+  # OCI configuration for Minikube registry addon (HTTP-only)
+  # The Minikube registry addon uses HTTP, so we configure httpOnlyRegistries
+  # The ClusterIP will be dynamically determined, but we can also use the service DNS
+  # Note: The actual ClusterIP will vary, but the operator will use the ClusterIP from the CRD
+  httpOnlyRegistries:
+    - "registry.kube-system.svc.cluster.local:80"
