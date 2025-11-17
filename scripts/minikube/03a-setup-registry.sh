@@ -117,26 +117,26 @@ echo ""
 echo "No additional Minikube configuration is needed for Docker pushes."
 echo ""
 
-# Upgrade operator with httpOnlyRegistries configuration
+# Upgrade operator with http_only_registries configuration
 echo ""
 echo "Upgrading Apollo GraphOS Operator with HTTP-only registry configuration..."
 if helm list -n apollo-operator | grep -q apollo-operator; then
-    # Create temporary values file with ClusterIP added to httpOnlyRegistries
+    # Create temporary values file with ClusterIP added to http_only_registries
     TEMP_VALUES=$(mktemp)
     cat deploy/operator-resources/operator-values.yaml > "$TEMP_VALUES"
     
-    # Add ClusterIP to httpOnlyRegistries if it's not already there
+    # Add ClusterIP to http_only_registries if it's not already there
     if [ -n "$REGISTRY_CLUSTER_IP" ]; then
         # Use yq if available, otherwise use awk to add the ClusterIP
         if command -v yq &> /dev/null; then
-            yq eval ".config.httpOnlyRegistries += [\"${REGISTRY_CLUSTER_IP}:${REGISTRY_PORT}\"]" -i "$TEMP_VALUES"
+            yq eval ".config.oci.http_only_registries += [\"${REGISTRY_CLUSTER_IP}:${REGISTRY_PORT}\"]" -i "$TEMP_VALUES"
         else
-            # Fallback to awk: add ClusterIP after the service DNS entry
+            # Fallback to awk: add ClusterIP after the service DNS entry under oci.http_only_registries
             awk -v clusterip="${REGISTRY_CLUSTER_IP}:${REGISTRY_PORT}" \
-                '/registry\.kube-system\.svc\.cluster\.local:80/ { print; print "    - \"" clusterip "\""; next } { print }' \
+                '/registry\.kube-system\.svc\.cluster\.local:80/ { print; print "      - \"" clusterip "\""; next } { print }' \
                 "$TEMP_VALUES" > "${TEMP_VALUES}.tmp" && mv "${TEMP_VALUES}.tmp" "$TEMP_VALUES"
         fi
-        echo "  Added ClusterIP (${REGISTRY_CLUSTER_IP}:${REGISTRY_PORT}) to httpOnlyRegistries"
+        echo "  Added ClusterIP (${REGISTRY_CLUSTER_IP}:${REGISTRY_PORT}) to http_only_registries"
     fi
     
     helm upgrade apollo-operator \
