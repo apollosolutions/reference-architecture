@@ -26,7 +26,7 @@ spec:
         memory: 256Mi
   schema:
     oci:
-      reference: registry.kube-system.svc.cluster.local:80/supergraph-schema:dev
+      reference: registry.kube-system.svc.cluster.local:80/supergraph-schema:latest
   routerConfig:
     supergraph:
       listen: 0.0.0.0:4000

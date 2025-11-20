@@ -96,32 +96,14 @@ if [[ "${USE_LOCAL_REGISTRY:-}" == "true" ]]; then
         exit 1
     fi
     
-    # Read image tag from file (created by script 04)
-    if [ ! -f ".image-tag" ]; then
-        echo "Error: .image-tag file not found"
-        echo "Please run 04-build-images.sh first when using registry"
-        exit 1
-    fi
-    
-    # Read only the first line and remove any whitespace/newlines
-    IMAGE_TAG=$(head -n 1 .image-tag | tr -d '[:space:]')
-    
-    # Validate tag format (should be alphanumeric, 12 chars expected)
-    if [ -z "$IMAGE_TAG" ] || [ ${#IMAGE_TAG} -lt 8 ]; then
-        echo "Error: Invalid image tag in .image-tag: '${IMAGE_TAG}'"
-        echo "Tag must be at least 8 characters. Please run 04-build-images.sh again"
-        exit 1
-    fi
-    
-    echo "Using image tag from .image-tag: ${IMAGE_TAG}"
     echo "Using registry at ${REGISTRY_CLUSTER_IP}:${REGISTRY_PORT} (HTTP, ClusterIP for operator)"
     
     SUPERGRAPH_FILE="deploy/operator-resources/supergraph-${ENVIRONMENT}-oci.yaml"
     if [ -f "${SUPERGRAPH_FILE}" ]; then
         echo "Using OCI-based Supergraph file: ${SUPERGRAPH_FILE}"
-        # Replace service DNS with ClusterIP and image tag (port will be included in the replacement)
+        # Replace service DNS with ClusterIP (port will be included in the replacement)
+        # Note: Tag is already set to :latest in the YAML file
         sed -e "s|registry.kube-system.svc.cluster.local:80|${REGISTRY_CLUSTER_IP}:${REGISTRY_PORT}|g" \
-            -e "s|supergraph-schema:${ENVIRONMENT}|supergraph-schema:${IMAGE_TAG}|g" \
             "${SUPERGRAPH_FILE}" | kubectl apply -f -
     else
         echo "Error: OCI-based Supergraph file not found: ${SUPERGRAPH_FILE}"

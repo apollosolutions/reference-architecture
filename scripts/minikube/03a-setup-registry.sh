@@ -107,6 +107,102 @@ done
 # Clean up test pod if it still exists
 kubectl delete pod test-registry -n kube-system --ignore-not-found=true &>/dev/null || true
 
+# Check and install oras CLI if needed
+echo ""
+echo "Checking for oras CLI..."
+if command -v oras &> /dev/null; then
+    ORAS_VERSION=$(oras version 2>/dev/null | head -n 1 || echo "unknown")
+    echo "✓ oras CLI is already installed: $ORAS_VERSION"
+else
+    echo "oras CLI not found. Installing..."
+    
+    # Detect OS and architecture
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+    ARCH=$(uname -m)
+    
+    # Map architecture
+    case "$ARCH" in
+        x86_64)
+            ORAS_ARCH="amd64"
+            ;;
+        arm64|aarch64)
+            ORAS_ARCH="arm64"
+            ;;
+        *)
+            echo "Error: Unsupported architecture: $ARCH"
+            echo "Please install oras manually from https://oras.land/docs/installation"
+            exit 1
+            ;;
+    esac
+    
+    # Map OS
+    case "$OS" in
+        linux)
+            ORAS_OS="linux"
+            ;;
+        darwin)
+            ORAS_OS="darwin"
+            ;;
+        *)
+            echo "Error: Unsupported OS: $OS"
+            echo "Please install oras manually from https://oras.land/docs/installation"
+            exit 1
+            ;;
+    esac
+    
+    # Get latest version
+    ORAS_VERSION=$(curl -s https://api.github.com/repos/oras-project/oras/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+    
+    if [ -z "$ORAS_VERSION" ] || [ "$ORAS_VERSION" == "null" ]; then
+        echo "Warning: Could not determine latest oras version. Using 1.1.0 as fallback."
+        ORAS_VERSION="1.1.0"
+    fi
+    
+    # Download and install
+    ORAS_URL="https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_${ORAS_OS}_${ORAS_ARCH}.tar.gz"
+    TEMP_DIR=$(mktemp -d)
+    
+    echo "  Downloading oras v${ORAS_VERSION}..."
+    if curl -sL "$ORAS_URL" -o "$TEMP_DIR/oras.tar.gz"; then
+        echo "  Extracting..."
+        tar -xzf "$TEMP_DIR/oras.tar.gz" -C "$TEMP_DIR" oras
+        chmod +x "$TEMP_DIR/oras"
+        
+        # Install to a directory in PATH
+        if [ -w "/usr/local/bin" ]; then
+            sudo mv "$TEMP_DIR/oras" /usr/local/bin/oras
+            echo "✓ oras installed to /usr/local/bin/oras"
+        elif [ -w "$HOME/.local/bin" ]; then
+            mkdir -p "$HOME/.local/bin"
+            mv "$TEMP_DIR/oras" "$HOME/.local/bin/oras"
+            echo "✓ oras installed to $HOME/.local/bin/oras"
+            echo "  Make sure $HOME/.local/bin is in your PATH"
+        else
+            echo "Error: Cannot find writable directory in PATH"
+            echo "Please install oras manually:"
+            echo "  1. Download from: $ORAS_URL"
+            echo "  2. Extract and move to a directory in your PATH"
+            rm -rf "$TEMP_DIR"
+            exit 1
+        fi
+        
+        rm -rf "$TEMP_DIR"
+        
+        # Verify installation
+        if command -v oras &> /dev/null; then
+            echo "✓ oras installation verified"
+        else
+            echo "Warning: oras installed but not found in PATH"
+            echo "  You may need to add the installation directory to your PATH"
+        fi
+    else
+        echo "Error: Failed to download oras"
+        echo "Please install oras manually from https://oras.land/docs/installation"
+        rm -rf "$TEMP_DIR"
+        exit 1
+    fi
+fi
+
 echo ""
 echo "✓ Registry configuration complete!"
 echo ""
@@ -171,6 +267,7 @@ echo "Note:"
 echo "  - The registry uses HTTP (not HTTPS)"
 echo "  - The operator is configured to use HTTP-only registries"
 echo "  - Images pushed to localhost:5000 will be accessible from Kubernetes pods"
+echo "  - oras CLI is required for syncing supergraph schemas (installed above)"
 echo ""
 echo "Next step: Run 04-build-images.sh to build Docker images"
 echo ""
