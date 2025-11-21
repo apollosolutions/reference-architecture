@@ -165,6 +165,8 @@ This script:
 
 **Note:** The coprocessor (script 06) must be deployed before running this script.
 
+**Note:** The router is configured with telemetry enabled. If you plan to use distributed tracing, it's recommended to deploy the telemetry stack (script 10) before deploying the router to avoid connection errors in the router logs. However, the router will still function correctly even if the telemetry collector is not available - you'll just see connection errors in the logs until the collector is deployed.
+
 Monitor router deployment:
 
 ```bash
@@ -196,6 +198,32 @@ This script:
 - Sets up ingress for client access
 
 **Note:** The client is required if you want to access the router via the ingress controller (minikube tunnel or NodePort). If you only need direct router access, you can use port-forward (Option 2 in Step 4) and skip this script.
+
+### Script 10: Deploy Telemetry Stack (Optional)
+
+Deploy Zipkin and OpenTelemetry Collector for distributed tracing:
+
+```bash
+./scripts/minikube/10-deploy-telemetry.sh
+```
+
+This script:
+- Creates the `monitoring` namespace
+- Deploys Zipkin for trace visualization
+- Deploys OpenTelemetry Collector to receive traces from router and subgraphs
+- Waits for both services to be ready
+
+**Note:** This script is optional. Telemetry is configured for all environments (dev and prod) but the telemetry stack only needs to be deployed once per cluster. The collector receives traces from all subgraphs and the router, then exports them to Zipkin.
+
+**Recommended:** Deploy telemetry (script 10) before deploying the router (script 07) to avoid connection errors in router logs. If you've already deployed the router, you can deploy telemetry at any time - the router will automatically start sending traces once the collector is available.
+
+**Access Zipkin UI:**
+
+```bash
+kubectl port-forward -n monitoring svc/zipkin 9411:9411
+```
+
+Then open http://localhost:9411 in your browser to view traces.
 
 ## Step 4: Access Your Supergraph
 
@@ -322,6 +350,8 @@ source .env
 ./scripts/minikube/08-setup-router-access.sh
 ./scripts/minikube/09-deploy-client.sh
 ```
+
+**Note:** Script 10 (telemetry) only needs to be run once per cluster, not per environment. All environments share the same telemetry stack.
 
 Each environment will have:
 - Its own Apollo GraphOS variant (created automatically when schemas are published)

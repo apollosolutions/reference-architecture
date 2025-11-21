@@ -10,6 +10,8 @@ spec:
     env:
       - name: APOLLO_ROUTER_LOG
         value: "warn"
+      - name: OTEL_SERVICE_NAME
+        value: "router"
     resources:
       requests:
         cpu: 500m
@@ -55,4 +57,11 @@ spec:
       enabled: true
     homepage:
       enabled: false
+    telemetry:
+      exporters:
+        tracing:
+          otlp:
+            enabled: true
+            endpoint: http://collector.monitoring.svc.cluster.local:4318
+            protocol: http
 

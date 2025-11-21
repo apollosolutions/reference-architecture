@@ -12,7 +12,7 @@ data:
           http:
     exporters:
       zipkin:
-        endpoint: "http://zipkin.zipkin.svc.cluster.local:9411/api/v2/spans"
+        endpoint: "http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans"
     processors:
       memory_limiter:
         check_interval: 1s

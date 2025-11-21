@@ -16,11 +16,15 @@ import * as env from 'env-var';
 
 const url = env.get('OTEL_HTTP_ENDPOINT').asString()?.trim();
 
+// OTLP exporter expects base URL without /v1/traces suffix
+// The exporter will automatically append /v1/traces
+const otlpUrl = url ? url.replace(/\/v1\/traces$/, '') : undefined;
+
 const sdk = new NodeSDK({
   serviceName: name,
-  traceExporter: url ? new OTLPTraceExporter() : new ConsoleSpanExporter(),
+  traceExporter: otlpUrl ? new OTLPTraceExporter({ url: otlpUrl }) : new ConsoleSpanExporter(),
   metricReader: new PeriodicExportingMetricReader({
-    exporter: url ? new OTLPMetricExporter() : new ConsoleMetricExporter(),
+    exporter: otlpUrl ? new OTLPMetricExporter({ url: otlpUrl }) : new ConsoleMetricExporter(),
   }),
   instrumentations: [getNodeAutoInstrumentations()],
 });

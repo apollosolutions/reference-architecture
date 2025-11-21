@@ -18,8 +18,8 @@ This file tracks future improvements and features for the reference architecture
 
 ## Monitoring & Observability
 
-- [ ] Implement Zipkin for distributed tracing
-- [ ] Implement OpenTelemetry Collector
+- [x] Implement Zipkin for distributed tracing
+- [x] Implement OpenTelemetry Collector
 - [ ] Implement Grafana for metrics visualization
 - [ ] Implement InfluxDB for time-series metrics storage
 - [ ] Implement k6 for load testing
@@ -28,7 +28,7 @@ This file tracks future improvements and features for the reference architecture
 ## Future Enhancements
 
 - [ ] Add persisted queries support
-- [ ] Add telemetry configuration to router
+- [x] Add telemetry configuration to router
 - [ ] Add advanced router configuration options
 - [ ] Add production-ready security configurations
 
