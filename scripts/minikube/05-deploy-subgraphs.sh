@@ -99,5 +99,3 @@ echo "Monitor subgraph status with:"
 echo "  kubectl get subgraphs --all-namespaces"
 echo ""
 echo "Next step: Run 06-deploy-coprocessor.sh to deploy the coprocessor"
-echo "  Then run 07-deploy-operator-resources.sh to deploy the router"
-
