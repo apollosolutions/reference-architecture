@@ -4,6 +4,13 @@ set -euo pipefail
 # Script 05: Deploy Subgraphs
 # This script deploys all subgraphs using Helm and creates Subgraph CRDs with inline SDL
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/05-deploy-subgraphs.sh"
+    exit 1
+fi
+
 echo "=== Step 05: Deploying Subgraphs ==="
 
 # Load environment variables from .env if it exists
@@ -98,4 +105,4 @@ echo ""
 echo "Monitor subgraph status with:"
 echo "  kubectl get subgraphs --all-namespaces"
 echo ""
-echo "Next step: Run 06-deploy-coprocessor.sh to deploy the coprocessor"
+echo "Next step: Run ./scripts/minikube/06-deploy-coprocessor.sh to deploy the coprocessor"

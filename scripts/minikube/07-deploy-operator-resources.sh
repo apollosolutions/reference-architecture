@@ -5,6 +5,13 @@ set -euo pipefail
 # This script deploys SupergraphSchema and Supergraph CRDs
 # Note: The coprocessor (script 06) must be deployed first as the router requires it
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/07-deploy-operator-resources.sh"
+    exit 1
+fi
+
 echo "=== Step 07: Deploying Operator Resources ==="
 
 # Load environment variables from .env if it exists
@@ -23,7 +30,7 @@ fi
 
 if [[ -z "${APOLLO_GRAPH_ID:-}" ]]; then
     echo "Error: APOLLO_GRAPH_ID is not set"
-    echo "Please run 02-setup-apollo-graph.sh first"
+    echo "Please run ./scripts/minikube/02-setup-apollo-graph.sh first"
     exit 1
 fi
 
@@ -110,5 +117,5 @@ echo "Monitor router status with:"
 echo "  kubectl get supergraphs -n apollo"
 echo "  kubectl get pods -n apollo"
 echo ""
-echo "Next step: Run 08-setup-router-access.sh to configure external access"
+echo "Next step: Run ./scripts/minikube/08-setup-router-access.sh to configure external access"
 

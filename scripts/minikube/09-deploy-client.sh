@@ -4,6 +4,13 @@ set -euo pipefail
 # Script 09: Deploy Client
 # This script deploys the client application and sets up port-forwarding
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/09-deploy-client.sh"
+    exit 1
+fi
+
 echo "=== Step 09: Deploying Client Application ==="
 
 # Load environment variables from .env if it exists
@@ -41,7 +48,7 @@ fi
 # Get router URL from .env file
 if [[ -z "${ROUTER_URL:-}" ]]; then
     echo "Error: ROUTER_URL is not set"
-    echo "Please run 08-setup-router-access.sh first to set up the router URL"
+    echo "Please run ./scripts/minikube/08-setup-router-access.sh first to set up the router URL"
     exit 1
 fi
 
@@ -102,6 +109,18 @@ fi
 
 # Set up port-forwarding for client
 CLIENT_PORT_FORWARD_PORT=3000
+CLIENT_PF_PID_FILE=".client-port-forward.pid"
+
+# Clean up existing PID file and any stale process
+if [ -f "$CLIENT_PF_PID_FILE" ]; then
+    OLD_PID=$(cat "$CLIENT_PF_PID_FILE" 2>/dev/null | head -n 1 | tr -d '[:space:]' || echo "")
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "Found existing port-forward process (PID: $OLD_PID). Stopping it..."
+        kill "$OLD_PID" 2>/dev/null || true
+        sleep 2
+    fi
+    rm -f "$CLIENT_PF_PID_FILE"
+fi
 
 # Check if port-forward is already running on this port
 if lsof -ti:${CLIENT_PORT_FORWARD_PORT} &> /dev/null; then
@@ -144,10 +163,7 @@ else
 fi
 
 # Save PID to a file for cleanup later
-CLIENT_PF_PID_FILE=".client-port-forward.pid"
 echo "$CLIENT_PORT_FORWARD_PID" > "$CLIENT_PF_PID_FILE"
-echo "# Client port-forward PID (created by 09-deploy-client.sh)" >> "$CLIENT_PF_PID_FILE"
-echo "# To stop: kill \$(cat $CLIENT_PF_PID_FILE)" >> "$CLIENT_PF_PID_FILE"
 
 # Output summary
 echo ""

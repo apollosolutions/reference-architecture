@@ -5,6 +5,13 @@ set -euo pipefail
 # This script configures port-forwarding for the router service
 # Port-forwarding is the only consistently working access method
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/08-setup-router-access.sh"
+    exit 1
+fi
+
 echo "=== Step 08: Setting Up Router Access ==="
 
 # Load environment variables from .env if it exists
@@ -45,6 +52,18 @@ fi
 # Apollo Router serves GraphQL at the root path (/), not /graphql
 ROUTER_URL="http://localhost:4000/"
 PORT_FORWARD_PORT=4000
+PF_PID_FILE=".router-port-forward.pid"
+
+# Clean up existing PID file and any stale process
+if [ -f "$PF_PID_FILE" ]; then
+    OLD_PID=$(cat "$PF_PID_FILE" 2>/dev/null | head -n 1 | tr -d '[:space:]' || echo "")
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "Found existing port-forward process (PID: $OLD_PID). Stopping it..."
+        kill "$OLD_PID" 2>/dev/null || true
+        sleep 2
+    fi
+    rm -f "$PF_PID_FILE"
+fi
 
 # Check if port-forward is already running on this port
 if lsof -ti:${PORT_FORWARD_PORT} &> /dev/null; then
@@ -87,10 +106,7 @@ else
 fi
 
 # Save PID to a file for cleanup later
-PF_PID_FILE=".router-port-forward.pid"
 echo "$PORT_FORWARD_PID" > "$PF_PID_FILE"
-echo "# Router port-forward PID (created by 08-setup-router-access.sh)" >> "$PF_PID_FILE"
-echo "# To stop: kill \$(cat $PF_PID_FILE)" >> "$PF_PID_FILE"
 
 # Save to .env file
 ENV_FILE=".env"
@@ -123,6 +139,6 @@ echo ""
 echo "Note: The port-forward is running in the background."
 echo "      To stop it: kill \$(cat $PF_PID_FILE)"
 echo ""
-echo "Next: Run 09-deploy-client.sh to deploy the client application"
+echo "Next: Run ./scripts/minikube/09-deploy-client.sh to deploy the client application"
 
 

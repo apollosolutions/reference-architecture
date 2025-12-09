@@ -4,6 +4,13 @@ set -euo pipefail
 # Script 03: Setup Kubernetes Cluster
 # This script sets up namespaces, installs the Apollo GraphOS Operator, and creates secrets
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/03-setup-cluster.sh"
+    exit 1
+fi
+
 echo "=== Step 03: Setting up Kubernetes Cluster ==="
 
 # Load environment variables from .env if it exists
@@ -22,7 +29,7 @@ fi
 
 if [[ -z "${OPERATOR_KEY:-}" ]]; then
     echo "Error: OPERATOR_KEY is not set"
-    echo "Please run 02-setup-apollo-graph.sh first to generate the operator key"
+    echo "Please run ./scripts/minikube/02-setup-apollo-graph.sh first to generate the operator key"
     exit 1
 fi
 
@@ -79,5 +86,5 @@ kubectl wait --for=condition=available --timeout=300s deployment/apollo-operator
 echo ""
 echo "✓ Kubernetes cluster setup complete!"
 echo ""
-echo "Next step: Run 04-build-images.sh to build Docker images locally"
+echo "Next step: Run ./scripts/minikube/04-build-images.sh to build Docker images locally"
 
