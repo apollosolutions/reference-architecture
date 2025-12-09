@@ -70,6 +70,15 @@ if [ -f "client/Dockerfile" ] && grep -q "BACKEND_URL" "client/Dockerfile"; then
     echo "Building client image with BACKEND_URL=$BACKEND_URL..."
     echo "Note: The client will use the port-forwarded router URL"
     eval $(minikube docker-env)
+    
+    # Generate or use existing timestamp-based image tag
+    if [ -f ".image-tag" ]; then
+        CLIENT_IMAGE_TAG=$(head -n 1 .image-tag | tr -d '[:space:]')
+    else
+        CLIENT_IMAGE_TAG="local-$(date +%s)"
+    fi
+    echo "Using image tag: ${CLIENT_IMAGE_TAG}"
+    
     # Backup original nginx config
     cp client/docker/nginx/conf.d/default.conf client/docker/nginx/conf.d/default.conf.bak
     # Replace placeholder with actual service name (handle both macOS and Linux sed)
@@ -84,21 +93,28 @@ if [ -f "client/Dockerfile" ] && grep -q "BACKEND_URL" "client/Dockerfile"; then
         cat client/docker/nginx/conf.d/default.conf
     fi
     # Build without cache to ensure nginx config is included
-    docker build --no-cache --build-arg BACKEND_URL="$BACKEND_URL" -t client:local client
+    docker build --no-cache --build-arg BACKEND_URL="$BACKEND_URL" -t "client:${CLIENT_IMAGE_TAG}" client
+    # Also tag as "local" for backward compatibility
+    docker tag "client:${CLIENT_IMAGE_TAG}" "client:local"
     # Restore original nginx config
     mv client/docker/nginx/conf.d/default.conf.bak client/docker/nginx/conf.d/default.conf
 fi
 
-# Install using Helm
-echo "Deploying client..."
+# Get image tag for deployment
+if [ -n "${CLIENT_IMAGE_TAG:-}" ]; then
+    CLIENT_DEPLOY_TAG="$CLIENT_IMAGE_TAG"
+elif [ -f ".image-tag" ]; then
+    CLIENT_DEPLOY_TAG=$(head -n 1 .image-tag | tr -d '[:space:]')
+else
+    CLIENT_DEPLOY_TAG="local"
+fi
+
+# Install using Helm with timestamp-based image tag
+echo "Deploying client with image tag: ${CLIENT_DEPLOY_TAG}..."
 helm upgrade --install client "deploy/client" \
+    --set image.tag="${CLIENT_DEPLOY_TAG}" \
     -n client \
     --wait
-
-# Force pod restart to pick up new image
-echo "Restarting client pods to pick up new image..."
-kubectl rollout restart deployment/web -n client
-kubectl rollout status deployment/web -n client --timeout=120s
 
 # Check if client service exists
 CLIENT_SERVICE="web"

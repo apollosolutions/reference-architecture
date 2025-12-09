@@ -6,7 +6,7 @@ import {
   StandaloneServerContextFunctionArgument,
   startStandaloneServer,
 } from "@apollo/server/standalone";
-import {resolvers} from "./resolvers";
+import { resolvers } from "./resolvers";
 import { DataSourceContext } from "./types/DataSourceContext";
 import { GraphQLError } from "graphql";
 
@@ -18,6 +18,11 @@ const context: ContextFunction<
   [StandaloneServerContextFunctionArgument],
   DataSourceContext
 > = async ({ req }) => {
+  // Log warning if trace context is missing
+  if (!req.headers['traceparent']) {
+    console.warn(`[${subgraphName}] Incoming request missing traceparent header - will create new root trace`);
+  }
+
   if (routerSecret && req.headers["router-authorization"] !== routerSecret) {
     throw new GraphQLError("Missing router authentication", {
       extensions: {
