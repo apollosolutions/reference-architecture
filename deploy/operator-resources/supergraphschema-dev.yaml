@@ -1,0 +1,13 @@
+apiVersion: apollographql.com/v1alpha2
+kind: SupergraphSchema
+metadata:
+  name: reference-architecture-dev
+  namespace: apollo
+spec:
+  graphRef: ${APOLLO_GRAPH_ID}@dev
+  selectors:
+    - matchExpressions:
+        - key: apollo.io/subgraph
+          operator: Exists
+  partial: false
+

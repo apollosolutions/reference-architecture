@@ -18,11 +18,21 @@ const ProductListing = (props: ProductListingProps) => {
   } = props
 
   return (
-    <Container maxW={'container.xl'} centerContent>
-      <Grid templateColumns="repeat(2, 1fr)" gap={10}>
+    <Container maxW={'container.xl'} centerContent py={8} px={4} pb={16}>
+      <Grid
+        templateColumns={{
+          base: '1fr',
+          sm: 'repeat(2, 1fr)',
+          md: 'repeat(2, 1fr)',
+          lg: 'repeat(3, 1fr)',
+          xl: 'repeat(4, 1fr)',
+        }}
+        gap={{ base: 4, md: 6, lg: 8 }}
+        width="100%"
+      >
         {data.searchProducts.map((product) => {
           return (
-            <GridItem key={product.id}>
+            <GridItem key={product.id} w="100%">
               <ProductCard product={product} />
             </GridItem>
           )

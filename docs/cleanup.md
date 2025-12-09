@@ -1,69 +1,98 @@
-## Cleanup
+# Cleanup
 
-⏱ Estimated time: 15 minutes
+⏱ Estimated time: 5 minutes
 
-Running Google Cloud or AWS resources will continue to incur costs on your account so we have documented all the steps to take for a proper tear-down.
+This guide covers cleaning up all resources deployed to your local Minikube cluster.
 
-### Automated cleanup
+## Delete Operator-Managed Resources
 
-### Cloud-specific steps
+Before deleting Kubernetes resources, first remove the operator-managed CRDs. The operator creates and manages these resources, so they should be deleted before Helm releases. Make sure you have your `ENVIRONMENT` variable set (or load it from `.env`):
 
-There are a few cloud-specific steps you'll need to take.
+```bash
+if [ -f .env ]; then
+    source .env
+fi
 
-#### <image src="../images/gcp.svg" height="13" style="margin:auto;" /> GCP
-
-In order to delete some non-Kubernetes resources created by Google Cloud, it's easiest to just delete everything:
-
-```sh
-kubectx apollo-supergraph-k8s-dev
-kubectl delete daemonsets,replicasets,services,deployments,pods,rc,ingress --all --all-namespaces
+ENVIRONMENT=${ENVIRONMENT:-dev}
+RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
 ```
 
-The command may hang at the end. You can kill the process (`ctrl-c`) and repeat with the prod cluster:
+Delete operator-managed CRDs:
 
-```sh
-kubectx apollo-supergraph-k8s-prod
-kubectl delete daemonsets,replicasets,services,deployments,pods,rc,ingress --all --all-namespaces
+```bash
+kubectl delete supergraphs ${RESOURCE_NAME} -n apollo || true
+kubectl delete supergraphschemas ${RESOURCE_NAME} -n apollo || true
+kubectl delete subgraph --all --all-namespaces || true
 ```
 
-#### <image src="../images/aws.svg" height="13" style="margin:auto;" /> AWS
+**Note:** The client's Ingress resource is managed by Helm and will be automatically deleted when you uninstall the Helm release in the next step.
 
-In order to ensure the load balancers are properly removed, and the IAM service roles are removed, please run:
+## Uninstall Helm Releases
 
-```sh
-gh workflow run "Uninstall Router" --repo $GITHUB_ORG/reference-architecture
-open https://github.com/$GITHUB_ORG/reference-architecture/actions/workflows/uninstall-router.yaml
-``` 
+Uninstall all Helm releases. This will automatically delete all resources created by Helm, including deployments, services, ConfigMaps, and Ingress resources:
 
-Wait for the action to complete on the opened screen, and once finished, run the following, replacing `apollo-supergraph-k8s` with the appropriate cluster prefix if modified: 
-
-```sh
-# dev
-eksctl delete iamserviceaccount \
-    --cluster=apollo-supergraph-k8s-dev \
-    --name="aws-load-balancer-controller" 
-aws cloudformation delete-stack --stack-name eksctl-apollo-supergraph-k8s-dev-addon-iamserviceaccount-kube-system-aws-load-balancer-controller
-# prod
-eksctl delete iamserviceaccount \
-    --cluster=apollo-supergraph-k8s-prod \
-    --name="aws-load-balancer-controller" 
-aws cloudformation delete-stack --stack-name eksctl-apollo-supergraph-k8s-prod-addon-iamserviceaccount-kube-system-aws-load-balancer-controller
+```bash
+helm uninstall client -n client || true
+helm uninstall coprocessor -n apollo || true
+for subgraph in checkout discovery inventory orders products reviews shipping users; do
+  helm uninstall $subgraph -n $subgraph || true
+done
 ```
 
-### Remaining steps
+## Delete Namespaces
 
-Then you can destroy all the provisioned resources (Kubernetes clusters, GitHub repositories) with terraform:
+After deleting CRDs and uninstalling Helm releases, delete all application namespaces. This will remove any remaining resources:
 
-```sh
-cd terraform/<cloud_provider>
-terraform destroy # takes roughly 10 minutes
+```bash
+kubectl delete namespace checkout discovery inventory orders products reviews shipping users || true
+kubectl delete namespace client || true
+kubectl delete secret apollo-api-key -n apollo-operator || true
+helm uninstall apollo-operator -n apollo-operator || true
+kubectl delete namespace apollo-operator apollo || true
 ```
 
-Lastly, you can remove the contexts from your `kubectl`:
+## Clean Up Apollo GraphOS Resources (Optional)
 
-```sh
-kubectl config delete-context apollo-supergraph-k8s-dev
-kubectl config delete-context apollo-supergraph-k8s-prod
+If you want to clean up the Apollo GraphOS graph and variants you created:
+
+1. Go to [Apollo GraphOS Studio](https://studio.apollographql.com)
+2. Navigate to your graph
+3. Delete the graph or specific variants as needed
+
+**Note:** The operator API key created during setup will remain in your Apollo GraphOS account. You can delete it from [User Settings > API Keys](https://studio.apollographql.com/user-settings/api-keys) if desired.
+
+## Delete Minikube Cluster (Optional)
+
+If you want to completely remove the Minikube cluster:
+
+```bash
+minikube stop
+minikube delete
 ```
 
-Terraform does not delete the Docker containers from GitHub. Visit `https://github.com/<your github username>?tab=packages` and delete the packages created by the previous versions of the repos.
+Or if you have multiple Minikube profiles and want to delete all:
+
+```bash
+minikube delete --all
+```
+
+## Clean Up Local Docker Images (Optional)
+
+If you want to remove the local Docker images built for this project:
+
+```bash
+eval $(minikube docker-env)
+docker rmi checkout:local discovery:local inventory:local orders:local \
+  products:local reviews:local shipping:local users:local \
+  coprocessor:local client:local || true
+```
+
+## Clean Up Environment Variables (Optional)
+
+If you want to remove the `.env` file created during setup:
+
+```bash
+rm .env
+```
+
+**Note:** This will remove your Apollo GraphOS configuration. You'll need to run `02-setup-apollo-graph.sh` again if you want to recreate the graph.

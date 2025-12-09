@@ -43,3 +43,5 @@ router
 router.exe
 .repo.env
 lockfile.sh
+
+*.pid
