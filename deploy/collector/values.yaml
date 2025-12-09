@@ -4,7 +4,7 @@ replicaCount: 1
 image:
   repository: otel/opentelemetry-collector-contrib
   pullPolicy: IfNotPresent
-  tag: "0.59.0"
+  tag: "0.141.0"
 
 imagePullSecrets: []
 

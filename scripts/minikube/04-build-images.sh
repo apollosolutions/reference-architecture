@@ -95,22 +95,6 @@ else
     echo "Warning: coprocessor directory not found, skipping..."
 fi
 
-# Build client image (for future use)
-echo ""
-echo "Building client image..."
-if [ -d "client" ]; then
-    docker build -t "client:${IMAGE_TAG}" "client"
-    if [ $? -eq 0 ]; then
-        echo "✓ Successfully built client:${IMAGE_TAG}"
-        docker tag "client:${IMAGE_TAG}" "client:local"
-    else
-        echo "✗ Failed to build client:${IMAGE_TAG}"
-        exit 1
-    fi
-else
-    echo "Warning: client directory not found, skipping..."
-fi
-
 echo ""
 echo "✓ All images built successfully!"
 echo ""

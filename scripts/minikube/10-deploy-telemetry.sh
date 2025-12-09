@@ -155,6 +155,74 @@ else
     echo "$ZIPKIN_PORT_FORWARD_PID" > "$ZIPKIN_PF_PID_FILE"
 fi
 
+# Set up port-forwarding for Collector (needed for browser tracing)
+COLLECTOR_SERVICE="collector"
+COLLECTOR_PORT_FORWARD_PORT=4318
+COLLECTOR_PF_PID_FILE=".collector-port-forward.pid"
+
+# Check if Collector service exists
+if ! kubectl get service "$COLLECTOR_SERVICE" -n monitoring &> /dev/null; then
+    echo "Warning: Collector service '$COLLECTOR_SERVICE' not found in namespace 'monitoring'"
+    echo "Skipping collector port-forward setup"
+else
+    # Clean up existing PID file and any stale process
+    if [ -f "$COLLECTOR_PF_PID_FILE" ]; then
+        OLD_PID=$(cat "$COLLECTOR_PF_PID_FILE" 2>/dev/null | head -n 1 | tr -d '[:space:]' || echo "")
+        if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+            echo "Found existing Collector port-forward process (PID: $OLD_PID). Stopping it..."
+            kill "$OLD_PID" 2>/dev/null || true
+            sleep 2
+        fi
+        rm -f "$COLLECTOR_PF_PID_FILE"
+    fi
+
+    # Check if port-forward is already running on this port
+    if lsof -ti:${COLLECTOR_PORT_FORWARD_PORT} &> /dev/null; then
+        echo "Port ${COLLECTOR_PORT_FORWARD_PORT} is already in use. Checking if it's a kubectl port-forward..."
+        EXISTING_PF=$(ps aux | grep "kubectl port-forward.*${COLLECTOR_SERVICE}.*${COLLECTOR_PORT_FORWARD_PORT}" | grep -v grep | awk '{print $2}' || echo "")
+        if [ -n "$EXISTING_PF" ]; then
+            echo "Found existing port-forward (PID: $EXISTING_PF). Stopping it..."
+            kill $EXISTING_PF 2>/dev/null || true
+            sleep 2
+        else
+            echo "Warning: Port ${COLLECTOR_PORT_FORWARD_PORT} is in use by another process"
+            echo "Please free the port or use a different port"
+        fi
+    fi
+
+    # Start port-forwarding in the background
+    echo ""
+    echo "Starting port-forward for Collector service..."
+    echo "  Mapping localhost:${COLLECTOR_PORT_FORWARD_PORT} -> collector:4318"
+    nohup kubectl port-forward service/$COLLECTOR_SERVICE -n monitoring ${COLLECTOR_PORT_FORWARD_PORT}:4318 > /dev/null 2>&1 &
+    COLLECTOR_PORT_FORWARD_PID=$!
+    # Disown the process so it continues after script exits
+    disown $COLLECTOR_PORT_FORWARD_PID 2>/dev/null || true
+
+    # Wait a moment for port-forward to establish
+    sleep 3
+
+    # Verify port-forward is running
+    if ! kill -0 $COLLECTOR_PORT_FORWARD_PID 2>/dev/null; then
+        echo "✗ Error: Collector port-forward failed to start"
+        echo "  You can manually start it with:"
+        echo "  kubectl port-forward service/collector -n monitoring ${COLLECTOR_PORT_FORWARD_PORT}:4318"
+    else
+        # Test if the port is accessible
+        if ! lsof -ti:${COLLECTOR_PORT_FORWARD_PORT} &> /dev/null; then
+            echo "Warning: Collector port-forward started but port ${COLLECTOR_PORT_FORWARD_PORT} is not accessible"
+            echo "Port-forward PID: $COLLECTOR_PORT_FORWARD_PID"
+            echo "  Check if the port-forward is working: kubectl port-forward service/collector -n monitoring ${COLLECTOR_PORT_FORWARD_PORT}:4318"
+        else
+            echo "✓ Collector port-forward is running (PID: $COLLECTOR_PORT_FORWARD_PID)"
+            echo "  Collector is accessible at: http://localhost:${COLLECTOR_PORT_FORWARD_PORT}"
+        fi
+    fi
+
+    # Save PID to a file for cleanup later
+    echo "$COLLECTOR_PORT_FORWARD_PID" > "$COLLECTOR_PF_PID_FILE"
+fi
+
 echo ""
 echo "✓ Telemetry stack deployment complete!"
 echo ""
@@ -177,8 +245,9 @@ fi
 echo "Telemetry is now configured for:"
 echo "  - All subgraphs (via OTEL_HTTP_ENDPOINT)"
 echo "  - Apollo Router (via router-config.yaml)"
+echo "  - Browser client (via OpenTelemetry browser SDK)"
 echo ""
-echo "Traces flow: Subgraphs/Router → OTEL Collector → Zipkin"
+echo "Traces flow: Browser Client → Subgraphs/Router → OTEL Collector → Zipkin"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📊 How to View Traces:"
@@ -235,4 +304,36 @@ else
 fi
 echo "💡 Tip: If you don't see traces, ensure the router and subgraphs are running"
 echo "   and making requests. Traces will appear after GraphQL queries are executed."
+echo ""
+if [ -f "$COLLECTOR_PF_PID_FILE" ]; then
+    COLLECTOR_PID=$(cat "$COLLECTOR_PF_PID_FILE" 2>/dev/null | head -n 1 | tr -d '[:space:]' || echo "")
+    if [ -n "$COLLECTOR_PID" ] && kill -0 "$COLLECTOR_PID" 2>/dev/null; then
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🌐 Browser Tracing Setup:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo "✓ Collector port-forward is running on port ${COLLECTOR_PORT_FORWARD_PORT}"
+        echo "  The browser client will automatically send traces to:"
+        echo "  → http://localhost:${COLLECTOR_PORT_FORWARD_PORT}/v1/traces"
+        echo ""
+        echo "The client is configured to use this endpoint by default."
+        echo "To use a different endpoint, set VITE_OTEL_COLLECTOR_URL when building the client."
+        echo ""
+        echo "Note: The port-forward is running in the background."
+        echo "      To stop it: kill \$(cat $COLLECTOR_PF_PID_FILE)"
+        echo "      To restart it: kubectl port-forward service/collector -n monitoring ${COLLECTOR_PORT_FORWARD_PORT}:4318"
+        echo ""
+    else
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🌐 Browser Tracing Setup:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo "⚠ Collector port-forward is not running"
+        echo "  To start it manually, run:"
+        echo "  kubectl port-forward service/collector -n monitoring ${COLLECTOR_PORT_FORWARD_PORT}:4318"
+        echo ""
+        echo "  Or re-run this script to set it up automatically."
+        echo ""
+    fi
+fi
 

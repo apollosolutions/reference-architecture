@@ -71,12 +71,9 @@ if [ -f "client/Dockerfile" ] && grep -q "BACKEND_URL" "client/Dockerfile"; then
     echo "Note: The client will use the port-forwarded router URL"
     eval $(minikube docker-env)
     
-    # Generate or use existing timestamp-based image tag
-    if [ -f ".image-tag" ]; then
-        CLIENT_IMAGE_TAG=$(head -n 1 .image-tag | tr -d '[:space:]')
-    else
-        CLIENT_IMAGE_TAG="local-$(date +%s)"
-    fi
+    # Generate timestamp-based image tag (seconds since epoch)
+    # This is independent of the tag used in 04-build-images.sh
+    CLIENT_IMAGE_TAG="local-$(date +%s)"
     echo "Using image tag: ${CLIENT_IMAGE_TAG}"
     
     # Backup original nginx config
@@ -101,10 +98,9 @@ if [ -f "client/Dockerfile" ] && grep -q "BACKEND_URL" "client/Dockerfile"; then
 fi
 
 # Get image tag for deployment
+# Use the tag we just built, or fallback to "local" if build was skipped
 if [ -n "${CLIENT_IMAGE_TAG:-}" ]; then
     CLIENT_DEPLOY_TAG="$CLIENT_IMAGE_TAG"
-elif [ -f ".image-tag" ]; then
-    CLIENT_DEPLOY_TAG=$(head -n 1 .image-tag | tr -d '[:space:]')
 else
     CLIENT_DEPLOY_TAG="local"
 fi
