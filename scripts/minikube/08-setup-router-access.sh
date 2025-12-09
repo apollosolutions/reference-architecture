@@ -2,9 +2,15 @@
 set -euo pipefail
 
 # Script 08: Setup Router Access
-# This script configures the ingress controller for the client application
-# The ingress controller is needed for the client's Ingress resource (not the router)
-# Note: The router does not use an Ingress resource - the client's nginx proxies to it internally
+# This script configures port-forwarding for the router service
+# Port-forwarding is the only consistently working access method
+
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/08-setup-router-access.sh"
+    exit 1
+fi
 
 echo "=== Step 08: Setting Up Router Access ==="
 
@@ -34,40 +40,73 @@ if ! kubectl cluster-info &> /dev/null; then
     exit 1
 fi
 
-# Check if ingress addon is enabled (required for client's Ingress resource)
-if ! minikube addons list | grep -q "ingress.*enabled"; then
-    echo "Enabling ingress addon (required for client application)..."
-    minikube addons enable ingress
-    echo "Waiting for ingress controller to be ready..."
-    sleep 15
+# Check if router service exists
+RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
+if ! kubectl get service "$RESOURCE_NAME" -n apollo &> /dev/null; then
+    echo "Error: Router service '$RESOURCE_NAME' not found in namespace 'apollo'"
+    echo "Please ensure the router is deployed first"
+    exit 1
 fi
 
-# Wait for ingress controller pods to be ready
-echo "Waiting for ingress controller to be ready..."
-kubectl wait --namespace ingress-nginx \
-    --for=condition=ready pod \
-    --selector=app.kubernetes.io/component=controller \
-    --timeout=120s || {
-    echo "Warning: Ingress controller may not be fully ready"
-}
+# Set router URL to use port-forwarding
+# Apollo Router serves GraphQL at the root path (/), not /graphql
+ROUTER_URL="http://localhost:4000/"
+PORT_FORWARD_PORT=4000
+PF_PID_FILE=".router-port-forward.pid"
 
-# Change ingress controller service to LoadBalancer for minikube tunnel support
-echo "Configuring ingress controller for minikube tunnel..."
-kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"LoadBalancer"}}' 2>/dev/null || true
+# Clean up existing PID file and any stale process
+if [ -f "$PF_PID_FILE" ]; then
+    OLD_PID=$(cat "$PF_PID_FILE" 2>/dev/null | head -n 1 | tr -d '[:space:]' || echo "")
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "Found existing port-forward process (PID: $OLD_PID). Stopping it..."
+        kill "$OLD_PID" 2>/dev/null || true
+        sleep 2
+    fi
+    rm -f "$PF_PID_FILE"
+fi
 
-# Get router URL - use localhost for minikube tunnel (LoadBalancer) or NodePort fallback
-MINIKUBE_IP=$(minikube ip)
-INGRESS_NODEPORT=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "")
-INGRESS_TYPE=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.type}' 2>/dev/null || echo "")
+# Check if port-forward is already running on this port
+if lsof -ti:${PORT_FORWARD_PORT} &> /dev/null; then
+    echo "Port ${PORT_FORWARD_PORT} is already in use. Checking if it's a kubectl port-forward..."
+    # Try to find kubectl port-forward processes for this service
+    EXISTING_PF=$(ps aux | grep "kubectl port-forward.*${RESOURCE_NAME}.*${PORT_FORWARD_PORT}" | grep -v grep | awk '{print $2}' || echo "")
+    if [ -n "$EXISTING_PF" ]; then
+        echo "Found existing port-forward (PID: $EXISTING_PF). Stopping it..."
+        kill $EXISTING_PF 2>/dev/null || true
+        sleep 2
+    else
+        echo "Warning: Port ${PORT_FORWARD_PORT} is in use by another process"
+        echo "Please free the port or use a different port"
+        exit 1
+    fi
+fi
 
-# Determine router URL based on ingress type
-if [ "$INGRESS_TYPE" == "LoadBalancer" ]; then
-    ROUTER_URL="http://127.0.0.1/graphql"
-elif [ -n "$INGRESS_NODEPORT" ]; then
-    ROUTER_URL="http://${MINIKUBE_IP}:${INGRESS_NODEPORT}/graphql"
+# Start port-forwarding in the background
+echo "Starting port-forward for router service..."
+nohup kubectl port-forward service/$RESOURCE_NAME -n apollo ${PORT_FORWARD_PORT}:80 > /dev/null 2>&1 &
+PORT_FORWARD_PID=$!
+# Disown the process so it continues after script exits
+disown $PORT_FORWARD_PID 2>/dev/null || true
+
+# Wait a moment for port-forward to establish
+sleep 3
+
+# Verify port-forward is running
+if ! kill -0 $PORT_FORWARD_PID 2>/dev/null; then
+    echo "Error: Port-forward failed to start"
+    exit 1
+fi
+
+# Test if the port is accessible
+if ! lsof -ti:${PORT_FORWARD_PORT} &> /dev/null; then
+    echo "Warning: Port-forward started but port ${PORT_FORWARD_PORT} is not accessible"
+    echo "Port-forward PID: $PORT_FORWARD_PID"
 else
-    ROUTER_URL="http://localhost:4000/graphql"
+    echo "✓ Port-forward is running (PID: $PORT_FORWARD_PID)"
 fi
+
+# Save PID to a file for cleanup later
+echo "$PORT_FORWARD_PID" > "$PF_PID_FILE"
 
 # Save to .env file
 ENV_FILE=".env"
@@ -93,36 +132,13 @@ echo ""
 echo "✓ Router access configured successfully!"
 echo ""
 echo "Router URL: $ROUTER_URL (saved to .env)"
+echo "Port-forward PID: $PORT_FORWARD_PID (saved to $PF_PID_FILE)"
 echo ""
-
-if [ "$INGRESS_TYPE" == "LoadBalancer" ]; then
-    echo "⚠️  Next step: Run 'minikube tunnel' in a separate terminal to access the router"
-    echo ""
-    echo "Access methods:"
-    echo "  1. minikube tunnel (recommended):"
-    echo "     • Run: minikube tunnel"
-    echo "     • If it hangs, check if tunnel is already running: ps aux | grep 'minikube tunnel'"
-    echo "     • Stop existing tunnel: pkill -f 'minikube tunnel'"
-    echo "     • Access client UI at: http://127.0.0.1/"
-    echo "     • GraphQL requests proxied via /graphql"
-    if [ -n "$INGRESS_NODEPORT" ]; then
-        echo ""
-        echo "  2. NodePort (no tunnel needed):"
-        echo "     • Client UI: http://${MINIKUBE_IP}:${INGRESS_NODEPORT}/"
-        echo "     • Update .env: export ROUTER_URL=\"http://${MINIKUBE_IP}:${INGRESS_NODEPORT}/graphql\""
-    fi
-    echo ""
-    echo "  3. Port forward (no tunnel needed):"
-    echo "     • Run: kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80"
-    echo "     • Update .env: export ROUTER_URL=\"http://localhost:4000/graphql\""
-else
-    echo "Access methods:"
-    echo "  1. NodePort: http://${MINIKUBE_IP}:${INGRESS_NODEPORT}"
-    echo "  2. Port forward: kubectl port-forward service/reference-architecture-${ENVIRONMENT} -n apollo 4000:80"
-fi
-
+echo "The router is now accessible at: http://localhost:${PORT_FORWARD_PORT}/"
 echo ""
-echo "Next: Run 09-deploy-client.sh to deploy the client application"
-echo "      (Required for ingress access; optional if using port-forward)"
+echo "Note: The port-forward is running in the background."
+echo "      To stop it: kill \$(cat $PF_PID_FILE)"
+echo ""
+echo "Next: Run ./scripts/minikube/09-deploy-client.sh to deploy the client application"
 
 

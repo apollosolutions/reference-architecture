@@ -4,6 +4,13 @@ set -euo pipefail
 # Script 04: Build Docker Images Locally
 # This script builds all subgraph Docker images and loads them into Minikube
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/04-build-images.sh"
+    exit 1
+fi
+
 echo "=== Step 04: Building Docker Images Locally ==="
 
 # Load environment variables from .env if it exists
@@ -96,5 +103,5 @@ echo "✓ All images built successfully!"
 echo ""
 echo "Note: Images are loaded into Minikube's Docker daemon"
 echo ""
-echo "Next step: Run 05-deploy-subgraphs.sh to deploy subgraphs"
+echo "Next step: Run ./scripts/minikube/05-deploy-subgraphs.sh to deploy subgraphs"
 

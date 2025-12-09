@@ -5,6 +5,13 @@ set -euo pipefail
 # This script deploys the coprocessor using Helm
 # The coprocessor is required for JWT authentication and the @authenticated directive
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/06-deploy-coprocessor.sh"
+    exit 1
+fi
+
 echo "=== Step 06: Deploying Coprocessor ==="
 
 # Load environment variables from .env if it exists
@@ -88,5 +95,5 @@ echo ""
 echo "Coprocessor is now available at:"
 echo "  http://coprocessor.apollo.svc.cluster.local:8081"
 echo ""
-echo "Next step: Run 07-deploy-operator-resources.sh to deploy the router with coprocessor configuration"
+echo "Next step: Run ./scripts/minikube/07-deploy-operator-resources.sh to deploy the router with coprocessor configuration"
 

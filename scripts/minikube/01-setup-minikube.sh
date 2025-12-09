@@ -4,6 +4,13 @@ set -euo pipefail
 # Script 01: Setup Minikube Cluster
 # This script installs and starts a Minikube cluster
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/01-setup-minikube.sh"
+    exit 1
+fi
+
 echo "=== Step 01: Setting up Minikube Cluster ==="
 
 # Check if minikube is installed
@@ -44,5 +51,5 @@ kubectl config use-context minikube
 echo ""
 echo "✓ Minikube cluster is ready!"
 echo ""
-echo "Next step: Run 02-setup-apollo-graph.sh to create your Apollo GraphOS graph"
+echo "Next step: Run ./scripts/minikube/02-setup-apollo-graph.sh to create your Apollo GraphOS graph"
 

@@ -4,6 +4,13 @@ set -euo pipefail
 # Script 02: Setup Apollo GraphOS Graph
 # This script creates an Apollo GraphOS graph and generates API keys
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/02-setup-apollo-graph.sh"
+    exit 1
+fi
+
 echo "=== Step 02: Setting up Apollo GraphOS Graph ==="
 
 # Load environment variables from .env if it exists
@@ -172,5 +179,5 @@ echo "Environment: $ENVIRONMENT"
 echo ""
 echo "Configuration saved to .env file"
 echo ""
-echo "Next step: Run 03-setup-cluster.sh to setup the Kubernetes cluster"
+echo "Next step: Run ./scripts/minikube/03-setup-cluster.sh to setup the Kubernetes cluster"
 
