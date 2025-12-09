@@ -5,6 +5,13 @@ set -euo pipefail
 # This script deploys Zipkin and OpenTelemetry Collector for distributed tracing
 # Both services are deployed in the monitoring namespace
 
+# Ensure script is run from repository root
+if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
+    echo "Error: This script must be run from the repository root directory"
+    echo "Please run: ./scripts/minikube/10-deploy-telemetry.sh"
+    exit 1
+fi
+
 echo "=== Step 10: Deploying Telemetry Stack ==="
 
 # Load environment variables from .env if it exists
@@ -84,6 +91,70 @@ echo ""
 echo "Checking services..."
 kubectl get svc -n monitoring
 
+# Set up port-forwarding for Zipkin
+ZIPKIN_SERVICE="zipkin"
+ZIPKIN_PORT_FORWARD_PORT=9411
+ZIPKIN_PF_PID_FILE=".zipkin-port-forward.pid"
+
+# Check if Zipkin service exists
+if ! kubectl get service "$ZIPKIN_SERVICE" -n monitoring &> /dev/null; then
+    echo "Warning: Zipkin service '$ZIPKIN_SERVICE' not found in namespace 'monitoring'"
+    echo "Skipping port-forward setup"
+else
+    # Clean up existing PID file and any stale process
+    if [ -f "$ZIPKIN_PF_PID_FILE" ]; then
+        OLD_PID=$(cat "$ZIPKIN_PF_PID_FILE" 2>/dev/null | head -n 1 | tr -d '[:space:]' || echo "")
+        if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+            echo "Found existing Zipkin port-forward process (PID: $OLD_PID). Stopping it..."
+            kill "$OLD_PID" 2>/dev/null || true
+            sleep 2
+        fi
+        rm -f "$ZIPKIN_PF_PID_FILE"
+    fi
+
+    # Check if port-forward is already running on this port
+    if lsof -ti:${ZIPKIN_PORT_FORWARD_PORT} &> /dev/null; then
+        echo "Port ${ZIPKIN_PORT_FORWARD_PORT} is already in use. Checking if it's a kubectl port-forward..."
+        # Try to find kubectl port-forward processes for this service
+        EXISTING_PF=$(ps aux | grep "kubectl port-forward.*${ZIPKIN_SERVICE}.*${ZIPKIN_PORT_FORWARD_PORT}" | grep -v grep | awk '{print $2}' || echo "")
+        if [ -n "$EXISTING_PF" ]; then
+            echo "Found existing port-forward (PID: $EXISTING_PF). Stopping it..."
+            kill $EXISTING_PF 2>/dev/null || true
+            sleep 2
+        else
+            echo "Warning: Port ${ZIPKIN_PORT_FORWARD_PORT} is in use by another process"
+            echo "Please free the port or use a different port"
+        fi
+    fi
+
+    # Start port-forwarding in the background
+    echo ""
+    echo "Starting port-forward for Zipkin service..."
+    nohup kubectl port-forward service/$ZIPKIN_SERVICE -n monitoring ${ZIPKIN_PORT_FORWARD_PORT}:9411 > /dev/null 2>&1 &
+    ZIPKIN_PORT_FORWARD_PID=$!
+    # Disown the process so it continues after script exits
+    disown $ZIPKIN_PORT_FORWARD_PID 2>/dev/null || true
+
+    # Wait a moment for port-forward to establish
+    sleep 3
+
+    # Verify port-forward is running
+    if ! kill -0 $ZIPKIN_PORT_FORWARD_PID 2>/dev/null; then
+        echo "Warning: Zipkin port-forward failed to start"
+    else
+        # Test if the port is accessible
+        if ! lsof -ti:${ZIPKIN_PORT_FORWARD_PORT} &> /dev/null; then
+            echo "Warning: Zipkin port-forward started but port ${ZIPKIN_PORT_FORWARD_PORT} is not accessible"
+            echo "Port-forward PID: $ZIPKIN_PORT_FORWARD_PID"
+        else
+            echo "✓ Zipkin port-forward is running (PID: $ZIPKIN_PORT_FORWARD_PID)"
+        fi
+    fi
+
+    # Save PID to a file for cleanup later
+    echo "$ZIPKIN_PORT_FORWARD_PID" > "$ZIPKIN_PF_PID_FILE"
+fi
+
 echo ""
 echo "✓ Telemetry stack deployment complete!"
 echo ""
@@ -92,13 +163,76 @@ echo "  Zipkin UI: http://zipkin.monitoring.svc.cluster.local:9411"
 echo "  OTEL Collector (HTTP): http://collector.monitoring.svc.cluster.local:4318"
 echo "  OTEL Collector (gRPC): http://collector.monitoring.svc.cluster.local:4317"
 echo ""
-echo "To access Zipkin UI from your local machine:"
-echo "  kubectl port-forward -n monitoring svc/zipkin 9411:9411"
-echo "  Then open http://localhost:9411 in your browser"
-echo ""
+if [ -f "$ZIPKIN_PF_PID_FILE" ]; then
+    ZIPKIN_PID=$(cat "$ZIPKIN_PF_PID_FILE" 2>/dev/null | head -n 1 | tr -d '[:space:]' || echo "")
+    if [ -n "$ZIPKIN_PID" ] && kill -0 "$ZIPKIN_PID" 2>/dev/null; then
+        echo "✓ Zipkin UI is accessible at: http://localhost:${ZIPKIN_PORT_FORWARD_PORT}"
+        echo "  Port-forward PID: $ZIPKIN_PID (saved to $ZIPKIN_PF_PID_FILE)"
+        echo ""
+        echo "Note: The port-forward is running in the background."
+        echo "      To stop it: kill \$(cat $ZIPKIN_PF_PID_FILE)"
+        echo ""
+    fi
+fi
 echo "Telemetry is now configured for:"
 echo "  - All subgraphs (via OTEL_HTTP_ENDPOINT)"
 echo "  - Apollo Router (via router-config.yaml)"
 echo ""
 echo "Traces flow: Subgraphs/Router → OTEL Collector → Zipkin"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📊 How to View Traces:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+if [ -f "$ZIPKIN_PF_PID_FILE" ]; then
+    ZIPKIN_PID=$(cat "$ZIPKIN_PF_PID_FILE" 2>/dev/null | head -n 1 | tr -d '[:space:]' || echo "")
+    if [ -n "$ZIPKIN_PID" ] && kill -0 "$ZIPKIN_PID" 2>/dev/null; then
+        echo "1. Open Zipkin UI in your browser:"
+        echo "   → http://localhost:${ZIPKIN_PORT_FORWARD_PORT}"
+        echo ""
+        echo "2. Generate some traffic to see traces:"
+        echo "   • Make GraphQL requests via the client: http://localhost:3000"
+        echo "   • Or directly to the router: http://localhost:4000/"
+        echo ""
+        echo "3. In Zipkin UI:"
+        echo "   • Click 'Run Query' to see recent traces"
+        echo "   • Filter by service name (e.g., 'reference-architecture-dev' for router)"
+        echo "   • Click a trace to see the full span tree with timing details"
+        echo ""
+    else
+        echo "1. Start port-forwarding for Zipkin:"
+        echo "   kubectl port-forward -n monitoring svc/zipkin 9411:9411"
+        echo ""
+        echo "2. Open Zipkin UI in your browser:"
+        echo "   → http://localhost:9411"
+        echo ""
+        echo "3. Generate some traffic to see traces:"
+        echo "   • Make GraphQL requests via the client: http://localhost:3000"
+        echo "   • Or directly to the router: http://localhost:4000/"
+        echo ""
+        echo "4. In Zipkin UI:"
+        echo "   • Click 'Run Query' to see recent traces"
+        echo "   • Filter by service name (e.g., 'reference-architecture-dev' for router)"
+        echo "   • Click a trace to see the full span tree with timing details"
+        echo ""
+    fi
+else
+    echo "1. Start port-forwarding for Zipkin:"
+    echo "   kubectl port-forward -n monitoring svc/zipkin 9411:9411"
+    echo ""
+    echo "2. Open Zipkin UI in your browser:"
+    echo "   → http://localhost:9411"
+    echo ""
+    echo "3. Generate some traffic to see traces:"
+    echo "   • Make GraphQL requests via the client: http://localhost:3000"
+    echo "   • Or directly to the router: http://localhost:4000/"
+    echo ""
+    echo "4. In Zipkin UI:"
+    echo "   • Click 'Run Query' to see recent traces"
+    echo "   • Filter by service name (e.g., 'reference-architecture-dev' for router)"
+    echo "   • Click a trace to see the full span tree with timing details"
+    echo ""
+fi
+echo "💡 Tip: If you don't see traces, ensure the router and subgraphs are running"
+echo "   and making requests. Traces will appear after GraphQL queries are executed."
 
