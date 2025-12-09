@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Script 09: Deploy Client
-# This script deploys the client application (optional)
+# This script deploys the client application and sets up port-forwarding
 
 echo "=== Step 09: Deploying Client Application ==="
 
@@ -61,7 +61,7 @@ fi
 RESOURCE_NAME="reference-architecture-${ENVIRONMENT}"
 if [ -f "client/Dockerfile" ] && grep -q "BACKEND_URL" "client/Dockerfile"; then
     echo "Building client image with BACKEND_URL=$BACKEND_URL..."
-    echo "Note: The client's nginx will proxy /graphql requests to the router service"
+    echo "Note: The client will use the port-forwarded router URL"
     eval $(minikube docker-env)
     # Backup original nginx config
     cp client/docker/nginx/conf.d/default.conf client/docker/nginx/conf.d/default.conf.bak
@@ -93,33 +93,75 @@ echo "Restarting client pods to pick up new image..."
 kubectl rollout restart deployment/web -n client
 kubectl rollout status deployment/web -n client --timeout=120s
 
-# The Helm chart already creates an ingress resource named "web"
-# Check if ingress exists and get its status
-echo "Checking client ingress status..."
-CLIENT_INGRESS_NAME="web"
-CLIENT_IP=""
-for i in {1..30}; do
-    CLIENT_IP=$(kubectl get ingress ${CLIENT_INGRESS_NAME} -n client -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-    if [ -n "$CLIENT_IP" ]; then
-        break
-    fi
-    echo "  Waiting for ingress IP... ($i/30)"
-    sleep 2
-done
-
-if [ -z "$CLIENT_IP" ]; then
-    echo ""
-    echo "Warning: Client ingress did not get an IP address after waiting"
-    echo "The ingress may still be configuring. Check status with:"
-    echo "  kubectl get ingress ${CLIENT_INGRESS_NAME} -n client"
-    echo ""
-else
-    echo ""
-    echo "✓ Client is accessible at:"
-    echo "  http://${CLIENT_IP}"
-    echo ""
-    echo "If using minikube tunnel, access at: http://127.0.0.1/"
-    echo "(The client ingress uses the same LoadBalancer as the router)"
-    echo ""
+# Check if client service exists
+CLIENT_SERVICE="web"
+if ! kubectl get service "$CLIENT_SERVICE" -n client &> /dev/null; then
+    echo "Error: Client service '$CLIENT_SERVICE' not found in namespace 'client'"
+    exit 1
 fi
+
+# Set up port-forwarding for client
+CLIENT_PORT_FORWARD_PORT=3000
+
+# Check if port-forward is already running on this port
+if lsof -ti:${CLIENT_PORT_FORWARD_PORT} &> /dev/null; then
+    echo "Port ${CLIENT_PORT_FORWARD_PORT} is already in use. Checking if it's a kubectl port-forward..."
+    # Try to find kubectl port-forward processes for this service
+    EXISTING_PF=$(ps aux | grep "kubectl port-forward.*${CLIENT_SERVICE}.*${CLIENT_PORT_FORWARD_PORT}" | grep -v grep | awk '{print $2}' || echo "")
+    if [ -n "$EXISTING_PF" ]; then
+        echo "Found existing port-forward (PID: $EXISTING_PF). Stopping it..."
+        kill $EXISTING_PF 2>/dev/null || true
+        sleep 2
+    else
+        echo "Warning: Port ${CLIENT_PORT_FORWARD_PORT} is in use by another process"
+        echo "Please free the port or use a different port"
+        exit 1
+    fi
+fi
+
+# Start port-forwarding in the background
+echo "Starting port-forward for client service..."
+nohup kubectl port-forward service/$CLIENT_SERVICE -n client ${CLIENT_PORT_FORWARD_PORT}:80 > /dev/null 2>&1 &
+CLIENT_PORT_FORWARD_PID=$!
+# Disown the process so it continues after script exits
+disown $CLIENT_PORT_FORWARD_PID 2>/dev/null || true
+
+# Wait a moment for port-forward to establish
+sleep 3
+
+# Verify port-forward is running
+if ! kill -0 $CLIENT_PORT_FORWARD_PID 2>/dev/null; then
+    echo "Error: Client port-forward failed to start"
+    exit 1
+fi
+
+# Test if the port is accessible
+if ! lsof -ti:${CLIENT_PORT_FORWARD_PORT} &> /dev/null; then
+    echo "Warning: Client port-forward started but port ${CLIENT_PORT_FORWARD_PORT} is not accessible"
+    echo "Port-forward PID: $CLIENT_PORT_FORWARD_PID"
+else
+    echo "✓ Client port-forward is running (PID: $CLIENT_PORT_FORWARD_PID)"
+fi
+
+# Save PID to a file for cleanup later
+CLIENT_PF_PID_FILE=".client-port-forward.pid"
+echo "$CLIENT_PORT_FORWARD_PID" > "$CLIENT_PF_PID_FILE"
+echo "# Client port-forward PID (created by 09-deploy-client.sh)" >> "$CLIENT_PF_PID_FILE"
+echo "# To stop: kill \$(cat $CLIENT_PF_PID_FILE)" >> "$CLIENT_PF_PID_FILE"
+
+# Output summary
+echo ""
+echo "✓ Client deployed successfully!"
+echo ""
+echo "Client URL: http://localhost:${CLIENT_PORT_FORWARD_PORT}"
+echo "Port-forward PID: $CLIENT_PORT_FORWARD_PID (saved to $CLIENT_PF_PID_FILE)"
+echo ""
+echo "The client is now accessible at: http://localhost:${CLIENT_PORT_FORWARD_PORT}"
+echo "The client will proxy GraphQL requests to the router"
+echo ""
+echo "Note: The port-forward is running in the background."
+echo "      To stop it: kill \$(cat $CLIENT_PF_PID_FILE)"
+echo ""
+echo "Note: Make sure the router port-forward is also running."
+echo "      Check with: ps aux | grep 'kubectl port-forward.*reference-architecture'"
 
