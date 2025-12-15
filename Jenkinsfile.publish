@@ -1,16 +1,36 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(
+            name: 'SUBGRAPH',
+            choices: [
+                'checkout',
+                'discovery',
+                'inventory',
+                'orders',
+                'products',
+                'reviews',
+                'shipping',
+                'users'
+            ],
+            description: 'Select a single subgraph to publish'
+        )
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'workshop-jenkins-ci'],
+            description: 'Environment name'
+        )
+    }
+
     environment {
         // Apollo GraphOS configuration
         // Note: APOLLO_KEY will be set in Validate Environment stage to handle missing credentials gracefully
-        APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@${env.ENVIRONMENT ?: 'dev'}"
-        ENVIRONMENT = "${env.ENVIRONMENT ?: 'dev'}"
+        APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@${params.ENVIRONMENT}"
+        ENVIRONMENT = "${params.ENVIRONMENT}"
         
-        // Subgraphs to process (comma-separated, default: checkout only)
-        // Set via Jenkins environment variable or build parameter
-        // Example: checkout,discovery,inventory
-        SUBGRAPHS = "${env.SUBGRAPHS ?: 'checkout'}"
+        // Subgraph to process (single subgraph from build parameter)
+        SUBGRAPH = "${params.SUBGRAPH}"
     }
 
     options {
@@ -84,15 +104,8 @@ pipeline {
         stage('Subgraph Publish') {
             steps {
                 script {
-                    echo "Publishing subgraphs..."
-                    def subgraphs = SUBGRAPHS.split(',').collect { it.trim() }
-                    echo "Publishing ${subgraphs.size()} subgraph(s): ${subgraphs.join(', ')}"
-                    
-                    for (subgraph in subgraphs) {
-                        stage("Publish ${subgraph}") {
-                            runRoverPublish(subgraph)
-                        }
-                    }
+                    echo "Publishing subgraph: ${SUBGRAPH}"
+                    runRoverPublish(SUBGRAPH)
                 }
             }
         }
@@ -101,7 +114,7 @@ pipeline {
     post {
         success {
             script {
-                echo "✅ All subgraphs published successfully!"
+                echo "✅ Subgraph ${SUBGRAPH} published successfully!"
             }
         }
         failure {
