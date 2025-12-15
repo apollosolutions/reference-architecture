@@ -16,7 +16,7 @@ properties([
         ),
         choice(
             name: 'ENVIRONMENT',
-            choices: ['dev', 'workshop-jenkins-ci'],
+            choices: ['workshop-jenkins-ci', 'dev'],
             description: 'Environment name'
         )
     ])
