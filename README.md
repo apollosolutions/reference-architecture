@@ -121,3 +121,18 @@ Learn how the Apollo GraphOS Operator works in this architecture, including:
 ### [Cleanup](/docs/cleanup.md)
 
 Once finished, you can cleanup your environments following the above document.
+
+### [Jenkins CI/CD](/docs/jenkins-overview.md)
+
+Automated CI/CD pipeline for schema validation and publishing:
+
+- **Rover Subgraph Check**: Validates all subgraph schemas
+- **Rover Subgraph Publish**: Publishes schemas to Apollo GraphOS
+- **Rover Supergraph Compose**: Composes the supergraph
+
+Includes:
+- [Jenkins Setup Guide](/docs/jenkins-setup.md) - What needs to be done and when
+- [Manual Setup Instructions](/docs/jenkins-manual-setup.md) - Step-by-step Jenkins configuration
+- [Quick Reference](/docs/jenkins-quick-reference.md) - Common tasks and commands
+
+You can also run the pipeline locally without Jenkins using `./scripts/jenkins/run-all.sh dev`.

@@ -1,0 +1,28 @@
+# Supergraph composition configuration
+# This file is optional - Rover can compose without it
+# If you need custom composition settings, uncomment and modify below
+
+# federation_version: "2.0"
+
+# subgraphs:
+#   - name: checkout
+#     routing_url: http://graphql.checkout.svc.cluster.local:4001
+#   - name: discovery
+#     routing_url: http://graphql.discovery.svc.cluster.local:4002
+#   - name: inventory
+#     routing_url: http://graphql.inventory.svc.cluster.local:4003
+#   - name: orders
+#     routing_url: http://graphql.orders.svc.cluster.local:4004
+#   - name: products
+#     routing_url: http://graphql.products.svc.cluster.local:4005
+#   - name: reviews
+#     routing_url: http://graphql.reviews.svc.cluster.local:4006
+#   - name: shipping
+#     routing_url: http://graphql.shipping.svc.cluster.local:4007
+#   - name: users
+#     routing_url: http://graphql.users.svc.cluster.local:4008
+
+# Note: When using rover supergraph compose with a graph reference,
+# Rover will automatically fetch subgraph information from Apollo GraphOS.
+# This config file is only needed if you want to override default behavior.
+

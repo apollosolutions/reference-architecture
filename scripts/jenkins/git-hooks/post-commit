@@ -1,0 +1,59 @@
+#!/bin/bash
+# Git post-commit hook to trigger Jenkins build
+# Install: cp scripts/jenkins/git-hooks/post-commit .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+
+# Configuration - Edit these values
+JENKINS_URL="${JENKINS_URL:-http://localhost:8080}"
+JENKINS_JOB="${JENKINS_JOB:-reference-architecture}"
+JENKINS_USER="${JENKINS_USER:-}"
+JENKINS_TOKEN="${JENKINS_TOKEN:-}"
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo ""
+echo -e "${YELLOW}=== Jenkins Build Trigger ===${NC}"
+
+# Check if Jenkins is accessible
+if ! curl -s --head --fail "${JENKINS_URL}" > /dev/null 2>&1; then
+    echo -e "${RED}⚠️  Jenkins is not accessible at ${JENKINS_URL}${NC}"
+    echo "   Skipping build trigger. Start Jenkins or update JENKINS_URL in the hook."
+    exit 0  # Don't fail the commit
+fi
+
+# Build authentication string if credentials provided
+AUTH_STRING=""
+if [[ -n "$JENKINS_USER" ]] && [[ -n "$JENKINS_TOKEN" ]]; then
+    AUTH_STRING="--user ${JENKINS_USER}:${JENKINS_TOKEN}"
+fi
+
+# Trigger Jenkins build
+echo -e "${GREEN}🚀 Triggering Jenkins build: ${JENKINS_JOB}${NC}"
+
+BUILD_URL="${JENKINS_URL}/job/${JENKINS_JOB}/build"
+
+if [[ -n "$AUTH_STRING" ]]; then
+    RESPONSE=$(curl -s -w "\n%{http_code}" ${AUTH_STRING} -X POST "${BUILD_URL}")
+else
+    RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BUILD_URL}")
+fi
+
+HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+
+if [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "200" ]]; then
+    echo -e "${GREEN}✅ Build triggered successfully!${NC}"
+    echo "   View build: ${JENKINS_URL}/job/${JENKINS_JOB}/"
+    echo ""
+else
+    echo -e "${RED}❌ Failed to trigger build (HTTP ${HTTP_CODE})${NC}"
+    echo "   Check Jenkins URL and job name"
+    echo "   URL: ${JENKINS_URL}"
+    echo "   Job: ${JENKINS_JOB}"
+    echo ""
+fi
+
+exit 0  # Always succeed so commit isn't blocked
+
