@@ -1,16 +1,22 @@
 pipeline {
     agent any
 
+    parameters {
+        string(
+            name: 'SUBGRAPHS',
+            defaultValue: 'checkout',
+            description: 'Comma-separated list of subgraphs to check (e.g., checkout,discovery,inventory)'
+        )
+    }
+
     environment {
         // Apollo GraphOS configuration
         // Note: APOLLO_KEY will be set in Validate Environment stage to handle missing credentials gracefully
         APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@${env.ENVIRONMENT ?: 'dev'}"
         ENVIRONMENT = "${env.ENVIRONMENT ?: 'dev'}"
         
-        // Subgraphs to process (comma-separated, default: checkout only)
-        // Set via Jenkins environment variable or build parameter
-        // Example: checkout,discovery,inventory
-        SUBGRAPHS = "${env.SUBGRAPHS ?: 'checkout'}"
+        // Subgraphs to process (from build parameter)
+        SUBGRAPHS = "${params.SUBGRAPHS}"
     }
 
     options {
