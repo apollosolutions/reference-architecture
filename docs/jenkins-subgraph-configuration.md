@@ -144,3 +144,4 @@ Processing 3 subgraph(s): checkout, discovery, inventory
 - Verify subgraph schema is valid
 - Check Apollo GraphOS permissions for the subgraph
 
+

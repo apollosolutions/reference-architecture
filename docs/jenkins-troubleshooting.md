@@ -260,3 +260,4 @@ If issues persist:
 | `Authentication failed` | Invalid API key | Verify APOLLO_KEY is correct |
 | `Schema validation failed` | Schema errors | Check schema.graphql files |
 
+

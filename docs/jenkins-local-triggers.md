@@ -218,3 +218,4 @@ The hook script (`scripts/jenkins/git-hooks/post-commit`) will:
 3. Test with a local commit
 4. Verify build triggers in Jenkins
 
+

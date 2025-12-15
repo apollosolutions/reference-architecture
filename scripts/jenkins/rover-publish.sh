@@ -38,3 +38,4 @@ rover subgraph publish "${GRAPH_REF}" \
 
 echo "✅ ${SUBGRAPH_NAME} subgraph published successfully"
 
+

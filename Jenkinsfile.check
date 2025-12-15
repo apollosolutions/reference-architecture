@@ -1,9 +1,7 @@
-pipeline {
-    agent any
-
-    parameters {
+properties([
+    parameters([
         choice(
-            name: 'SUBGRAPHS',
+            name: 'SUBGRAPH',
             choices: [
                 'checkout',
                 'discovery',
@@ -14,14 +12,18 @@ pipeline {
                 'shipping',
                 'users'
             ],
-            description: 'Select subgraph to check.'
-        )
+            description: 'Select a single subgraph to check'
+        ),
         choice(
             name: 'ENVIRONMENT',
-            choices: ['dev', 'workshop-jenkins-ci'],
+            choices: ['workshop-jenkins-ci','dev'],
             description: 'Environment name'
         )
-    }
+    ])
+])
+
+pipeline {
+    agent any
 
     environment {
         // Apollo GraphOS configuration
@@ -29,8 +31,8 @@ pipeline {
         APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@${params.ENVIRONMENT}"
         ENVIRONMENT = "${params.ENVIRONMENT}"
         
-        // Subgraphs to process (from build parameter)
-        SUBGRAPHS = "${params.SUBGRAPHS}"
+        // Subgraph to process (single subgraph from build parameter)
+        SUBGRAPH = "${params.SUBGRAPH}"
     }
 
     options {
@@ -104,18 +106,8 @@ pipeline {
         stage('Subgraph Check') {
             steps {
                 script {
-                    def subgraphsList = []
-                    
-
-                    subgraphsList = SUBGRAPHS.split(',').collect { it.trim() }
-                    
-                    echo "Processing ${subgraphsList.size()} subgraph(s): ${subgraphsList.join(', ')}"
-                    
-                    for (subgraph in subgraphsList) {
-                        stage("Check ${subgraph}") {
-                            runRoverCheck(subgraph)
-                        }
-                    }
+                    echo "Checking subgraph: ${SUBGRAPH}"
+                    runRoverCheck(SUBGRAPH)
                 }
             }
         }
@@ -124,7 +116,7 @@ pipeline {
     post {
         success {
             script {
-                echo "✅ All subgraph checks passed!"
+                echo "✅ Subgraph ${SUBGRAPH} check passed!"
             }
         }
         failure {
