@@ -118,7 +118,10 @@ pipeline {
                     sh '''
                         if ! command -v rover &> /dev/null; then
                             echo "Rover CLI not found. Installing..."
-                            curl -sSL https://rover.apollo.dev/nix/latest | sh
+                            curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
+                        else
+                            echo "Rover CLI found. Ensuring latest version..."
+                            curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
                         fi
                         rover --version
                     '''
