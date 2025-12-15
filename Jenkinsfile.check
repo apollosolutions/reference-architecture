@@ -1,0 +1,138 @@
+pipeline {
+    agent any
+
+    environment {
+        // Apollo GraphOS configuration
+        // Note: APOLLO_KEY will be set in Validate Environment stage to handle missing credentials gracefully
+        APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@${env.ENVIRONMENT ?: 'dev'}"
+        ENVIRONMENT = "${env.ENVIRONMENT ?: 'dev'}"
+        
+        // Subgraphs to process (comma-separated, default: checkout only)
+        // Set via Jenkins environment variable or build parameter
+        // Example: checkout,discovery,inventory
+        SUBGRAPHS = "${env.SUBGRAPHS ?: 'checkout'}"
+    }
+
+    options {
+        // Keep build history
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+        
+        // Timeout after 30 minutes
+        timeout(time: 30, unit: 'MINUTES')
+        
+        // Add timestamps to console output
+        timestamps()
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    echo "Checking out code from ${env.GIT_BRANCH ?: 'current branch'}"
+                    checkout scm
+                }
+            }
+        }
+
+        stage('Validate Environment') {
+            steps {
+                script {
+                    echo "Validating environment configuration..."
+                    
+                    // Try to get APOLLO_KEY from credentials if not already set
+                    try {
+                        if (!env.APOLLO_KEY) {
+                            def apolloKeyCred = credentials('apollo-key')
+                            env.APOLLO_KEY = apolloKeyCred
+                        }
+                    } catch (Exception e) {
+                        error("APOLLO_KEY credential 'apollo-key' not found. Please configure it in Jenkins:\n" +
+                              "1. Go to Manage Jenkins → Manage Credentials\n" +
+                              "2. Add credential with ID: apollo-key\n" +
+                              "3. Or set APOLLO_KEY as environment variable")
+                    }
+                    
+                    if (!env.APOLLO_KEY || env.APOLLO_KEY.trim().isEmpty()) {
+                        error("APOLLO_KEY is not set. Please configure it in Jenkins credentials (ID: apollo-key) or as environment variable.")
+                    }
+                    
+                    if (!env.APOLLO_GRAPH_ID) {
+                        error("APOLLO_GRAPH_ID is not set. Please set it as an environment variable in Jenkins:\n" +
+                              "Manage Jenkins → Configure System → Environment variables")
+                    }
+                    
+                    echo "Environment: ${ENVIRONMENT}"
+                    echo "Graph Reference: ${APOLLO_GRAPH_REF}"
+                    
+                    // Verify Rover is installed
+                    sh '''
+                        if ! command -v rover &> /dev/null; then
+                            echo "Rover CLI not found. Installing..."
+                            curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
+                        else
+                            echo "Rover CLI found. Ensuring latest version..."
+                            curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
+                        fi
+                        # Add rover bin directory to PATH
+                        export PATH="$HOME/.rover/bin:$PATH"
+                        rover --version
+                    '''
+                }
+            }
+        }
+
+        stage('Subgraph Check') {
+            steps {
+                script {
+                    def subgraphs = SUBGRAPHS.split(',').collect { it.trim() }
+                    echo "Processing ${subgraphs.size()} subgraph(s): ${subgraphs.join(', ')}"
+                    
+                    for (subgraph in subgraphs) {
+                        stage("Check ${subgraph}") {
+                            runRoverCheck(subgraph)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                echo "✅ All subgraph checks passed!"
+            }
+        }
+        failure {
+            script {
+                echo "❌ Build failed. Check the logs above for details."
+            }
+        }
+        always {
+            script {
+                // Only clean workspace if we have a workspace context
+                try {
+                    cleanWs()
+                } catch (Exception e) {
+                    echo "Note: Could not clean workspace (this is normal if build failed early)"
+                }
+            }
+        }
+    }
+}
+
+// Helper function to run rover subgraph check
+def runRoverCheck(String subgraphName) {
+    echo "Checking ${subgraphName} subgraph..."
+    
+    sh """
+        export PATH="\$HOME/.rover/bin:\$PATH"
+        cd subgraphs/${subgraphName}
+        rover subgraph check ${APOLLO_GRAPH_REF} \\
+            --name ${subgraphName} \\
+            --schema schema.graphql
+    """
+    
+    echo "✅ ${subgraphName} subgraph check passed"
+}
+
