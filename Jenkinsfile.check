@@ -2,18 +2,32 @@ pipeline {
     agent any
 
     parameters {
-        string(
+        choice(
             name: 'SUBGRAPHS',
-            defaultValue: 'checkout',
-            description: 'Comma-separated list of subgraphs to check (e.g., checkout,discovery,inventory)'
+            choices: [
+                'checkout',
+                'discovery',
+                'inventory',
+                'orders',
+                'products',
+                'reviews',
+                'shipping',
+                'users'
+            ],
+            description: 'Select subgraph to check.'
+        )
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'workshop-jenkins-ci'],
+            description: 'Environment name'
         )
     }
 
     environment {
         // Apollo GraphOS configuration
         // Note: APOLLO_KEY will be set in Validate Environment stage to handle missing credentials gracefully
-        APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@${env.ENVIRONMENT ?: 'dev'}"
-        ENVIRONMENT = "${env.ENVIRONMENT ?: 'dev'}"
+        APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@${params.ENVIRONMENT}"
+        ENVIRONMENT = "${params.ENVIRONMENT}"
         
         // Subgraphs to process (from build parameter)
         SUBGRAPHS = "${params.SUBGRAPHS}"
@@ -90,10 +104,14 @@ pipeline {
         stage('Subgraph Check') {
             steps {
                 script {
-                    def subgraphs = SUBGRAPHS.split(',').collect { it.trim() }
-                    echo "Processing ${subgraphs.size()} subgraph(s): ${subgraphs.join(', ')}"
+                    def subgraphsList = []
                     
-                    for (subgraph in subgraphs) {
+
+                    subgraphsList = SUBGRAPHS.split(',').collect { it.trim() }
+                    
+                    echo "Processing ${subgraphsList.size()} subgraph(s): ${subgraphsList.join(', ')}"
+                    
+                    for (subgraph in subgraphsList) {
                         stage("Check ${subgraph}") {
                             runRoverCheck(subgraph)
                         }
