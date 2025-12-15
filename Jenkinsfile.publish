@@ -1,7 +1,5 @@
-pipeline {
-    agent any
-
-    parameters {
+properties([
+    parameters([
         choice(
             name: 'SUBGRAPH',
             choices: [
@@ -15,22 +13,26 @@ pipeline {
                 'users'
             ],
             description: 'Select a single subgraph to publish'
-        )
+        ),
         choice(
             name: 'ENVIRONMENT',
             choices: ['dev', 'workshop-jenkins-ci'],
             description: 'Environment name'
         )
-    }
+    ])
+])
+
+pipeline {
+    agent any
 
     environment {
         // Apollo GraphOS configuration
         // Note: APOLLO_KEY will be set in Validate Environment stage to handle missing credentials gracefully
-        APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@${params.ENVIRONMENT}"
-        ENVIRONMENT = "${params.ENVIRONMENT}"
+        APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@${params.ENVIRONMENT ?: 'dev'}"
+        ENVIRONMENT = "${params.ENVIRONMENT ?: 'dev'}"
         
         // Subgraph to process (single subgraph from build parameter)
-        SUBGRAPH = "${params.SUBGRAPH}"
+        SUBGRAPH = "${params.SUBGRAPH ?: 'checkout'}"
     }
 
     options {
@@ -58,6 +60,10 @@ pipeline {
             steps {
                 script {
                     echo "Validating environment configuration..."
+                    echo "DEBUG: params.ENVIRONMENT = ${params.ENVIRONMENT}"
+                    echo "DEBUG: params.SUBGRAPH = ${params.SUBGRAPH}"
+                    echo "DEBUG: ENVIRONMENT = ${ENVIRONMENT}"
+                    echo "DEBUG: SUBGRAPH = ${SUBGRAPH}"
                     
                     // Try to get APOLLO_KEY from credentials if not already set
                     try {
