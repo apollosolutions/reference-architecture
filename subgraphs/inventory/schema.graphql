@@ -18,7 +18,6 @@ type Inventory {
   Returns true if the inventory count is greater than 0
   """
   inStock: Boolean!
-  test: String!
 
   """
   The raw count of not purchased items in the warehouse

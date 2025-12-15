@@ -1,0 +1,301 @@
+pipeline {
+    agent any
+
+    environment {
+        // Apollo GraphOS configuration
+        // Note: APOLLO_KEY will be set in Validate Environment stage to handle missing credentials gracefully
+        APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@workshop-jenkins-ci"
+        ENVIRONMENT = "workshop-jenkins-ci"
+    }
+
+    options {
+        // Keep build history
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+        
+        // Timeout after 30 minutes
+        timeout(time: 30, unit: 'MINUTES')
+        
+        // Add timestamps to console output
+        timestamps()
+        
+        // GitHub integration for status checks (requires GitHub plugin)
+        githubProjectProperty(projectUrlStr: "${env.GIT_URL ?: 'https://github.com/apollosolutions/reference-architecture'}")
+    }
+
+    triggers {
+        // Trigger on pull requests targeting workshop-jenkins-ci from workshop-jenkins-ci/* branches
+        // This requires the GitHub Pull Request Builder plugin or GitHub Branch Source plugin
+        // For local Jenkins, you may need to configure this in the job settings instead
+    }
+
+    stages {
+        stage('Checkout PR') {
+            steps {
+                script {
+                    echo "Checking out pull request code"
+                    
+                    // Get PR information from environment (set by GitHub plugin)
+                    def prNumber = env.CHANGE_ID ?: env.ghprbPullId
+                    def sourceBranch = env.CHANGE_BRANCH ?: env.ghprbSourceBranch
+                    def targetBranch = env.CHANGE_TARGET ?: env.ghprbTargetBranch ?: 'workshop-jenkins-ci'
+                    
+                    echo "PR Number: ${prNumber ?: 'N/A'}"
+                    echo "Source Branch: ${sourceBranch ?: 'N/A'}"
+                    echo "Target Branch: ${targetBranch}"
+                    
+                    // Validate branch pattern
+                    if (sourceBranch && !sourceBranch.startsWith('workshop-jenkins-ci/')) {
+                        echo "⚠️  Warning: Source branch '${sourceBranch}' does not match pattern 'workshop-jenkins-ci/*'"
+                    }
+                    
+                    if (targetBranch != 'workshop-jenkins-ci') {
+                        error("This pipeline only processes PRs targeting 'workshop-jenkins-ci' branch. Target branch is: ${targetBranch}")
+                    }
+                    
+                    // Checkout the PR branch
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "origin/${sourceBranch ?: 'HEAD'}"]],
+                        extensions: [
+                            [$class: 'PreBuildMerge', options: [mergeRemote: 'origin', mergeTarget: targetBranch]],
+                            [$class: 'CleanBeforeCheckout']
+                        ],
+                        userRemoteConfigs: scm.userRemoteConfigs
+                    ])
+                    
+                    // Store PR info for later use
+                    env.PR_NUMBER = prNumber ?: ''
+                    env.SOURCE_BRANCH = sourceBranch ?: ''
+                }
+            }
+        }
+
+        stage('Detect Changed Subgraphs') {
+            steps {
+                script {
+                    echo "Detecting changed subgraphs in pull request..."
+                    
+                    def targetBranch = env.CHANGE_TARGET ?: env.ghprbTargetBranch ?: 'workshop-jenkins-ci'
+                    
+                    // Get list of changed files in subgraphs directory compared to target branch
+                    def changedFiles = sh(
+                        script: """
+                            git diff --name-only origin/${targetBranch}...HEAD | grep '^subgraphs/' || true
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (!changedFiles) {
+                        echo "No changes detected in subgraphs directory"
+                        env.CHANGED_SUBGRAPHS = ""
+                        return
+                    }
+                    
+                    echo "Changed files in subgraphs:"
+                    echo changedFiles
+                    
+                    // Extract unique subgraph names from changed file paths
+                    // Pattern: subgraphs/<subgraph-name>/...
+                    def subgraphSet = [] as Set
+                    changedFiles.split('\n').each { file ->
+                        if (file.trim()) {
+                            def matcher = file =~ /^subgraphs\/([^\/]+)\//
+                            if (matcher) {
+                                subgraphSet.add(matcher[0][1])
+                            }
+                        }
+                    }
+                    
+                    def changedSubgraphs = subgraphSet.sort().join(',')
+                    env.CHANGED_SUBGRAPHS = changedSubgraphs
+                    
+                    if (changedSubgraphs) {
+                        echo "Changed subgraphs detected: ${changedSubgraphs}"
+                    } else {
+                        echo "No subgraph directories affected by changes"
+                    }
+                }
+            }
+        }
+
+        stage('Validate Environment') {
+            steps {
+                script {
+                    echo "Validating environment configuration..."
+                    
+                    // Try to get APOLLO_KEY from credentials if not already set
+                    try {
+                        if (!env.APOLLO_KEY) {
+                            def apolloKeyCred = credentials('apollo-key')
+                            env.APOLLO_KEY = apolloKeyCred
+                        }
+                    } catch (Exception e) {
+                        error("APOLLO_KEY credential 'apollo-key' not found. Please configure it in Jenkins:\n" +
+                              "1. Go to Manage Jenkins → Manage Credentials\n" +
+                              "2. Add credential with ID: apollo-key\n" +
+                              "3. Or set APOLLO_KEY as environment variable")
+                    }
+                    
+                    if (!env.APOLLO_KEY || env.APOLLO_KEY.trim().isEmpty()) {
+                        error("APOLLO_KEY is not set. Please configure it in Jenkins credentials (ID: apollo-key) or as environment variable.")
+                    }
+                    
+                    if (!env.APOLLO_GRAPH_ID) {
+                        error("APOLLO_GRAPH_ID is not set. Please set it as an environment variable in Jenkins:\n" +
+                              "Manage Jenkins → Configure System → Environment variables")
+                    }
+                    
+                    echo "Environment: ${ENVIRONMENT}"
+                    echo "Graph Reference: ${APOLLO_GRAPH_REF}"
+                    
+                    // Verify Rover is installed
+                    sh '''
+                        if ! command -v rover &> /dev/null; then
+                            echo "Rover CLI not found. Installing..."
+                            curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
+                        else
+                            echo "Rover CLI found. Ensuring latest version..."
+                            curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
+                        fi
+                        # Add rover bin directory to PATH
+                        export PATH="$HOME/.rover/bin:$PATH"
+                        rover --version
+                    '''
+                }
+            }
+        }
+
+        stage('Subgraph Check') {
+            when {
+                expression { env.CHANGED_SUBGRAPHS && !env.CHANGED_SUBGRAPHS.trim().isEmpty() }
+            }
+            steps {
+                script {
+                    def subgraphs = env.CHANGED_SUBGRAPHS.split(',').collect { it.trim() }
+                    echo "Checking ${subgraphs.size()} changed subgraph(s): ${subgraphs.join(', ')}"
+                    
+                    for (subgraph in subgraphs) {
+                        stage("Check ${subgraph}") {
+                            runRoverCheck(subgraph)
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Skip - No Changes') {
+            when {
+                expression { !env.CHANGED_SUBGRAPHS || env.CHANGED_SUBGRAPHS.trim().isEmpty() }
+            }
+            steps {
+                script {
+                    echo "⏭️  No subgraph changes detected. Skipping check stage."
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                if (env.CHANGED_SUBGRAPHS && !env.CHANGED_SUBGRAPHS.trim().isEmpty()) {
+                    echo "✅ All changed subgraph checks passed!"
+                    echo "Changed subgraphs: ${env.CHANGED_SUBGRAPHS}"
+                    
+                    // Update GitHub status if PR number is available
+                    updateGitHubStatus('success', 'All subgraph checks passed')
+                } else {
+                    echo "✅ Build completed (no subgraph changes detected)"
+                    updateGitHubStatus('success', 'No subgraph changes to check')
+                }
+            }
+        }
+        failure {
+            script {
+                echo "❌ Build failed. Check the logs above for details."
+                updateGitHubStatus('failure', 'Subgraph checks failed')
+            }
+        }
+        always {
+            script {
+                // Only clean workspace if we have a workspace context
+                try {
+                    cleanWs()
+                } catch (Exception e) {
+                    echo "Note: Could not clean workspace (this is normal if build failed early)"
+                }
+            }
+        }
+    }
+}
+
+// Helper function to run rover subgraph check
+def runRoverCheck(String subgraphName) {
+    echo "Checking ${subgraphName} subgraph..."
+    
+    sh """
+        export PATH="\$HOME/.rover/bin:\$PATH"
+        cd subgraphs/${subgraphName}
+        rover subgraph check ${APOLLO_GRAPH_REF} \\
+            --name ${subgraphName} \\
+            --schema schema.graphql
+    """
+    
+    echo "✅ ${subgraphName} subgraph check passed"
+}
+
+// Helper function to update GitHub status (requires GitHub API token)
+def updateGitHubStatus(String state, String description) {
+    script {
+        def prNumber = env.PR_NUMBER ?: env.CHANGE_ID ?: env.ghprbPullId
+        def repo = env.GIT_URL ?: 'apollosolutions/reference-architecture'
+        
+        // Extract repo owner/name from GIT_URL if it's a full URL
+        if (repo.contains('github.com')) {
+            repo = repo.replaceAll(/.*github\.com[\/:]([^\/]+)\/([^\/]+)(?:\.git)?.*/, '$1/$2')
+        }
+        
+        if (!prNumber) {
+            echo "⚠️  PR number not available. Skipping GitHub status update."
+            return
+        }
+        
+        try {
+            // Try to get GitHub token from credentials
+            def githubToken = null
+            try {
+                withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                    githubToken = env.GITHUB_TOKEN
+                }
+            } catch (Exception e) {
+                echo "⚠️  GitHub token not configured. Status check will not be posted to GitHub."
+                echo "   To enable GitHub status checks, add a 'github-token' credential with a GitHub Personal Access Token"
+                return
+            }
+            
+            // Post status to GitHub
+            def statusUrl = "https://api.github.com/repos/${repo}/statuses/${env.GIT_COMMIT}"
+            def statusJson = """
+                {
+                    "state": "${state}",
+                    "target_url": "${env.BUILD_URL}",
+                    "description": "${description}",
+                    "context": "jenkins/subgraph-check"
+                }
+            """
+            
+            sh """
+                curl -X POST ${statusUrl} \\
+                    -H "Authorization: token ${githubToken}" \\
+                    -H "Content-Type: application/json" \\
+                    -d '${statusJson}'
+            """
+            
+            echo "✅ GitHub status updated: ${state}"
+        } catch (Exception e) {
+            echo "⚠️  Failed to update GitHub status: ${e.getMessage()}"
+            echo "   This is non-fatal - the build will continue"
+        }
+    }
+}
+
