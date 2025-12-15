@@ -23,7 +23,7 @@ pipeline {
     }
 
     triggers {
-        // Trigger on pull requests targeting workshop-jenkins-ci from workshop-jenkins-ci/* branches
+        // Trigger on pull requests targeting workshop-jenkins-ci from workshop-jenkins-ci-* branches
         // This requires the GitHub Pull Request Builder plugin or GitHub Branch Source plugin
         // For local Jenkins, you may need to configure this in the job settings instead
     }
@@ -44,8 +44,8 @@ pipeline {
                     echo "Target Branch: ${targetBranch}"
                     
                     // Validate branch pattern
-                    if (sourceBranch && !sourceBranch.startsWith('workshop-jenkins-ci/')) {
-                        echo "⚠️  Warning: Source branch '${sourceBranch}' does not match pattern 'workshop-jenkins-ci/*'"
+                    if (sourceBranch && !sourceBranch.startsWith('workshop-jenkins-ci-')) {
+                        echo "⚠️  Warning: Source branch '${sourceBranch}' does not match pattern 'workshop-jenkins-ci-*'"
                     }
                     
                     if (targetBranch != 'workshop-jenkins-ci') {
