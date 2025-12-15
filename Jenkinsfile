@@ -123,8 +123,13 @@ pipeline {
                             echo "Rover CLI found. Ensuring latest version..."
                             curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
                         fi
+                        # Add rover bin directory to PATH
+                        export PATH="$HOME/.rover/bin:$PATH"
                         rover --version
                     '''
+                    
+                    // Set PATH environment variable for subsequent stages
+                    env.PATH = "${env.HOME}/.rover/bin:${env.PATH}"
                 }
             }
         }
@@ -192,6 +197,7 @@ pipeline {
                     }
                     
                     sh """
+                        export PATH="\$HOME/.rover/bin:\$PATH"
                         rover supergraph compose \\
                             ${configFlag} \\
                             --output supergraph-${ENVIRONMENT}.graphql \\
@@ -243,6 +249,7 @@ def runRoverCheck(String subgraphName) {
     echo "Checking ${subgraphName} subgraph..."
     
     sh """
+        export PATH="\$HOME/.rover/bin:\$PATH"
         cd subgraphs/${subgraphName}
         rover subgraph check ${APOLLO_GRAPH_REF} \\
             --name ${subgraphName} \\
@@ -260,6 +267,7 @@ def runRoverPublish(String subgraphName) {
     def subgraphUrl = "http://graphql.${subgraphName}.svc.cluster.local:4001"
     
     sh """
+        export PATH="\$HOME/.rover/bin:\$PATH"
         cd subgraphs/${subgraphName}
         rover subgraph publish ${APOLLO_GRAPH_REF} \\
             --name ${subgraphName} \\
