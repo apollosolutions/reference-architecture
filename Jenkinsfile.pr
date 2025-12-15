@@ -44,7 +44,7 @@ pipeline {
                     echo "Target Branch: ${targetBranch}"
                     
                     // Validate branch pattern
-                    if (sourceBranch && !sourceBranch.startsWith('workshop-jenkins-ci/')) {
+                    if (sourceBranch && !sourceBranch.startsWith('workshop-jenkins-ci-')) {
                         echo "⚠️  Warning: Source branch '${sourceBranch}' does not match pattern 'workshop-jenkins-ci/*'"
                     }
                     
