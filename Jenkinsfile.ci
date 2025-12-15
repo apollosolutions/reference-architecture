@@ -1,0 +1,262 @@
+pipeline {
+    agent any
+
+    environment {
+        // Apollo GraphOS configuration
+        // Note: APOLLO_KEY will be set in Validate Environment stage to handle missing credentials gracefully
+        APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@workshop-jenkins-ci"
+        ENVIRONMENT = "workshop-jenkins-ci"
+    }
+
+    options {
+        // Keep build history
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+        
+        // Timeout after 30 minutes
+        timeout(time: 30, unit: 'MINUTES')
+        
+        // Add timestamps to console output
+        timestamps()
+    }
+
+    triggers {
+        // Poll SCM every minute (or use webhook trigger in Jenkins job configuration)
+        pollSCM('H/1 * * * *')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    echo "Checking out code from workshop-jenkins-ci branch"
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: 'origin/workshop-jenkins-ci']],
+                        userRemoteConfigs: scm.userRemoteConfigs
+                    ])
+                }
+            }
+        }
+
+        stage('Detect Changed Subgraphs') {
+            steps {
+                script {
+                    echo "Detecting changed subgraphs..."
+                    
+                    // Get the previous commit hash (or use HEAD~1 if this is the first build)
+                    def previousCommit = sh(
+                        script: '''
+                            if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+                                echo $(git rev-parse HEAD~1)
+                            else
+                                echo $(git rev-parse HEAD)
+                            fi
+                        ''',
+                        returnStdout: true
+                    ).trim()
+                    
+                    def currentCommit = sh(
+                        script: 'git rev-parse HEAD',
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Previous commit: ${previousCommit}"
+                    echo "Current commit: ${currentCommit}"
+                    
+                    // Get list of changed files in subgraphs directory
+                    def changedFiles = sh(
+                        script: """
+                            git diff --name-only ${previousCommit} ${currentCommit} | grep '^subgraphs/' || true
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (!changedFiles) {
+                        echo "No changes detected in subgraphs directory"
+                        env.CHANGED_SUBGRAPHS = ""
+                        return
+                    }
+                    
+                    echo "Changed files in subgraphs:"
+                    echo changedFiles
+                    
+                    // Extract unique subgraph names from changed file paths
+                    // Pattern: subgraphs/<subgraph-name>/...
+                    def subgraphSet = [] as Set
+                    changedFiles.split('\n').each { file ->
+                        def matcher = file =~ /^subgraphs\/([^\/]+)\//
+                        if (matcher) {
+                            subgraphSet.add(matcher[0][1])
+                        }
+                    }
+                    
+                    def changedSubgraphs = subgraphSet.sort().join(',')
+                    env.CHANGED_SUBGRAPHS = changedSubgraphs
+                    
+                    if (changedSubgraphs) {
+                        echo "Changed subgraphs detected: ${changedSubgraphs}"
+                    } else {
+                        echo "No subgraph directories affected by changes"
+                    }
+                }
+            }
+        }
+
+        stage('Validate Environment') {
+            steps {
+                script {
+                    echo "Validating environment configuration..."
+                    
+                    // Try to get APOLLO_KEY from credentials if not already set
+                    try {
+                        if (!env.APOLLO_KEY) {
+                            def apolloKeyCred = credentials('apollo-key')
+                            env.APOLLO_KEY = apolloKeyCred
+                        }
+                    } catch (Exception e) {
+                        error("APOLLO_KEY credential 'apollo-key' not found. Please configure it in Jenkins:\n" +
+                              "1. Go to Manage Jenkins → Manage Credentials\n" +
+                              "2. Add credential with ID: apollo-key\n" +
+                              "3. Or set APOLLO_KEY as environment variable")
+                    }
+                    
+                    if (!env.APOLLO_KEY || env.APOLLO_KEY.trim().isEmpty()) {
+                        error("APOLLO_KEY is not set. Please configure it in Jenkins credentials (ID: apollo-key) or as environment variable.")
+                    }
+                    
+                    if (!env.APOLLO_GRAPH_ID) {
+                        error("APOLLO_GRAPH_ID is not set. Please set it as an environment variable in Jenkins:\n" +
+                              "Manage Jenkins → Configure System → Environment variables")
+                    }
+                    
+                    echo "Environment: ${ENVIRONMENT}"
+                    echo "Graph Reference: ${APOLLO_GRAPH_REF}"
+                    
+                    // Verify Rover is installed
+                    sh '''
+                        if ! command -v rover &> /dev/null; then
+                            echo "Rover CLI not found. Installing..."
+                            curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
+                        else
+                            echo "Rover CLI found. Ensuring latest version..."
+                            curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
+                        fi
+                        # Add rover bin directory to PATH
+                        export PATH="$HOME/.rover/bin:$PATH"
+                        rover --version
+                    '''
+                }
+            }
+        }
+
+        stage('Subgraph Check') {
+            when {
+                expression { env.CHANGED_SUBGRAPHS && !env.CHANGED_SUBGRAPHS.trim().isEmpty() }
+            }
+            steps {
+                script {
+                    def subgraphs = env.CHANGED_SUBGRAPHS.split(',').collect { it.trim() }
+                    echo "Checking ${subgraphs.size()} changed subgraph(s): ${subgraphs.join(', ')}"
+                    
+                    for (subgraph in subgraphs) {
+                        stage("Check ${subgraph}") {
+                            runRoverCheck(subgraph)
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Subgraph Publish') {
+            when {
+                expression { env.CHANGED_SUBGRAPHS && !env.CHANGED_SUBGRAPHS.trim().isEmpty() }
+            }
+            steps {
+                script {
+                    def subgraphs = env.CHANGED_SUBGRAPHS.split(',').collect { it.trim() }
+                    echo "Publishing ${subgraphs.size()} changed subgraph(s): ${subgraphs.join(', ')}"
+                    
+                    for (subgraph in subgraphs) {
+                        stage("Publish ${subgraph}") {
+                            runRoverPublish(subgraph)
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Skip - No Changes') {
+            when {
+                expression { !env.CHANGED_SUBGRAPHS || env.CHANGED_SUBGRAPHS.trim().isEmpty() }
+            }
+            steps {
+                script {
+                    echo "⏭️  No subgraph changes detected. Skipping check and publish stages."
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                if (env.CHANGED_SUBGRAPHS && !env.CHANGED_SUBGRAPHS.trim().isEmpty()) {
+                    echo "✅ All changed subgraphs checked and published successfully!"
+                    echo "Changed subgraphs: ${env.CHANGED_SUBGRAPHS}"
+                } else {
+                    echo "✅ Build completed (no subgraph changes detected)"
+                }
+            }
+        }
+        failure {
+            script {
+                echo "❌ Build failed. Check the logs above for details."
+            }
+        }
+        always {
+            script {
+                // Only clean workspace if we have a workspace context
+                try {
+                    cleanWs()
+                } catch (Exception e) {
+                    echo "Note: Could not clean workspace (this is normal if build failed early)"
+                }
+            }
+        }
+    }
+}
+
+// Helper function to run rover subgraph check
+def runRoverCheck(String subgraphName) {
+    echo "Checking ${subgraphName} subgraph..."
+    
+    sh """
+        export PATH="\$HOME/.rover/bin:\$PATH"
+        cd subgraphs/${subgraphName}
+        rover subgraph check ${APOLLO_GRAPH_REF} \\
+            --name ${subgraphName} \\
+            --schema schema.graphql
+    """
+    
+    echo "✅ ${subgraphName} subgraph check passed"
+}
+
+// Helper function to run rover subgraph publish
+def runRoverPublish(String subgraphName) {
+    echo "Publishing ${subgraphName} subgraph..."
+    
+    // Determine subgraph URL (adjust based on your deployment)
+    def subgraphUrl = "http://graphql.${subgraphName}.svc.cluster.local:4001"
+    
+    sh """
+        export PATH="\$HOME/.rover/bin:\$PATH"
+        cd subgraphs/${subgraphName}
+        rover subgraph publish ${APOLLO_GRAPH_REF} \\
+            --name ${subgraphName} \\
+            --schema schema.graphql \\
+            --routing-url ${subgraphUrl}
+    """
+    
+    echo "✅ ${subgraphName} subgraph published successfully"
+}
+
