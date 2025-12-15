@@ -20,8 +20,10 @@ pipeline {
     }
 
     triggers {
-        // Poll SCM every minute (or use webhook trigger in Jenkins job configuration)
-        pollSCM('H/1 * * * *')
+        // Poll SCM every 2 minutes for local Jenkins
+        // This checks for changes on the workshop-jenkins-ci branch
+        // For production, consider using GitHub webhooks instead
+        pollSCM('H/2 * * * *')
     }
 
     stages {
