@@ -193,11 +193,13 @@ pipeline {
                     def subgraphs = env.CHANGED_SUBGRAPHS.split(',').collect { it.trim() }
                     echo "Checking ${subgraphs.size()} changed subgraph(s): ${subgraphs.join(', ')}"
                     
+                    def parallelStages = [:]
                     for (subgraph in subgraphs) {
-                        stage("Check ${subgraph}") {
+                        parallelStages["Check ${subgraph}"] = {
                             runRoverCheck(subgraph)
                         }
                     }
+                    parallel parallelStages
                 }
             }
         }
