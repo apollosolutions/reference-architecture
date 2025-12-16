@@ -65,17 +65,47 @@ pipeline {
                     echo "Detecting changed subgraphs in pull request..."
                     
                     def targetBranch = env.CHANGE_TARGET ?: env.ghprbTargetBranch ?: 'workshop-jenkins-ci'
+                    env.DETECTION_ERROR = "false"
                     
-                    // Get list of changed files in subgraphs directory compared to target branch
-                    def changedFiles = sh(
+                    // Fetch the target branch so we can compare against it
+                    def fetchResult = sh(
                         script: """
-                            git diff --name-only origin/${targetBranch}...HEAD | grep '^subgraphs/' || true
+                            git fetch origin ${targetBranch}:refs/remotes/origin/${targetBranch} 2>&1 || echo "FETCH_FAILED"
                         """,
                         returnStdout: true
                     ).trim()
                     
-                    if (!changedFiles) {
-                        echo "No changes detected in subgraphs directory"
+                    if (fetchResult.contains("FETCH_FAILED")) {
+                        echo "⚠️  Warning: Could not fetch target branch ${targetBranch}. Trying alternative method..."
+                        // Try fetching all branches
+                        sh 'git fetch origin --prune || true'
+                    }
+                    
+                    // Get list of changed files in subgraphs directory compared to target branch
+                    def changedFiles = ""
+                    try {
+                        changedFiles = sh(
+                            script: """
+                                if git rev-parse --verify origin/${targetBranch} >/dev/null 2>&1; then
+                                    git diff --name-only origin/${targetBranch}...HEAD | grep '^subgraphs/' || true
+                                else
+                                    echo ""
+                                fi
+                            """,
+                            returnStdout: true
+                        ).trim()
+                    } catch (Exception e) {
+                        echo "⚠️  Error detecting changed files: ${e.getMessage()}"
+                        env.DETECTION_ERROR = "true"
+                        changedFiles = ""
+                    }
+                    
+                    if (!changedFiles || changedFiles.isEmpty()) {
+                        if (env.DETECTION_ERROR == "true") {
+                            echo "⚠️  Could not detect changes (error occurred). Assuming no subgraph changes."
+                        } else {
+                            echo "No changes detected in subgraphs directory"
+                        }
                         env.CHANGED_SUBGRAPHS = ""
                         return
                     }
@@ -193,6 +223,10 @@ pipeline {
                     
                     // Update GitHub status if PR number is available
                     updateGitHubStatus('success', 'All subgraph checks passed')
+                } else if (env.DETECTION_ERROR == "true") {
+                    echo "⚠️  Build completed but could not detect subgraph changes (error occurred)"
+                    echo "   This may indicate an issue with branch comparison. Check the logs above."
+                    updateGitHubStatus('success', 'Build completed (change detection had issues)')
                 } else {
                     echo "✅ Build completed (no subgraph changes detected)"
                     updateGitHubStatus('success', 'No subgraph changes to check')
@@ -253,12 +287,22 @@ def updateGitHubStatus(String state, String description) {
             // Try to get GitHub token from credentials
             def githubToken = null
             try {
+                // Try to find the credential - it might be in different stores
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     githubToken = env.GITHUB_TOKEN
+                    if (!githubToken || githubToken.trim().isEmpty()) {
+                        throw new Exception("GitHub token is empty")
+                    }
                 }
             } catch (Exception e) {
-                echo "⚠️  GitHub token not configured. Status check will not be posted to GitHub."
-                echo "   To enable GitHub status checks, add a 'github-token' credential with a GitHub Personal Access Token"
+                echo "⚠️  GitHub token credential 'github-token' not found or not accessible."
+                echo "   Error: ${e.getMessage()}"
+                echo "   To enable GitHub status checks:"
+                echo "   1. Go to Manage Jenkins → Manage Credentials"
+                echo "   2. Add credential with ID: 'github-token' (exact match, case-sensitive)"
+                echo "   3. Type: Secret text"
+                echo "   4. Value: Your GitHub Personal Access Token with 'repo' scope"
+                echo "   5. Ensure it's in the Global domain or accessible to this job"
                 return
             }
             
