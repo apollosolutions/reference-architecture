@@ -151,6 +151,7 @@ pipeline {
             }
         }
 
+
         stage('Subgraph Check') {
             when {
                 expression { env.CHANGED_SUBGRAPHS && !env.CHANGED_SUBGRAPHS.trim().isEmpty() }
@@ -165,6 +166,31 @@ pipeline {
                             runRoverCheck(subgraph)
                         }
                     }
+                }
+            }
+        }
+
+
+        stage("Deploy Subgraphs") {
+            when {
+                expression { env.CHANGED_SUBGRAPHS && !env.CHANGED_SUBGRAPHS.trim().isEmpty() }
+            }
+            steps {
+                script {
+                    def subgraphs = env.CHANGED_SUBGRAPHS.split(',').collect { it.trim() }
+                    echo "[MOCK/DEMO] Deploying ${subgraphs.size()} changed subgraph(s): ${subgraphs.join(', ')}"
+                    echo "[MOCK/DEMO] Note: This is a demonstration - no actual deployment will occur"
+                    
+                    def parallelStages = [:]
+                    subgraphs.each { subgraph ->
+                        def subgraphName = subgraph  // Capture the value explicitly
+                        parallelStages["Deploy ${subgraphName}"] = {
+                            script {
+                                deploySubgraph(subgraphName)
+                            }
+                        }
+                    }
+                    parallel parallelStages
                 }
             }
         }
@@ -241,6 +267,17 @@ def runRoverCheck(String subgraphName) {
     """
     
     echo "✅ ${subgraphName} subgraph check passed"
+}
+
+// Helper function to deploy subgraph (demo - echo statements only)
+def deploySubgraph(String subgraphName) {
+    echo "[${subgraphName}] [MOCK/DEMO] Starting deployment for ${subgraphName} subgraph..."
+    echo "[${subgraphName}] [MOCK/DEMO] Building Docker image for ${subgraphName}..."
+    echo "[${subgraphName}] [MOCK/DEMO] Pushing Docker image to registry..."
+    echo "[${subgraphName}] [MOCK/DEMO] Updating Kubernetes deployment for ${subgraphName}..."
+    echo "[${subgraphName}] [MOCK/DEMO] Waiting for ${subgraphName} deployment to be ready..."
+    echo "[${subgraphName}] [MOCK/DEMO] Verifying ${subgraphName} health check..."
+    echo "[${subgraphName}] [MOCK/DEMO] ✅ ${subgraphName} subgraph deployed successfully"
 }
 
 // Helper function to run rover subgraph publish
