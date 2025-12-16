@@ -8,7 +8,7 @@ type Variant @key(fields: "id") {
   Checks the warehouse API for inventory information.
   """
   inventory: Inventory
-  testPr: String @shareable
+  testPr: String @invalid
 }
 
 """
