@@ -194,9 +194,12 @@ pipeline {
                     echo "Checking ${subgraphs.size()} changed subgraph(s): ${subgraphs.join(', ')}"
                     
                     def parallelStages = [:]
-                    for (subgraph in subgraphs) {
-                        parallelStages["Check ${subgraph}"] = {
-                            runRoverCheck(subgraph)
+                    subgraphs.each { subgraph ->
+                        def subgraphName = subgraph  // Capture the value explicitly
+                        parallelStages["Check ${subgraphName}"] = {
+                            script {
+                                runRoverCheck(subgraphName)
+                            }
                         }
                     }
                     parallel parallelStages
@@ -256,17 +259,21 @@ pipeline {
 
 // Helper function to run rover subgraph check
 def runRoverCheck(String subgraphName) {
-    echo "Checking ${subgraphName} subgraph..."
+    echo "[${subgraphName}] Checking ${subgraphName} subgraph..."
     
-    sh """
-        export PATH="\$HOME/.rover/bin:\$PATH"
-        cd subgraphs/${subgraphName}
-        rover subgraph check ${APOLLO_GRAPH_REF} \\
-            --name ${subgraphName} \\
-            --schema schema.graphql
-    """
-    
-    echo "✅ ${subgraphName} subgraph check passed"
+    try {
+        sh """
+            export PATH="\$HOME/.rover/bin:\$PATH"
+            cd subgraphs/${subgraphName}
+            rover subgraph check ${APOLLO_GRAPH_REF} \\
+                --name ${subgraphName} \\
+                --schema schema.graphql
+        """
+        echo "[${subgraphName}] ✅ ${subgraphName} subgraph check passed"
+    } catch (Exception e) {
+        echo "[${subgraphName}] ❌ ${subgraphName} subgraph check failed"
+        throw e
+    }
 }
 
 // Helper function to update GitHub status (requires GitHub API token)
