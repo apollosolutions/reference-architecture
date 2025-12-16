@@ -21,13 +21,7 @@ pipeline {
         // GitHub integration for status checks (requires GitHub plugin)
         githubProjectProperty(projectUrlStr: "${env.GIT_URL ?: 'https://github.com/apollosolutions/reference-architecture'}")
     }
-
-    triggers {
-        // Trigger on pull requests targeting workshop-jenkins-ci from workshop-jenkins-ci-* branches
-        // This requires the GitHub Pull Request Builder plugin or GitHub Branch Source plugin
-        // For local Jenkins, you may need to configure this in the job settings instead
-    }
-
+    
     stages {
         stage('Checkout PR') {
             steps {
