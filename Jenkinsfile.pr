@@ -295,14 +295,9 @@ def updateGitHubStatus(String state, String description) {
                     }
                 }
             } catch (Exception e) {
-                echo "⚠️  GitHub token credential 'github-token' not found or not accessible."
-                echo "   Error: ${e.getMessage()}"
-                echo "   To enable GitHub status checks:"
-                echo "   1. Go to Manage Jenkins → Manage Credentials"
-                echo "   2. Add credential with ID: 'github-token' (exact match, case-sensitive)"
-                echo "   3. Type: Secret text"
-                echo "   4. Value: Your GitHub Personal Access Token with 'repo' scope"
-                echo "   5. Ensure it's in the Global domain or accessible to this job"
+                // GitHub Branch Source plugin already posts status checks automatically
+                // This custom status check is optional and can fail silently
+                // Only log if we're in debug mode or if the plugin isn't working
                 return
             }
             
