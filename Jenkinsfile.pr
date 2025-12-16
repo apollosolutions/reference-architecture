@@ -21,14 +21,14 @@ pipeline {
         // GitHub integration for status checks (requires GitHub plugin)
         githubProjectProperty(projectUrlStr: "${env.GIT_URL ?: 'https://github.com/apollosolutions/reference-architecture'}")
     }
-    
+
     stages {
         stage('Checkout PR') {
             steps {
                 script {
-                    echo "Checking out pull request code"
+                    echo "Processing pull request"
                     
-                    // Get PR information from environment (set by GitHub plugin)
+                    // Get PR information from environment (set by GitHub Branch Source plugin)
                     def prNumber = env.CHANGE_ID ?: env.ghprbPullId
                     def sourceBranch = env.CHANGE_BRANCH ?: env.ghprbSourceBranch
                     def targetBranch = env.CHANGE_TARGET ?: env.ghprbTargetBranch ?: 'workshop-jenkins-ci'
@@ -36,6 +36,7 @@ pipeline {
                     echo "PR Number: ${prNumber ?: 'N/A'}"
                     echo "Source Branch: ${sourceBranch ?: 'N/A'}"
                     echo "Target Branch: ${targetBranch}"
+                    echo "Current commit: ${env.GIT_COMMIT ?: 'N/A'}"
                     
                     // Validate branch pattern
                     if (sourceBranch && !sourceBranch.startsWith('workshop-jenkins-ci-')) {
@@ -46,20 +47,14 @@ pipeline {
                         error("This pipeline only processes PRs targeting 'workshop-jenkins-ci' branch. Target branch is: ${targetBranch}")
                     }
                     
-                    // Checkout the PR branch
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: "origin/${sourceBranch ?: 'HEAD'}"]],
-                        extensions: [
-                            [$class: 'PreBuildMerge', options: [mergeRemote: 'origin', mergeTarget: targetBranch]],
-                            [$class: 'CleanBeforeCheckout']
-                        ],
-                        userRemoteConfigs: scm.userRemoteConfigs
-                    ])
+                    // Jenkins Multibranch Pipeline already checked out the PR merge commit
+                    // No need to checkout again - just verify we have the code
+                    sh 'git log -1 --oneline'
                     
                     // Store PR info for later use
                     env.PR_NUMBER = prNumber ?: ''
                     env.SOURCE_BRANCH = sourceBranch ?: ''
+                    env.TARGET_BRANCH = targetBranch
                 }
             }
         }
