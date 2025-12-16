@@ -1,251 +1,154 @@
-# Jenkins Branch Strategy and Publishing Rules
+# Jenkins Branch Strategy
 
-This guide explains how the Jenkins pipeline handles different branches and when publishing occurs.
+This guide explains how the Jenkins pipelines handle different branches and when processing occurs.
 
-## Publishing Rules
+## Pipeline Behavior
 
-### When Publishing Happens
+### Main CI Pipeline (Jenkinsfile.ci)
 
-Publishing (subgraph publish and supergraph compose) **only occurs** when:
+- **Target Branch**: `workshop-jenkins-ci`
+- **Behavior**: 
+  - Processes all commits pushed to this branch
+  - Detects changed subgraphs automatically
+  - Runs checks and publishes changed subgraphs
+  - Includes mock deployment stage
 
-1. ✅ A **merge commit** is detected
-2. ✅ The merge is **to the publish branch** (default: `workshop-jenkins-ci`)
+### Pull Request Pipeline (Jenkinsfile.pr)
 
-### When Publishing is Skipped
+- **Target Branch**: `workshop-jenkins-ci`
+- **Behavior**:
+  - Processes pull requests targeting `workshop-jenkins-ci`
+  - Detects changed subgraphs in the PR
+  - Runs checks only (no publishing)
+  - Updates GitHub status checks
 
-Publishing is **skipped** when:
+### Changed Subgraph Detection
 
-- ❌ Regular commits (non-merge commits)
-- ❌ Commits on other branches
-- ❌ Merge commits to branches other than the publish branch
+The pipeline automatically detects which subgraphs have changed by:
 
-### When Checks Always Run
+1. **For CI Pipeline**: Comparing current commit with previous commit
+2. **For PR Pipeline**: Comparing PR branch with target branch (`workshop-jenkins-ci`)
+3. Analyzing changed files in the `subgraphs/` directory
+4. Extracting unique subgraph names from file paths
+5. Processing only the changed subgraphs
 
-**Subgraph checks always run** on:
-- ✅ All commits (merge or regular)
-- ✅ All branches
-- ✅ Pull requests
+**Example**: If you modify `subgraphs/checkout/schema.graphql` and `subgraphs/inventory/src/index.ts`, the pipeline will process both `checkout` and `inventory` subgraphs.
 
-This ensures schema validation happens on every change, but publishing only occurs on merges to the target branch.
+## When Processing Occurs
 
-## Configuration
+### CI Pipeline (Jenkinsfile.ci)
 
-### Publish Branch
+- ✅ **All commits** to `workshop-jenkins-ci` branch
+- ✅ **All changed subgraphs** are checked and published
+- ✅ Triggered by SCM polling (every 2 minutes) or webhooks
 
-The publish branch is configurable via the `PUBLISH_BRANCH` environment variable:
+### PR Pipeline (Jenkinsfile.pr)
 
-**Default**: `workshop-jenkins-ci`
+- ✅ **Pull requests** targeting `workshop-jenkins-ci`
+- ✅ **Only changed subgraphs** are checked (no publishing)
+- ✅ Triggered automatically when PR is created/updated
 
-**To change it**:
+### Parameterized Jobs
 
-1. In Jenkins: **Manage Jenkins** → **Configure System** → **Environment variables**
-2. Add:
-   - **Name**: `PUBLISH_BRANCH`
-   - **Value**: `your-branch-name`
-
-Or set in job configuration.
-
-## How It Works
-
-### Detection Logic
-
-The pipeline detects:
-1. **Current branch**: Using `git rev-parse --abbrev-ref HEAD` (normalized to remove `origin/` prefix)
-2. **Merge commit**: Checking multiple indicators:
-   - Multiple parent commits (merge commits have 2+ parents)
-   - Commit message contains "merge" or "Merge"
-   - MERGE_HEAD file exists (for in-progress merges)
-3. **Publish decision**: `IS_MERGE == true && CURRENT_BRANCH == PUBLISH_BRANCH`
-
-### Pipeline Flow
-
-```
-┌─────────────────┐
-│   Checkout      │  Get code
-└────────┬────────┘
-         │
-┌────────▼──────────────┐
-│ Validate Environment  │  Detect branch and merge status
-└────────┬──────────────┘
-         │
-┌────────▼──────────────┐
-│  Subgraph Check       │  ✅ Always runs
-│  (All subgraphs)      │
-└────────┬──────────────┘
-         │
-    ┌────┴────┐
-    │         │
-┌───▼───┐ ┌──▼──────────┐
-│Publish│ │ Skip Publish│
-│       │ │             │
-│✅ Only│ │⏭️  When not  │
-│on merge│ │  merge to   │
-│to target│ │  target    │
-│branch  │ │  branch    │
-└───┬───┘ └──────────────┘
-    │
-┌───▼──────────────┐
-│Supergraph Compose│  ✅ Only when publishing
-└──────────────────┘
-```
+- **Jenkinsfile.check**: Manual trigger, checks single subgraph
+- **Jenkinsfile.publish**: Manual trigger, publishes single subgraph
+- **Jenkinsfile.compose**: Manual trigger, composes supergraph
 
 ## Examples
 
-### Example 1: Merge to Publish Branch
+### Example 1: Commit to CI Branch
 
 ```bash
-# On feature branch
-git checkout feature/new-feature
-git commit -m "Add new feature"
-git push
-
-# Merge to workshop-jenkins-ci
+# On workshop-jenkins-ci branch
 git checkout workshop-jenkins-ci
-git merge feature/new-feature
+git commit -m "Update checkout schema"
 git push
 ```
 
 **Result**: 
-- ✅ Checks run
-- ✅ Publishing occurs
-- ✅ Supergraph composed
+- ✅ Changed subgraphs detected: `checkout`
+- ✅ Check runs
+- ✅ Publish runs
 
-### Example 2: Regular Commit to Publish Branch
+### Example 2: Pull Request
 
 ```bash
-# On publish branch
+# Create feature branch
+git checkout -b feature/new-feature
+git commit -m "Update inventory schema"
+git push
+
+# Create PR targeting workshop-jenkins-ci
+```
+
+**Result**:
+- ✅ Changed subgraphs detected: `inventory`
+- ✅ Check runs
+- ❌ Publish skipped (PR pipeline doesn't publish)
+
+### Example 3: Multiple Subgraphs Changed
+
+```bash
+# Modify multiple subgraphs
 git checkout workshop-jenkins-ci
-git commit -m "Update docs"
+# Edit subgraphs/checkout/schema.graphql
+# Edit subgraphs/inventory/src/index.ts
+git commit -m "Update multiple subgraphs"
 git push
 ```
 
 **Result**:
-- ✅ Checks run
-- ❌ Publishing skipped (not a merge)
-- ❌ Supergraph compose skipped
-
-### Example 3: Merge to Different Branch
-
-```bash
-# Merge to main branch
-git checkout main
-git merge feature/new-feature
-git push
-```
-
-**Result**:
-- ✅ Checks run
-- ❌ Publishing skipped (not merge to publish branch)
-- ❌ Supergraph compose skipped
-
-### Example 4: Commit on Feature Branch
-
-```bash
-# On feature branch
-git checkout feature/new-feature
-git commit -m "WIP"
-git push
-```
-
-**Result**:
-- ✅ Checks run
-- ❌ Publishing skipped (not on publish branch)
-- ❌ Supergraph compose skipped
+- ✅ Changed subgraphs detected: `checkout, inventory`
+- ✅ Both checked in parallel
+- ✅ Both published
 
 ## Build Logs
 
-### When Publishing Occurs
+### When Subgraphs Are Detected
 
 ```
-Current Branch: workshop-jenkins-ci
-Is Merge Commit: true
-Should Publish: true
-...
-✅ Merge detected to workshop-jenkins-ci branch - Publishing subgraphs...
+Detecting changed subgraphs...
+Previous commit: abc123
+Current commit: def456
+Changed files in subgraphs:
+subgraphs/checkout/schema.graphql
+subgraphs/inventory/src/index.ts
+Changed subgraphs detected: checkout, inventory
 ```
 
-### When Publishing is Skipped
+### When No Changes Detected
 
 ```
-Current Branch: feature/new-feature
-Is Merge Commit: false
-Should Publish: false
-...
-⏭️  Skipping publish (not a merge to workshop-jenkins-ci branch)
-   Current branch: feature/new-feature
-   Is merge: false
-   Publish branch: workshop-jenkins-ci
+Detecting changed subgraphs...
+No changes detected in subgraphs directory
+⏭️  No subgraph changes detected. Skipping check and publish stages.
 ```
-
-## Customizing the Publish Branch
-
-### Option 1: Environment Variable
-
-Set in Jenkins global configuration:
-
-```bash
-PUBLISH_BRANCH=main
-```
-
-### Option 2: Job Configuration
-
-In Jenkins job configuration, add to environment variables:
-
-```groovy
-environment {
-    PUBLISH_BRANCH = 'main'
-}
-```
-
-### Option 3: Build Parameter
-
-Modify Jenkinsfile to accept parameter:
-
-```groovy
-parameters {
-    string(name: 'PUBLISH_BRANCH', defaultValue: 'workshop-jenkins-ci', description: 'Branch to publish on merge')
-}
-```
-
-## Troubleshooting
-
-### Publishing Not Happening
-
-**Check**:
-1. Is this a merge commit? Look for "Is Merge Commit: true" in logs
-2. Is the current branch the publish branch? Check "Current Branch" in logs
-3. Is `PUBLISH_BRANCH` set correctly?
-
-### Publishing Happening When It Shouldn't
-
-**Check**:
-1. Verify `PUBLISH_BRANCH` is set to the correct branch
-2. Check if merge detection is working correctly
-3. Review build logs for branch detection
-
-### Merge Detection Not Working
-
-The pipeline uses multiple methods to detect merges:
-- **Parent count**: Checks if commit has multiple parents
-- **Commit message**: Looks for "merge" or "Merge" in commit message
-- **MERGE_HEAD**: Checks for merge state file
-
-This works for merge commits created by:
-- `git merge` (creates merge commit with multiple parents)
-- GitHub/GitLab merge commits (standard merge)
-- Pull request merges (when not squashed)
-
-**Note**: Squash merges and rebases create single-parent commits and won't be detected as merges. If you use squash merges, you may need to adjust the detection logic.
-
-If merge detection fails, check:
-- Git history shows merge commit (not squash/rebase): `git log --oneline --graph`
-- Commit has multiple parents: `git cat-file -p HEAD | grep "^parent"`
-- Commit message contains merge indicator
 
 ## Best Practices
 
-1. **Use feature branches**: Develop on feature branches, merge to publish branch
-2. **Keep publish branch clean**: Only merge tested code to publish branch
-3. **Monitor checks**: Even if publishing is skipped, checks validate schemas
-4. **Review before merge**: Ensure checks pass before merging to publish branch
+1. **Use feature branches**: Develop on feature branches, merge to `workshop-jenkins-ci`
+2. **Keep CI branch clean**: Only merge tested code to `workshop-jenkins-ci`
+3. **Monitor checks**: PR checks validate schemas before merge
+4. **Review before merge**: Ensure PR checks pass before merging to CI branch
 
+## Configuration
+
+### Changing the Target Branch
+
+To change the target branch from `workshop-jenkins-ci`:
+
+1. **Update Jenkinsfile.ci**:
+   ```groovy
+   branches: [[name: 'origin/your-branch-name']]
+   ```
+
+2. **Update Jenkinsfile.pr**:
+   ```groovy
+   def targetBranch = env.CHANGE_TARGET ?: 'your-branch-name'
+   ```
+
+3. **Update environment variable**:
+   ```groovy
+   ENVIRONMENT = "your-branch-name"
+   APOLLO_GRAPH_REF = "${env.APOLLO_GRAPH_ID}@your-branch-name"
+   ```

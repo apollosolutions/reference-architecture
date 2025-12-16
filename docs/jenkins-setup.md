@@ -4,30 +4,12 @@ This guide explains how to set up Jenkins for automated CI/CD with Apollo Rover 
 
 ## Overview
 
-Jenkins will automatically run the following Rover commands when code changes are detected:
+Jenkins will automatically:
 
-1. **Rover Subgraph Check** - Validates each subgraph schema against Apollo GraphOS
-2. **Rover Subgraph Publish** - Publishes each subgraph schema to Apollo GraphOS
-3. **Rover Supergraph Compose** - Composes all subgraphs into a supergraph
-
-## When Jenkins Runs
-
-Jenkins will trigger builds on:
-
-- **Local Commits**: Automatically via git hooks, or manually via CLI (see [Local Triggers Guide](./jenkins-local-triggers.md))
-- **Remote Git Commits**: When code is pushed to any branch (if webhook/polling configured)
-- **Pull Requests**: When a PR is created or updated (if GitHub integration is configured)
-- **Manual**: Click "Build Now" in Jenkins UI
-
-## Publishing Rules
-
-**Important**: Publishing (subgraph publish and supergraph compose) **only occurs** when:
-- ✅ A merge commit is detected
-- ✅ The merge is to the publish branch (default: `workshop-jenkins-ci`)
-
-**Subgraph checks always run** on all commits and branches.
-
-See [Branch Strategy Guide](./jenkins-branch-strategy.md) for detailed information.
+1. **Detect changed subgraphs** by analyzing git diffs
+2. **Validate** changed subgraph schemas using `rover subgraph check`
+3. **Publish** changed subgraph schemas to Apollo GraphOS using `rover subgraph publish`
+4. **Compose** supergraph (via separate compose pipeline)
 
 ## Prerequisites
 
@@ -35,128 +17,62 @@ Before setting up Jenkins, ensure you have:
 
 1. **Apollo GraphOS Account** with:
    - Personal API Key (for initial setup)
-   - Graph ID and variant configured
+   - Graph ID configured
    - All subgraphs registered in GraphOS
 
-2. **Environment Variables** configured:
+2. **Environment Variables** to configure:
    - `APOLLO_KEY`: Your Apollo GraphOS API key
-   - `APOLLO_GRAPH_REF`: Graph reference in format `graph-id@variant` (e.g., `my-graph@dev`)
-   - `ENVIRONMENT`: Environment name (e.g., `dev`, `prod`)
+   - `APOLLO_GRAPH_ID`: Your graph ID
+   - `ENVIRONMENT`: Environment name (defaults to `workshop-jenkins-ci`)
 
 3. **Rover CLI** installed on the Jenkins agent/node
    
-   > **Note**: The Jenkinsfile includes automatic Rover installation, but pre-installing it is recommended for better performance. See [Installing Rover CLI on Jenkins](#installing-rover-cli-on-jenkins) below for detailed instructions.
+   > **Note**: The Jenkinsfile includes automatic Rover installation, but pre-installing it is recommended for better performance.
 
-4. **Git** configured (if using GitHub integration)
+## Step 1: Install Jenkins
 
-## What Gets Checked
+### macOS (using Homebrew)
 
-### Subgraph Check (`rover subgraph check`)
+```bash
+brew install jenkins-lts
+brew services start jenkins-lts
+```
 
-For each subgraph, Jenkins will:
-- Validate the schema syntax
-- Check for breaking changes against the published schema in GraphOS
-- Verify federation directives are correct
-- Ensure schema compatibility with other subgraphs
+Or download from [Jenkins website](https://www.jenkins.io/download/)
 
-**Subgraphs checked:**
-- By default: `checkout` only
-- Configurable via `SUBGRAPHS` environment variable (comma-separated)
-- Available: `checkout`, `discovery`, `inventory`, `orders`, `products`, `reviews`, `shipping`, `users`
+Jenkins will start on `http://localhost:8080`
 
-See [Subgraph Configuration Guide](./jenkins-subgraph-configuration.md) for details.
+### Initial Setup
 
-### Subgraph Publish (`rover subgraph publish`)
-
-After successful checks, Jenkins will:
-- Publish each subgraph schema to Apollo GraphOS
-- Update the schema in the specified variant
-- Make the schema available for composition
-
-### Supergraph Compose (`rover supergraph compose`)
-
-After all subgraphs are published, Jenkins will:
-- Compose all subgraphs into a single supergraph schema
-- Validate the composed schema
-- Generate the supergraph schema file
-
-## Workflow
-
-### On Every Commit/PR
-
-1. **Checkout code** from repository
-2. **Install dependencies** (if needed)
-3. **For each subgraph:**
-   - Run `rover subgraph check` with the subgraph schema
-   - If check passes, run `rover subgraph publish`
-4. **After all subgraphs published:**
-   - Run `rover supergraph compose` to compose the supergraph
-5. **Report results** (success/failure)
-
-### Failure Handling
-
-- If any subgraph check fails, the build fails
-- If any subgraph publish fails, the build fails
-- If supergraph compose fails, the build fails
-- Build logs will show which subgraph/step failed
-
-## Manual Triggering
-
-You can manually trigger Jenkins builds:
-
-1. **Via Jenkins UI:**
-   - Navigate to your Jenkins job
-   - Click "Build Now"
-
-2. **Via Webhook (if configured):**
-   - Make a commit to your repository
-   - Push to GitHub (if webhook is set up)
-
-3. **Via API:**
+1. Open `http://localhost:8080` in your browser
+2. Get the initial admin password:
    ```bash
-   curl -X POST http://localhost:8080/job/reference-architecture/build \
-     --user username:api-token
+   cat ~/.jenkins/secrets/initialAdminPassword
    ```
+3. Paste the password and click "Continue"
+4. Install suggested plugins
+5. Create an admin user (or skip to use admin account)
+6. Click "Save and Finish"
 
-## Configuration Files
+## Step 2: Install Required Plugins
 
-The Jenkins setup uses:
+1. Go to **Manage Jenkins** → **Manage Plugins**
+2. Click on **Available** tab
+3. Search and install:
+   - **Pipeline** (usually pre-installed)
+   - **Git** (for Git integration)
+   - **GitHub** (optional, for GitHub webhooks)
+   - **GitHub Custom Notification Context SCM Behaviour** (for customizing GitHub status check names)
+   - **Credentials Binding** (for secure credential management)
+   - **Timestamper** (for build logs with timestamps)
 
-- **Jenkinsfile**: Declarative pipeline definition (in repository root)
-- **scripts/jenkins/rover-check.sh**: Helper script for subgraph checks
-- **scripts/jenkins/rover-publish.sh**: Helper script for subgraph publishing
-- **scripts/jenkins/rover-compose.sh**: Helper script for supergraph composition
+4. Click **Install without restart** or **Download now and install after restart**
 
-## Environment-Specific Behavior
+## Step 3: Install Rover CLI
 
-The Jenkins pipeline respects the `ENVIRONMENT` variable:
+The Jenkinsfile automatically installs Rover if it's not found, but **pre-installing is recommended** for better performance.
 
-- **dev**: Uses `@dev` variant in GraphOS
-- **prod**: Uses `@prod` variant in GraphOS
-- **Custom**: Uses `@custom` variant (if configured)
-
-Each environment publishes to its own variant, allowing parallel development and testing.
-
-## Local Commit Triggers
-
-Want Jenkins to trigger on **local commits** instead of remote pushes? See the [Local Triggers Guide](./jenkins-local-triggers.md) for:
-
-- Git post-commit hooks (automatic triggers)
-- Jenkins CLI scripts (manual triggers)
-- Local repository polling
-
-## Next Steps
-
-1. Follow the [Manual Jenkins Setup Instructions](./jenkins-manual-setup.md) to install and configure Jenkins
-2. Configure the Jenkinsfile with your Apollo GraphOS credentials
-3. Set up local triggers (see [Local Triggers Guide](./jenkins-local-triggers.md)) or webhooks for automatic triggering
-4. Test the pipeline with a manual build
-
-## Installing Rover CLI on Jenkins
-
-The Jenkinsfile automatically installs Rover if it's not found, but **pre-installing Rover is recommended** for better build performance. Here are detailed instructions for different Jenkins setups:
-
-### Option 1: Local Jenkins (Same Machine)
+### Option 1: Install on Jenkins Server (Local Installation)
 
 If Jenkins is running on your local machine:
 
@@ -176,10 +92,10 @@ source ~/.zshrc  # or source ~/.bashrc
 rover --version
 ```
 
-**For Jenkins user specifically** (if Jenkins runs as a different user):
+**If Jenkins runs as a different user** (e.g., `jenkins` user):
 
 ```bash
-# Switch to Jenkins user (if applicable)
+# Switch to Jenkins user
 sudo su - jenkins  # or the user running Jenkins
 
 # Install Rover
@@ -256,54 +172,6 @@ docker build -t jenkins-agent-with-rover .
 # }
 ```
 
-### Option 4: System-wide Installation (Linux)
-
-For system-wide installation on Linux:
-
-```bash
-# Download and install
-curl -sSL https://rover.apollo.dev/nix/latest | sh
-
-# Create symlink for system-wide access
-sudo ln -s $HOME/.rover/bin/rover /usr/local/bin/rover
-
-# Verify
-rover --version
-```
-
-### Option 5: Using Jenkins Tool Installer (Advanced)
-
-You can configure Jenkins to automatically install Rover using a tool installer:
-
-1. Go to **Manage Jenkins** → **Global Tool Configuration**
-2. Scroll to **Rover** (if plugin exists) or use **Shell Script** tool
-3. Configure automatic installation
-
-### Verification
-
-After installation, verify Rover is accessible:
-
-1. **In Jenkins Script Console:**
-   - Go to **Manage Jenkins** → **Script Console**
-   - Run:
-     ```groovy
-     def proc = "rover --version".execute()
-     proc.waitFor()
-     println proc.text
-     ```
-   - Or use the complete verification script (see [Script Console Guide](./jenkins-script-console-rover.md))
-
-2. **In Build Logs:**
-   - Run a test build
-   - Check for "Rover CLI not found" message
-   - If Rover is installed, you'll see the version number
-
-3. **From Command Line (on Jenkins server):**
-   ```bash
-   # As Jenkins user
-   rover --version
-   ```
-
 ### Automatic Installation (Fallback)
 
 **Note**: The Jenkinsfile includes automatic installation as a fallback:
@@ -311,7 +179,7 @@ After installation, verify Rover is accessible:
 ```groovy
 if ! command -v rover &> /dev/null; then
     echo "Rover CLI not found. Installing..."
-    curl -sSL https://rover.apollo.dev/nix/latest | sh
+    curl -sSL https://rover.apollo.dev/nix/latest | sh -s -- --force
 fi
 ```
 
@@ -320,72 +188,132 @@ This will install Rover during the build if it's not found, but:
 - ⚠️ May fail if network access is restricted
 - ✅ Works as a fallback if pre-installation isn't possible
 
-### Troubleshooting Installation
+## Step 4: Configure Credentials
 
-**Rover not found in PATH:**
-- Check if `~/.rover/bin` is in PATH
-- Verify installation location: `ls -la ~/.rover/bin/rover`
-- Add to PATH explicitly in Jenkins environment variables
+### Add Apollo GraphOS API Key
 
-**Permission denied:**
-- Ensure Jenkins user has execute permissions: `chmod +x ~/.rover/bin/rover`
-- Check file ownership: `ls -la ~/.rover/bin/rover`
-
-**Network issues:**
-- Verify agent can reach `https://rover.apollo.dev`
-- Check firewall/proxy settings
-- Consider downloading Rover binary manually
-
-## Troubleshooting
-
-For detailed troubleshooting, see the [Troubleshooting Guide](./jenkins-troubleshooting.md).
-
-### Common Issues
-
-### Credential Not Found (ERROR: apollo-key)
-
-**Problem**: Build fails immediately with `ERROR: apollo-key`
-
-**Solution**: 
 1. Go to **Manage Jenkins** → **Manage Credentials**
-2. Add credential with ID: `apollo-key`
-3. Or set `APOLLO_KEY` as environment variable
+2. Click on **(global)** → **Add Credentials**
+3. Fill in:
+   - **Kind**: Secret text
+   - **Secret**: Your Apollo GraphOS API key
+   - **ID**: `apollo-key` (must match exactly)
+   - **Description**: `Apollo GraphOS API Key`
+4. Click **OK**
 
-See [Troubleshooting Guide](./jenkins-troubleshooting.md#credential-errors) for details.
+### Add Environment Variables
 
-### Rover Command Not Found
+1. Go to **Manage Jenkins** → **Configure System**
+2. Scroll to **Global properties**
+3. Check **Environment variables**
+4. Add:
+   - `APOLLO_GRAPH_ID`: Your Apollo GraphOS graph ID
+   - `ENVIRONMENT`: `workshop-jenkins-ci` (or your environment name)
+5. Click **Save**
 
-If you see "Rover CLI not found" in build logs:
+## Step 5: Create Jenkins Jobs
 
-1. **Check if Rover is installed:**
-   ```bash
-   # On Jenkins server/agent
-   which rover
-   rover --version
-   ```
+### Main CI Pipeline (Jenkinsfile.ci)
 
-2. **If not installed, install it** (see [Installing Rover CLI on Jenkins](#installing-rover-cli-on-jenkins) above)
+1. Go to **New Item**
+2. Enter job name: `reference-architecture-ci`
+3. Select **Pipeline**
+4. Click **OK**
+5. In **Pipeline** section:
+   - **Definition**: Pipeline script from SCM
+   - **SCM**: Git
+   - **Repository URL**: Your repository URL (or local path)
+   - **Branch**: `*/workshop-jenkins-ci`
+   - **Script Path**: `Jenkinsfile.ci`
+6. Click **Save**
 
-3. **If installed but not found:**
-   - Check PATH environment variable
-   - Add Rover to PATH in Jenkins node configuration
-   - Or use full path: `/path/to/.rover/bin/rover`
+### Pull Request Pipeline (Jenkinsfile.pr)
 
-### Authentication Errors
+1. Go to **New Item**
+2. Enter job name: `reference-architecture-pr`
+3. Select **Multibranch Pipeline** (recommended) or **Pipeline**
+4. Click **OK**
+5. Configure branch source:
+   - **Branch Sources**: Add GitHub/Git source
+   - **Repository**: Your repository
+   - **Behaviors**: Add "Discover pull requests"
+   - **Script Path**: `Jenkinsfile.pr`
+6. Click **Save**
 
-Verify your `APOLLO_KEY` is set correctly in Jenkins credentials:
-- Check Jenkins → Manage Jenkins → Credentials
-- Verify the key has proper permissions in Apollo GraphOS
+### Parameterized Jobs (Optional)
 
-### Schema Check Failures
+For manual testing, create jobs from:
+- **Jenkinsfile.check**: Single subgraph check
+- **Jenkinsfile.publish**: Single subgraph publish
+- **Jenkinsfile.compose**: Supergraph composition
 
-- Review the build logs for specific schema errors
-- Check Apollo GraphOS Studio for schema validation details
-- Ensure all federation directives are correct
+## Step 6: Configure Build Triggers
 
-### Composition Failures
+### SCM Polling (for CI Pipeline)
 
-- Verify all subgraphs are published successfully
-- Check for schema conflicts between subgraphs
-- Review composition errors in Apollo GraphOS Studio
+1. In your Jenkins job, click **Configure**
+2. Scroll to **Build Triggers**
+3. Check **Poll SCM**
+4. Enter schedule: `H/2 * * * *` (every 2 minutes)
+5. Click **Save**
 
+### GitHub Webhooks (Recommended for Production)
+
+1. In your GitHub repository, go to **Settings** → **Webhooks**
+2. Click **Add webhook**
+3. Configure:
+   - **Payload URL**: `http://your-jenkins-url:8080/github-webhook/`
+   - **Content type**: `application/json`
+   - **Events**: Select **Just the push event** or **Let me select individual events**
+     - Check: **Pushes**
+     - Check: **Pull requests**
+4. Click **Add webhook**
+
+## Step 7: Test the Pipeline
+
+1. Go to your Jenkins job: `reference-architecture-ci`
+2. Click **Build Now**
+3. Click on the build number to view progress
+4. Click **Console Output** to see logs
+
+### Expected Output
+
+You should see:
+- ✅ Checkout stage completes
+- ✅ Changed subgraphs detected
+- ✅ Environment validation passes
+- ✅ Changed subgraph checks pass (in parallel)
+- ✅ Changed subgraph publishes succeed
+- ✅ Build succeeds
+
+## How Changed Subgraph Detection Works
+
+The pipeline automatically detects which subgraphs have changed by:
+
+1. Comparing the current commit with the previous commit (or target branch for PRs)
+2. Analyzing changed files in the `subgraphs/` directory
+3. Extracting unique subgraph names from file paths
+4. Processing only the changed subgraphs
+
+**Example**: If you modify `subgraphs/checkout/schema.graphql` and `subgraphs/inventory/src/index.ts`, the pipeline will process both `checkout` and `inventory` subgraphs.
+
+## Environment-Specific Behavior
+
+The Jenkins pipeline respects the `ENVIRONMENT` variable:
+
+- **workshop-jenkins-ci**: Default for CI pipeline (uses `@workshop-jenkins-ci` variant)
+- **dev**: Development environment (uses `@dev` variant)
+- **prod**: Production environment (uses `@prod` variant)
+
+Each environment publishes to its own variant, allowing parallel development and testing.
+
+## Next Steps
+
+- Set up webhooks for automatic builds
+- Configure notifications (email, Slack)
+- Test with a real commit
+- Review build logs to verify everything works
+
+For more information, see:
+- [Quick Reference Guide](./jenkins-quick-reference.md)
+- [Local Triggers Guide](./jenkins-local-triggers.md) (for local commit triggers)

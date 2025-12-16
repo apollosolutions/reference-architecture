@@ -6,112 +6,81 @@ This document provides an overview of the Jenkins CI/CD setup for the Apollo Fed
 
 A complete CI/CD pipeline that automatically:
 
-1. ✅ **Validates** all subgraph schemas using `rover subgraph check`
-2. ✅ **Publishes** all subgraph schemas to Apollo GraphOS using `rover subgraph publish`
-3. ✅ **Composes** the supergraph using `rover supergraph compose`
+1. ✅ **Detects changed subgraphs** by analyzing git diffs
+2. ✅ **Validates** changed subgraph schemas using `rover subgraph check`
+3. ✅ **Publishes** changed subgraph schemas to Apollo GraphOS using `rover subgraph publish`
+4. ✅ **Composes** the supergraph using `rover supergraph compose` (separate pipeline)
 
-## Documentation Structure
+## Pipeline Structure
 
-- **[jenkins-setup.md](./jenkins-setup.md)**: Comprehensive guide explaining what needs to be done and when
-- **[jenkins-manual-setup.md](./jenkins-manual-setup.md)**: Step-by-step instructions for setting up Jenkins
-- **[jenkins-local-triggers.md](./jenkins-local-triggers.md)**: Guide for triggering builds on local commits
-- **[jenkins-subgraph-configuration.md](./jenkins-subgraph-configuration.md)**: Configure which subgraphs to process
-- **[jenkins-quick-reference.md](./jenkins-quick-reference.md)**: Quick reference for common tasks
+The Jenkins setup consists of multiple pipeline files:
 
-## Files Created
+- **`Jenkinsfile.ci`**: Main CI pipeline for the `workshop-jenkins-ci` branch
+  - Detects changed subgraphs automatically
+  - Runs checks and publishes only changed subgraphs
+  - Includes mock deployment stage
+  
+- **`Jenkinsfile.pr`**: Pull request pipeline
+  - Validates changed subgraphs in PRs
+  - Only runs checks (no publishing)
+  - Updates GitHub status checks
 
-### Configuration Files
+- **`Jenkinsfile.check`**: Parameterized job for checking a single subgraph
+  - Manual trigger with subgraph selection
+  - Useful for testing individual subgraphs
 
-- **`Jenkinsfile`**: Declarative pipeline definition (repository root)
-- **`scripts/jenkins/supergraph-config.yaml`**: Optional supergraph composition configuration
+- **`Jenkinsfile.publish`**: Parameterized job for publishing a single subgraph
+  - Manual trigger with subgraph selection
+  - Useful for manual publishing
 
-### Helper Scripts
+- **`Jenkinsfile.compose`**: Supergraph composition pipeline
+  - Composes supergraph from all published subgraphs
+  - Generates `supergraph-{environment}.graphql` artifact
 
-- **`scripts/jenkins/rover-check.sh`**: Check a single subgraph
-- **`scripts/jenkins/rover-publish.sh`**: Publish a single subgraph
-- **`scripts/jenkins/rover-compose.sh`**: Compose the supergraph
-- **`scripts/jenkins/run-all.sh`**: Run the complete pipeline locally
-- **`scripts/jenkins/trigger-build.sh`**: Manually trigger Jenkins build from CLI
-- **`scripts/jenkins/git-hooks/post-commit`**: Git hook to auto-trigger builds on local commits
+## How It Works
 
-## Quick Start
+### Changed Subgraph Detection
 
-### Option 1: Run Locally (No Jenkins Required)
+The pipeline automatically detects which subgraphs have changed by:
 
-```bash
-# Set environment variables
-export APOLLO_KEY="your-api-key"
-export APOLLO_GRAPH_ID="your-graph-id"
-export ENVIRONMENT="dev"
+1. Comparing current commit with previous commit (or target branch for PRs)
+2. Analyzing changed files in the `subgraphs/` directory
+3. Extracting unique subgraph names from file paths
+4. Processing only the changed subgraphs
 
-# Run the complete pipeline
-./scripts/jenkins/run-all.sh dev
-```
+**Example**: If you modify `subgraphs/checkout/schema.graphql` and `subgraphs/inventory/src/index.ts`, the pipeline will process both `checkout` and `inventory` subgraphs.
 
-### Option 2: Use Jenkins
-
-1. Follow [jenkins-manual-setup.md](./jenkins-manual-setup.md) to install and configure Jenkins
-2. Create a Jenkins job using the `Jenkinsfile`
-3. Configure credentials and environment variables
-4. Trigger builds manually or via webhooks
-
-## When Jenkins Runs
-
-### Automatic Triggers
-
-- **Local Commits**: Via git post-commit hook (see [Local Triggers Guide](./jenkins-local-triggers.md))
-- **Remote Git Commits**: When code is pushed to any branch (if webhook/polling configured)
-- **Pull Requests**: When a PR is created or updated (if GitHub integration configured)
-- **Webhooks**: When configured with GitHub/GitLab
-- **SCM Polling**: Periodic checks for repository changes
-
-### Manual Triggers
-
-- **Jenkins UI**: Click "Build Now" in the job
-- **Command Line**: `./scripts/jenkins/trigger-build.sh`
-- **API**: POST request to Jenkins build endpoint
-
-## Pipeline Flow
+### Pipeline Flow
 
 ```
 ┌─────────────┐
 │   Checkout  │  Get code from repository
 └──────┬──────┘
        │
-┌──────▼──────────┐
-│ Validate Env    │  Check APOLLO_KEY, APOLLO_GRAPH_ID, Rover CLI
-└──────┬──────────┘
+┌──────▼──────────────────┐
+│ Detect Changed Subgraphs│  Analyze git diff
+└──────┬──────────────────┘
        │
-┌──────▼─────────────────────┐
-│ Subgraph Check (Parallel)   │  Validate all 8 subgraph schemas
-│  ✓ checkout                 │
-│  ✓ discovery                │
-│  ✓ inventory                │
-│  ✓ orders                   │
-│  ✓ products                 │
-│  ✓ reviews                  │
-│  ✓ shipping                 │
-│  ✓ users                    │
-└──────┬───────────────────────┘
+┌──────▼──────────────────┐
+│ Validate Environment    │  Check APOLLO_KEY, APOLLO_GRAPH_ID, Rover CLI
+└──────┬──────────────────┘
        │
-┌──────▼─────────────────────┐
-│ Subgraph Publish (Parallel) │  Publish all 8 subgraphs to GraphOS
-│  ✓ checkout                 │
-│  ✓ discovery                │
-│  ✓ inventory                │
-│  ✓ orders                   │
-│  ✓ products                 │
-│  ✓ reviews                  │
-│  ✓ shipping                 │
-│  ✓ users                    │
-└──────┬───────────────────────┘
+┌──────▼──────────────────┐
+│ Subgraph Check (Parallel)│  Validate changed subgraph schemas
+│  ✓ checkout (if changed) │
+│  ✓ inventory (if changed)│
+│  ...                     │
+└──────┬──────────────────┘
+       │
+┌──────▼──────────────────┐
+│ Subgraph Publish        │  Publish changed subgraphs to GraphOS
+│  ✓ checkout (if changed) │
+│  ✓ inventory (if changed)│
+│  ...                     │
+└──────┬──────────────────┘
        │
 ┌──────▼──────────────┐
-│ Supergraph Compose  │  Compose all subgraphs into supergraph
-└──────┬──────────────┘
-       │
-┌──────▼──────────────┐
-│   ✅ Success        │  Archive supergraph.graphql
+│   ✅ Success        │
 └─────────────────────┘
 ```
 
@@ -122,20 +91,20 @@ Before setting up Jenkins, ensure you have:
 1. **Apollo GraphOS Account**
    - Personal API Key
    - Graph created (or use existing)
-   - Graph ID and variant configured
+   - Graph ID configured
 
 2. **Environment Variables**
-   - `APOLLO_KEY`: Your Apollo GraphOS API key
-   - `APOLLO_GRAPH_ID`: Your graph ID
-   - `ENVIRONMENT`: Environment name (e.g., `dev`, `prod`)
+   - `APOLLO_KEY`: Your Apollo GraphOS API key (configured as Jenkins credential)
+   - `APOLLO_GRAPH_ID`: Your graph ID (set as Jenkins environment variable)
+   - `ENVIRONMENT`: Environment name (defaults to `workshop-jenkins-ci` for CI pipeline)
 
 3. **Rover CLI**
-   - Installed on Jenkins agent/node
-   - Or will be installed automatically by Jenkinsfile
+   - Automatically installed by Jenkinsfile if not found
+   - Pre-installing is recommended for better performance
 
-## Subgraphs Processed
+## Available Subgraphs
 
-The pipeline processes 8 subgraphs in parallel:
+The pipeline can process these 8 subgraphs:
 
 | Subgraph | Schema Location | Routing URL (default) |
 |----------|----------------|---------------------|
@@ -148,40 +117,31 @@ The pipeline processes 8 subgraphs in parallel:
 | shipping | `subgraphs/shipping/schema.graphql` | `http://graphql.shipping.svc.cluster.local:4007` |
 | users | `subgraphs/users/schema.graphql` | `http://graphql.users.svc.cluster.local:4008` |
 
-**Note**: By default, only the `checkout` subgraph is processed. Configure via `SUBGRAPHS` environment variable. See [Subgraph Configuration Guide](./jenkins-subgraph-configuration.md).
+## Local Execution
 
-## Output
+You can run the pipeline locally without Jenkins:
 
-After a successful build:
+```bash
+# Set environment variables
+export APOLLO_KEY="your-api-key"
+export APOLLO_GRAPH_ID="your-graph-id"
 
-- **Supergraph Schema**: `supergraph-{environment}.graphql`
-  - Composed from all published subgraphs
-  - Available as a build artifact in Jenkins
-  - Can be used for router deployment
+# Run the complete pipeline
+./scripts/jenkins/run-all.sh dev
 
-## Integration with Existing Setup
+# Or process specific subgraphs
+SUBGRAPHS="checkout,discovery" ./scripts/jenkins/run-all.sh dev
+```
 
-This Jenkins setup integrates with your existing Minikube/Kubernetes setup:
+## Documentation Structure
 
-- **Subgraph Schemas**: Uses existing `schema.graphql` files in each subgraph
-- **GraphOS Integration**: Publishes to the same GraphOS graph/variant used by the operator
-- **Environment Support**: Respects the `ENVIRONMENT` variable (dev/prod)
+- **[jenkins-setup.md](./jenkins-setup.md)**: Complete setup guide for Jenkins
+- **[jenkins-quick-reference.md](./jenkins-quick-reference.md)**: Quick reference for common tasks
+- **[jenkins-local-triggers.md](./jenkins-local-triggers.md)**: Guide for triggering builds on local commits
 
 ## Next Steps
 
 1. **Read the Setup Guide**: [jenkins-setup.md](./jenkins-setup.md)
-2. **Follow Manual Setup**: [jenkins-manual-setup.md](./jenkins-manual-setup.md)
-3. **Set Up Local Triggers**: [jenkins-local-triggers.md](./jenkins-local-triggers.md) (for local commit triggers)
-4. **Test Locally**: Run `./scripts/jenkins/run-all.sh dev`
-5. **Configure Jenkins**: Set up Jenkins job and credentials
-6. **Set Up Triggers**: Configure local git hooks or webhooks for automatic builds
-
-## Support
-
-For issues or questions:
-
-- Check [jenkins-quick-reference.md](./jenkins-quick-reference.md) for common tasks
-- Review build logs in Jenkins for specific errors
-- Check Apollo GraphOS Studio for schema validation details
-- Review the main [setup.md](./setup.md) for environment configuration
-
+2. **Test Locally**: Run `./scripts/jenkins/run-all.sh dev`
+3. **Configure Jenkins**: Set up Jenkins job and credentials
+4. **Set Up Triggers**: Configure SCM polling or webhooks for automatic builds

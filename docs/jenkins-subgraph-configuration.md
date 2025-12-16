@@ -1,46 +1,43 @@
-# Configuring Subgraphs in Jenkins Pipeline
+# Subgraph Detection and Configuration
 
-This guide explains how to configure which subgraphs are processed in the Jenkins pipeline.
+This guide explains how the Jenkins pipeline detects and processes subgraphs.
 
-## Default Behavior
+## Automatic Changed Subgraph Detection
 
-By default, the pipeline processes only the **checkout** subgraph. This is configured to start small and add more subgraphs as needed.
+The pipeline **automatically detects** which subgraphs have changed by analyzing git diffs. You don't need to manually configure which subgraphs to process.
 
-## Configuring Subgraphs
+### How It Works
 
-### Option 1: Environment Variable (Recommended)
+1. **For CI Pipeline (Jenkinsfile.ci)**:
+   - Compares current commit with previous commit
+   - Analyzes changed files in `subgraphs/` directory
+   - Extracts unique subgraph names from file paths
 
-Set the `SUBGRAPHS` environment variable in Jenkins:
+2. **For PR Pipeline (Jenkinsfile.pr)**:
+   - Compares PR branch with target branch (`workshop-jenkins-ci`)
+   - Analyzes changed files in `subgraphs/` directory
+   - Extracts unique subgraph names from file paths
 
-1. Go to **Manage Jenkins** → **Configure System**
-2. Scroll to **Global properties** → **Environment variables**
-3. Add:
-   - **Name**: `SUBGRAPHS`
-   - **Value**: `checkout` (or comma-separated list like `checkout,discovery,inventory`)
+3. **Processing**:
+   - Only changed subgraphs are checked and published
+   - If no subgraphs changed, stages are skipped
 
-### Option 2: Job-Level Environment Variable
+### Example Detection
 
-1. Go to your Jenkins job: `reference-architecture`
-2. Click **Configure**
-3. Scroll to **Build Environment**
-4. Check **Use secret text(s) or file(s)**
-5. Or add to **Pipeline** → **Environment** section
+If you modify these files:
+- `subgraphs/checkout/schema.graphql`
+- `subgraphs/inventory/src/index.ts`
+- `subgraphs/orders/package.json`
 
-### Option 3: Build Parameter
+The pipeline will detect and process:
+- `checkout`
+- `inventory`
+- `orders`
 
-You can modify the Jenkinsfile to accept a build parameter:
+## Available Subgraphs
 
-```groovy
-parameters {
-    string(name: 'SUBGRAPHS', defaultValue: 'checkout', description: 'Comma-separated list of subgraphs')
-}
-```
+The pipeline can process these 8 subgraphs:
 
-Then use `${params.SUBGRAPHS}` instead of `${env.SUBGRAPHS}`.
-
-## Subgraph Names
-
-Available subgraphs:
 - `checkout`
 - `discovery`
 - `inventory`
@@ -50,98 +47,99 @@ Available subgraphs:
 - `shipping`
 - `users`
 
-## Examples
+## Manual Subgraph Selection (Local Scripts)
+
+When running scripts locally (`scripts/jenkins/run-all.sh`), you can specify which subgraphs to process:
 
 ### Single Subgraph (Default)
-```
-SUBGRAPHS=checkout
+
+```bash
+./scripts/jenkins/run-all.sh dev
+# Processes: checkout (default)
 ```
 
 ### Multiple Subgraphs
-```
-SUBGRAPHS=checkout,discovery,inventory
+
+```bash
+SUBGRAPHS="checkout,discovery,inventory" ./scripts/jenkins/run-all.sh dev
 ```
 
 ### All Subgraphs
-```
-SUBGRAPHS=checkout,discovery,inventory,orders,products,reviews,shipping,users
-```
-
-## Processing Order
-
-Subgraphs are processed **sequentially** (one at a time), not in parallel:
-
-1. **Check Stage**: Each subgraph is checked individually
-   - Checkout → Discovery → Inventory → etc.
-2. **Publish Stage**: Each subgraph is published individually
-   - Checkout → Discovery → Inventory → etc.
-3. **Compose Stage**: Supergraph is composed from all published subgraphs
-
-## Local Script Usage
-
-When running `./scripts/jenkins/run-all.sh` locally:
 
 ```bash
-# Process only checkout (default)
-./scripts/jenkins/run-all.sh dev
-
-# Process multiple subgraphs
-SUBGRAPHS="checkout,discovery" ./scripts/jenkins/run-all.sh dev
-
-# Process all subgraphs
 SUBGRAPHS="checkout,discovery,inventory,orders,products,reviews,shipping,users" ./scripts/jenkins/run-all.sh dev
 ```
 
-## Adding More Subgraphs
+## Parameterized Jobs
 
-To add more subgraphs to your pipeline:
+For manual testing, you can use parameterized jobs:
 
-1. **Update Environment Variable**:
-   ```bash
-   # In Jenkins: Manage Jenkins → Configure System → Environment variables
-   SUBGRAPHS=checkout,discovery,inventory
-   ```
+### Jenkinsfile.check
 
-2. **Or Update Job Configuration**:
-   - Go to job → Configure
-   - Add `SUBGRAPHS` to environment variables
+- **Parameter**: `SUBGRAPH` (dropdown selection)
+- **Parameter**: `ENVIRONMENT` (dropdown: `workshop-jenkins-ci`, `dev`)
+- **Behavior**: Checks a single subgraph
 
-3. **Test with Manual Build**:
-   - Click "Build Now"
-   - Verify only specified subgraphs are processed
+### Jenkinsfile.publish
+
+- **Parameter**: `SUBGRAPH` (dropdown selection)
+- **Parameter**: `ENVIRONMENT` (dropdown: `workshop-jenkins-ci`, `dev`)
+- **Behavior**: Publishes a single subgraph
+
+## Processing Order
+
+### CI Pipeline
+
+Subgraphs are processed **sequentially** (one at a time):
+
+1. **Check Stage**: Each changed subgraph is checked individually
+   - Checkout → Inventory → Orders → etc.
+2. **Publish Stage**: Each changed subgraph is published individually
+   - Checkout → Inventory → Orders → etc.
+
+### PR Pipeline
+
+Subgraphs are processed **in parallel**:
+
+1. **Check Stage**: All changed subgraphs checked in parallel
+   - Checkout ✓ | Inventory ✓ | Orders ✓ (simultaneously)
 
 ## Verification
 
-After configuring, verify in build logs:
+After a build, check the logs to see which subgraphs were detected:
 
 ```
-Processing 1 subgraph(s): checkout
+Detecting changed subgraphs...
+Changed files in subgraphs:
+subgraphs/checkout/schema.graphql
+subgraphs/inventory/src/index.ts
+Changed subgraphs detected: checkout, inventory
 ```
 
-Or for multiple:
+Or when no changes:
 
 ```
-Processing 3 subgraph(s): checkout, discovery, inventory
+Detecting changed subgraphs...
+No changes detected in subgraphs directory
+⏭️  No subgraph changes detected. Skipping check and publish stages.
 ```
 
 ## Troubleshooting
 
-### All Subgraphs Running Instead of Selected Ones
+### All Subgraphs Running Instead of Changed Ones
 
-- Check environment variable is set correctly
-- Verify variable name is exactly `SUBGRAPHS` (case-sensitive)
-- Check if variable is overridden in job configuration
+- This shouldn't happen with automatic detection
+- Check build logs for "Changed subgraphs detected" message
+- Verify git diff is working correctly
 
-### Subgraph Not Found
+### Subgraph Not Detected
 
-- Verify subgraph name matches exactly (case-sensitive)
-- Check subgraph directory exists: `subgraphs/{name}/schema.graphql`
-- Ensure no extra spaces in comma-separated list
+- Verify the file path matches pattern: `subgraphs/{name}/...`
+- Check that changes are in the `subgraphs/` directory
+- Ensure changes are committed and pushed
 
 ### Build Fails on Specific Subgraph
 
 - Check build logs for specific subgraph errors
 - Verify subgraph schema is valid
 - Check Apollo GraphOS permissions for the subgraph
-
-
