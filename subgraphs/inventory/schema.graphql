@@ -24,3 +24,8 @@ type Inventory {
   """
   inventory: Int
 }
+
+type Query {
+  "The best query ever"
+  exampleAddedQuery: String
+}
