@@ -6,7 +6,6 @@ extend schema
 
 type Mutation {
   cart: CartMutations
-  testUpdate: Boolean
 }
 
 type CartMutations {
