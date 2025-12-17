@@ -6,7 +6,7 @@ metadata:
 spec:
   replicas: 3
   podTemplate:
-    routerVersion: 2.7.0
+    routerVersion: 2.9.0
     env:
       - name: APOLLO_ROUTER_LOG
         value: "debug"
@@ -58,8 +58,27 @@ spec:
     homepage:
       enabled: false
     telemetry:
+      apollo:
+        subgraph_metrics: true
+      instrumentation:
+        instruments:
+          default_requirement_level: required
+          router:
+            http.server.request.duration: true
+            http.server.request.body.size: true
+            http.server.response.body.size: true
+            http.server.active_requests: true
+          subgraph:
+            http.client.request.duration: true
+            http.client.request.body.size: true
+            http.client.response.body.size: true
       exporters:
         tracing:
+          otlp:
+            enabled: true
+            endpoint: http://collector.monitoring.svc.cluster.local:4318
+            protocol: http
+        metrics:
           otlp:
             enabled: true
             endpoint: http://collector.monitoring.svc.cluster.local:4318

@@ -7,14 +7,15 @@ The Grafana values file is present in this directory but Grafana is not integrat
 ## Status
 
 - [ ] Deployment script not created
-- [ ] Integration with InfluxDB not configured
+- [ ] Integration with Prometheus not configured
 - [ ] Dashboard provisioning not set up
 - [ ] Documentation not written
 - [ ] Testing not completed
 
 ## Future Implementation
 
-When implemented, Grafana will be used for visualizing metrics and dashboards. The values file references InfluxDB as a datasource and includes k6 dashboard configuration, but the deployment is not yet automated.
+When implemented, Grafana will be used for visualizing metrics and dashboards. The values file references Prometheus as a datasource and includes k6 dashboard configuration, but the deployment is not yet automated.
 
 **Do not use this directory until implementation is complete.**
 
+router-example-dashboard.json is from: https://github.com/apollographql/apm-templates/blob/main/grafana/example-dashboard.json

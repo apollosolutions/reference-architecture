@@ -58,8 +58,15 @@ spec:
     homepage:
       enabled: false
     telemetry:
+      apollo:
+        subgraph_metrics: true
       exporters:
         tracing:
+          otlp:
+            enabled: true
+            endpoint: http://collector.monitoring.svc.cluster.local:4318
+            protocol: http
+        metrics:
           otlp:
             enabled: true
             endpoint: http://collector.monitoring.svc.cluster.local:4318
