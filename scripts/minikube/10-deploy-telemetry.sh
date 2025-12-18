@@ -286,23 +286,24 @@ fi
 
 echo "✓ Prometheus service: $PROMETHEUS_SERVICE"
 
-# Create ConfigMap for router dashboard before deploying Grafana
+# Create ConfigMap for GraphOS template dashboard before deploying Grafana
 echo ""
-echo "Creating ConfigMap for router dashboard..."
-if [ -f "deploy/grafana/router-example-dashboard.json" ]; then
+echo "Creating ConfigMap for GraphOS template dashboard..."
+if [ -f "deploy/grafana/graphos-template.json" ]; then
     # Create ConfigMap with the dashboard JSON
-    kubectl create configmap router-dashboard \
-        --from-file=router-example-dashboard.json=deploy/grafana/router-example-dashboard.json \
+    # Grafana expects the key to match the dashboard filename pattern
+    kubectl create configmap graphos-template-dashboard \
+        --from-file=graphos-template.json=deploy/grafana/graphos-template.json \
         --namespace monitoring \
         --dry-run=client -o yaml | kubectl apply -f -
     
     # Label the ConfigMap so Grafana sidecar picks it up
-    kubectl label configmap router-dashboard grafana_dashboard=1 -n monitoring --overwrite 2>/dev/null || \
-    kubectl label configmap router-dashboard grafana_dashboard=1 -n monitoring 2>/dev/null || true
+    kubectl label configmap graphos-template-dashboard grafana_dashboard=1 -n monitoring --overwrite 2>/dev/null || \
+    kubectl label configmap graphos-template-dashboard grafana_dashboard=1 -n monitoring 2>/dev/null || true
     
-    echo "✓ Router dashboard ConfigMap created and labeled"
+    echo "✓ GraphOS template dashboard ConfigMap created and labeled"
 else
-    echo "⚠ Warning: router-example-dashboard.json not found at deploy/grafana/router-example-dashboard.json"
+    echo "⚠ Warning: graphos-template.json not found at deploy/grafana/graphos-template.json"
     echo "  Dashboard will not be automatically provisioned"
 fi
 

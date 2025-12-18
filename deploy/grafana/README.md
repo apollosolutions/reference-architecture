@@ -1,21 +1,30 @@
-# ⚠️ Grafana - Not Yet Implemented
+# Grafana Configuration
 
-**This directory is not yet implemented and should not be used.**
+This directory contains Grafana configuration files for visualizing Apollo Router metrics.
 
-The Grafana values file is present in this directory but Grafana is not integrated into the deployment scripts. Do not attempt to deploy Grafana until implementation is complete.
+## Files
 
-## Status
+- `values.yaml` - Helm values file for Grafana deployment
+- `graphos-template.json` - GraphOS Runtime Dashboard Template for monitoring Apollo Router metrics
 
-- [ ] Deployment script not created
-- [ ] Integration with Prometheus not configured
-- [ ] Dashboard provisioning not set up
-- [ ] Documentation not written
-- [ ] Testing not completed
+## Deployment
 
-## Future Implementation
+Grafana is deployed via `scripts/minikube/10-deploy-telemetry.sh`, which:
+- Creates a ConfigMap from `graphos-template.json`
+- Labels it with `grafana_dashboard=1` so the Grafana sidecar automatically loads it
+- Deploys Grafana using the Helm chart with Prometheus datasource configured
 
-When implemented, Grafana will be used for visualizing metrics and dashboards. The values file references Prometheus as a datasource and includes k6 dashboard configuration, but the deployment is not yet automated.
+## Dashboard
 
-**Do not use this directory until implementation is complete.**
+The `graphos-template.json` dashboard includes:
+- Request traffic and health metrics
+- Error rates and codes
+- Latency percentiles
+- Subgraph metrics
+- Coprocessor metrics
+- Query planning metrics
+- Cache metrics
 
-router-example-dashboard.json is from: https://github.com/apollographql/apm-templates/blob/main/grafana/example-dashboard.json
+Dashboard variables:
+- `job_name` - Filter by job label (default: "router")
+- `otel_scope_name` - Filter by OpenTelemetry scope name (default: "apollo/router")
