@@ -1,4 +1,5 @@
 import { Resolvers } from "../__generated__/resolvers-types.js";
+import { GraphQLError } from "graphql";
 import { PRODUCTS, VARIANTS } from "./data";
 
 export const getVariantById = (id: string) => VARIANTS.find((it) => it.id === id);
@@ -25,6 +26,15 @@ export const resolvers: Resolvers = {
       }
 
       return PRODUCTS;
+    },
+    testError(_, { message }) {
+      const errorMessage = message || "Test error from products subgraph";
+      throw new GraphQLError(errorMessage, {
+        extensions: {
+          code: "TEST_ERROR",
+          subgraph: "products",
+        },
+      });
     },
   },
   Product: {
