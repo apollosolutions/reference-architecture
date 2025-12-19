@@ -483,7 +483,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by(graphql_operation_name) (rate(http_server_request_duration_seconds_count{otel_scope_name=\"$otel_scope_name\",graphql_errors=\"true\",graphql_operation_name!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(graphql_operation_name) (rate(http_server_request_duration_seconds_count{otel_scope_name=\"$otel_scope_name\",graphql_errors!=\"\",graphql_operation_name!=\"\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{graphql_operation_name}}",
@@ -1041,7 +1041,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**Set Up Recommended SLOs & Alerts:**\n\n-   Alert on sustained increases in 5xx responses from any subgraph or connector source.\n-   Reliability SLO: \u226599.9% of Router\u2192backend requests should be 2xx and without error.\n\n### Throughput Categories\n\n**Low Throughput:** Fewer than **10 requests per minute (RPM)** (~0.17 RPS)\n-  Metrics like P95 latency and error rates may be unreliable. You're likely looking at isolated client activity or background tasks due to the api not being warm.\n-  Monitor with logs, traces, or uptime checks, not SLO-based alerts\n\n**Moderate Throughput:** Between **10 and 100 RPM** (~0.17 to ~1.7 RPS)\n-   Enough volume to detect trends, but not enough to be confident in moment-to-moment alerting.\n-  Use conservative thresholds on any alerts and look for trends over longer windows of time\n\n**High _(enough)_ Throughput:** Greater than **100 RPM** (>1.7 RPS)\n-  Generally enough for real-time alerting and solid SLO enforcement",
+        "content": "**Set Up Recommended SLOs & Alerts:**\n\n-   Alert on sustained increases in errors or latency from any subgraph or connector source.\n-   Reliability SLO: \u226599.9% of Router\u2192backend requests should be successful and without error.\n-   **Note:** HTTP status codes are not available as attributes on subgraph client metrics. Monitor subgraph health through latency, throughput, and error rates from router-level metrics.\n\n### Throughput Categories\n\n**Low Throughput:** Fewer than **10 requests per minute (RPM)** (~0.17 RPS)\n-  Metrics like P95 latency and error rates may be unreliable. You're likely looking at isolated client activity or background tasks due to the api not being warm.\n-  Monitor with logs, traces, or uptime checks, not SLO-based alerts\n\n**Moderate Throughput:** Between **10 and 100 RPM** (~0.17 to ~1.7 RPS)\n-   Enough volume to detect trends, but not enough to be confident in moment-to-moment alerting.\n-  Use conservative thresholds on any alerts and look for trends over longer windows of time\n\n**High _(enough)_ Throughput:** Greater than **100 RPM** (>1.7 RPS)\n-  Generally enough for real-time alerting and solid SLO enforcement",
         "mode": "markdown"
       },
       "pluginVersion": "10.1.1",
@@ -1134,16 +1134,16 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by(http_response_status_code, subgraph_name) (rate(http_client_request_duration_seconds_count{otel_scope_name=\"$otel_scope_name\",subgraph_name!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(subgraph_name) (rate(http_client_request_duration_seconds_count{otel_scope_name=\"$otel_scope_name\",subgraph_name!=\"\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{subgraph_name}} - {{http_response_status_code}}",
+          "legendFormat": "{{subgraph_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "Http Requests by Status Code",
+      "title": "Http Requests by Subgraph",
       "type": "timeseries"
     },
     {
@@ -1333,16 +1333,16 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by(subgraph_name, http_response_status_code) (rate(http_client_request_duration_seconds_count{otel_scope_name=\"$otel_scope_name\",subgraph_name!=\"\",http_response_status_code!~\"2..\"}[$__rate_interval]))",
+          "expr": "sum by(subgraph_name) (rate(http_client_request_duration_seconds_count{otel_scope_name=\"$otel_scope_name\",subgraph_name!=\"\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{subgraph_name}} - {{http_response_status_code}}",
+          "legendFormat": "{{subgraph_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "Non-2xx Responses",
+      "title": "Subgraph Request Volume",
       "type": "timeseries"
     },
     {

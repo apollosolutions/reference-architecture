@@ -76,8 +76,12 @@ spec:
             http.server.response.body.size: true
             http.server.active_requests: true
           subgraph:
-            http.client.request.duration: true
-            http.client.request.body.size: true
+            http.client.request.duration:
+              attributes:
+                subgraph.name: true
+            http.client.request.body.size:
+              attributes:
+                subgraph.name: true
             http.client.response.body.size: true
       exporters:
         tracing:
