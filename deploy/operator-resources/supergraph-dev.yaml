@@ -57,6 +57,8 @@ spec:
       enabled: true
     homepage:
       enabled: false
+    include_subgraph_errors:
+      all: true
     telemetry:
       apollo:
         subgraph_metrics: true
@@ -64,7 +66,12 @@ spec:
         instruments:
           default_requirement_level: required
           router:
-            http.server.request.duration: true
+            http.server.request.duration:
+              attributes:
+                graphql.operation.name:
+                  operation_name: string
+                graphql.errors:
+                  on_graphql_error: true
             http.server.request.body.size: true
             http.server.response.body.size: true
             http.server.active_requests: true
