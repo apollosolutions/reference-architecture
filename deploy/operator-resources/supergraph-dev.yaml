@@ -6,10 +6,12 @@ metadata:
 spec:
   replicas: 3
   podTemplate:
-    routerVersion: 2.7.0
+    routerVersion: 2.9.0
     env:
       - name: APOLLO_ROUTER_LOG
         value: "debug"
+      - name: OTEL_SERVICE_NAME
+        value: "router"
     resources:
       requests:
         cpu: 100m
@@ -55,4 +57,41 @@ spec:
       enabled: true
     homepage:
       enabled: false
+    include_subgraph_errors:
+      all: true
+    telemetry:
+      apollo:
+        subgraph_metrics: true
+      instrumentation:
+        instruments:
+          default_requirement_level: required
+          router:
+            http.server.request.duration:
+              attributes:
+                graphql.operation.name:
+                  operation_name: string
+                graphql.errors:
+                  on_graphql_error: true
+            http.server.request.body.size: true
+            http.server.response.body.size: true
+            http.server.active_requests: true
+          subgraph:
+            http.client.request.duration:
+              attributes:
+                subgraph.name: true
+            http.client.request.body.size:
+              attributes:
+                subgraph.name: true
+            http.client.response.body.size: true
+      exporters:
+        tracing:
+          otlp:
+            enabled: true
+            endpoint: http://collector.monitoring.svc.cluster.local:4318
+            protocol: http
+        metrics:
+          otlp:
+            enabled: true
+            endpoint: http://collector.monitoring.svc.cluster.local:4318
+            protocol: http
 

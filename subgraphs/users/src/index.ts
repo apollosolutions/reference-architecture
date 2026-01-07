@@ -60,6 +60,14 @@ async function main() {
     res.json(JSON.parse(jwks));
   })
 
+  // Log warning if trace context is missing
+  app.use((req, res, next) => {
+    if (!req.headers['traceparent']) {
+      console.warn(`[${subgraphName}] Incoming request missing traceparent header - will create new root trace`);
+    }
+    next();
+  });
+
   app.use(
     '/',
     cors(),

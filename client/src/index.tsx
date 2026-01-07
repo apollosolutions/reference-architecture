@@ -8,6 +8,8 @@ import { router } from './router'
 import client from './apollo/client'
 import './index.css'
 import theme from './theme'
+// Initialize tracing before anything else
+import './tracing'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

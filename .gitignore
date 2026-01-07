@@ -45,3 +45,4 @@ router.exe
 lockfile.sh
 
 *.pid
+.image-tag

@@ -24,6 +24,11 @@ type Query {
   Get a specific variant by id. Useful for the product details page or checkout page
   """
   variant(id: ID!): Variant
+
+  """
+  Test query that always throws an error for testing error handling and metrics
+  """
+  testError(message: String): String
 }
 
 """

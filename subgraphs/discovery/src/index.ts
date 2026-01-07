@@ -6,7 +6,7 @@ import {
   StandaloneServerContextFunctionArgument,
   startStandaloneServer,
 } from "@apollo/server/standalone";
-import {resolvers} from "./resolvers";
+import { resolvers } from "./resolvers";
 import { DataSourceContext } from "./types/DataSourceContext";
 
 const port = process.env.PORT ?? "4001";
@@ -16,6 +16,11 @@ const context: ContextFunction<
   [StandaloneServerContextFunctionArgument],
   DataSourceContext
 > = async ({ req }) => {
+  // Log warning if trace context is missing
+  if (!req.headers['traceparent']) {
+    console.warn(`[${subgraphName}] Incoming request missing traceparent header - will create new root trace`);
+  }
+
   return {
     auth: req.headers.authorization,
   };

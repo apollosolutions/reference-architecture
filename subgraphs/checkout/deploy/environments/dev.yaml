@@ -1,3 +1,6 @@
+env:
+  - name: OTEL_HTTP_ENDPOINT
+    value: http://collector.monitoring.svc.cluster.local:4318/v1/traces
 requests:
   cpu: 100m
   memory: 256Mi

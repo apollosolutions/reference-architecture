@@ -4,18 +4,18 @@ replicaCount: 1
 image:
   repository: otel/opentelemetry-collector-contrib
   pullPolicy: IfNotPresent
-  tag: "0.59.0"
+  tag: "0.141.0"
 
 imagePullSecrets: []
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
-  name: "metrics-writer"
+  name: ""
 
 podAnnotations: {}
 

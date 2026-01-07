@@ -44,7 +44,7 @@ spec:
               containerPort: 4318
               protocol: TCP
             - name: metrics-prom
-              containerPort: 8888
+              containerPort: 9091
               protocol: TCP
           volumeMounts:
           - name: otel-configuration

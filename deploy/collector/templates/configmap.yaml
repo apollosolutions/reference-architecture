@@ -9,10 +9,23 @@ data:
       otlp:
         protocols:
           grpc:
+            endpoint: 0.0.0.0:4317
           http:
+            endpoint: 0.0.0.0:4318
+            cors:
+              allowed_origins:
+                - "http://localhost:3000"
+                - "http://127.0.0.1:3000"
+              allowed_headers:
+                - "*"
+              max_age: 7200
     exporters:
       zipkin:
-        endpoint: "http://zipkin.zipkin.svc.cluster.local:9411/api/v2/spans"
+        endpoint: "http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans"
+      prometheus:
+        endpoint: "0.0.0.0:9091"
+        namespace: ""
+        add_metric_suffixes: true
     processors:
       memory_limiter:
         check_interval: 1s
@@ -25,3 +38,7 @@ data:
           receivers: [otlp]
           processors: [memory_limiter, batch]
           exporters: [zipkin]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [prometheus]

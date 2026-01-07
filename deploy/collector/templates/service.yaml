@@ -15,7 +15,7 @@ spec:
       protocol: TCP
       name: metrics-http
     - targetPort: metrics-prom
-      port: 8888
+      port: 9091
       protocol: TCP
       name: metrics-prom
   selector: {{- include "collector.selectorLabels" . | nindent 4 }}
