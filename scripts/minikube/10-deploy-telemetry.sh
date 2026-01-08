@@ -185,16 +185,22 @@ if kubectl get configmap "$CONFIGMAP" -n "$NAMESPACE" &>/dev/null; then
         TEMP_CURRENT=$(mktemp)
         printf '%s\n' "$CURRENT_CONFIG" > "$TEMP_CURRENT"
         
-        # Find where to insert (before alerting: section)
-        ALERTING_LINE=$(grep -n "^alerting:" "$TEMP_CURRENT" | head -1 | cut -d: -f1)
-        if [ -z "$ALERTING_LINE" ]; then
-            # If no alerting section, append to end
-            ALERTING_LINE=$(wc -l < "$TEMP_CURRENT" | tr -d ' ')
-            ALERTING_LINE=$((ALERTING_LINE + 1))
+        # Find where to insert (before rule_files: section, which is where scrape_configs ends)
+        RULE_FILES_LINE=$(grep -n "^rule_files:" "$TEMP_CURRENT" | head -1 | cut -d: -f1)
+        if [ -z "$RULE_FILES_LINE" ]; then
+            # If no rule_files section, try to find alerting: as fallback
+            ALERTING_LINE=$(grep -n "^alerting:" "$TEMP_CURRENT" | head -1 | cut -d: -f1)
+            if [ -z "$ALERTING_LINE" ]; then
+                # If no alerting section, append to end
+                RULE_FILES_LINE=$(wc -l < "$TEMP_CURRENT" | tr -d ' ')
+                RULE_FILES_LINE=$((RULE_FILES_LINE + 1))
+            else
+                RULE_FILES_LINE=$ALERTING_LINE
+            fi
         fi
         
-        # Insert after the last scrape_config entry (which ends at line before alerting)
-        INSERT_LINE=$((ALERTING_LINE - 1))
+        # Insert after the last scrape_config entry (which ends at line before rule_files)
+        INSERT_LINE=$((RULE_FILES_LINE - 1))
         
         # Create new config with otel-collector added using sed for precise insertion
         TEMP_NEW=$(mktemp)
@@ -217,8 +223,8 @@ if kubectl get configmap "$CONFIGMAP" -n "$NAMESPACE" &>/dev/null; then
     - targets: ['collector.monitoring.svc.cluster.local:9091']
 EOF
         
-        # Add the rest of the config (from alerting: onwards)
-        sed -n "${ALERTING_LINE},\$p" "$TEMP_CURRENT" >> "$TEMP_NEW"
+        # Add the rest of the config (from rule_files: onwards)
+        sed -n "${RULE_FILES_LINE},\$p" "$TEMP_CURRENT" >> "$TEMP_NEW"
         
         # Basic validation: check for required structure
         if ! grep -q "^scrape_configs:" "$TEMP_NEW"; then
@@ -233,9 +239,9 @@ EOF
             exit 1
         fi
         
-        # Validate YAML structure: check that alerting: still exists and scrape_configs is properly formatted
-        if ! grep -q "^alerting:" "$TEMP_NEW"; then
-            echo "✗ Error: alerting section missing in new config"
+        # Validate YAML structure: check that rule_files: still exists and scrape_configs is properly formatted
+        if ! grep -q "^rule_files:" "$TEMP_NEW"; then
+            echo "✗ Error: rule_files section missing in new config"
             rm -f "$TEMP_CURRENT" "$TEMP_NEW"
             exit 1
         fi
@@ -811,7 +817,7 @@ if [ -f "$GRAFANA_PF_PID_FILE" ]; then
         echo "4. Prometheus datasource:"
         echo "   To configure Prometheus datasource manually:"
         echo "   • Go to: Configuration → Data Sources → Prometheus"
-        echo "   • URL: http://${PROMETHEUS_SERVICE}.monitoring.svc.cluster.local:9090"
+        echo "   • URL: http://${PROMETHEUS_SERVICE}.monitoring.svc.cluster.local:80"
         echo ""
         echo "5. Metrics are automatically collected from:"
         echo "   • Apollo Router (via OTLP metrics exporter)"
