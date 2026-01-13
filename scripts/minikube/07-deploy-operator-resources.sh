@@ -80,10 +80,11 @@ echo "Deploying Supergraph..."
 SUPERGRAPH_FILE="deploy/operator-resources/supergraph-${ENVIRONMENT}.yaml"
 if [ -f "${SUPERGRAPH_FILE}" ]; then
     echo "Using environment-specific Supergraph file: ${SUPERGRAPH_FILE}"
-    kubectl apply -f "${SUPERGRAPH_FILE}"
+    # Use server-side apply to avoid resourceVersion conflicts
+    kubectl apply -f "${SUPERGRAPH_FILE}" --server-side --force-conflicts
 else
     echo "Using Supergraph template: deploy/operator-resources/supergraph.yaml.template"
-    sed "s/\${RESOURCE_NAME}/${RESOURCE_NAME}/g" deploy/operator-resources/supergraph.yaml.template | kubectl apply -f -
+    sed "s/\${RESOURCE_NAME}/${RESOURCE_NAME}/g" deploy/operator-resources/supergraph.yaml.template | kubectl apply -f - --server-side --force-conflicts
 fi
 
 echo "Supergraph deployed"

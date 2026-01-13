@@ -6,7 +6,7 @@ metadata:
 spec:
   replicas: 3
   podTemplate:
-    routerVersion: 2.3.0
+    routerVersion: 2.10.0
     env:
       - name: APOLLO_ROUTER_LOG
         value: "warn"
@@ -60,6 +60,30 @@ spec:
     telemetry:
       apollo:
         subgraph_metrics: true
+      instrumentation:
+        instruments:
+          default_requirement_level: required
+          router:
+            http.server.request.duration:
+              attributes:
+                graphql.errors:
+                  on_graphql_error: true
+            http.server.request.body.size: true
+            http.server.response.body.size: true
+            http.server.active_requests: true
+          subgraph:
+            http.client.request.duration:
+              attributes:
+                subgraph.name: true
+                http.response.status_code: true
+            http.client.request.body.size:
+              attributes:
+                subgraph.name: true
+                http.response.status_code: true
+            http.client.response.body.size:
+              attributes:
+                subgraph.name: true
+                http.response.status_code: true
       exporters:
         tracing:
           otlp:

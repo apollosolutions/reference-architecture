@@ -6,7 +6,7 @@ metadata:
 spec:
   replicas: 3
   podTemplate:
-    routerVersion: 2.9.0
+    routerVersion: 2.10.0
     env:
       - name: APOLLO_ROUTER_LOG
         value: "debug"
@@ -63,13 +63,48 @@ spec:
       apollo:
         subgraph_metrics: true
       instrumentation:
+        spans:
+          default_attribute_requirement_level: recommended
+          router:
+            attributes:
+              otel.name: router
+              operation.name: "router"
+              resource.name:
+                request_method: true
+          supergraph:
+            attributes:
+              otel.name: supergraph
+              operation.name: "supergraph"
+              resource.name:
+                operation_name: string
+              otel.status_code:
+                static: ERROR
+                condition:
+                  eq:
+                    - true
+                    - on_graphql_error: true
+              error.message:
+                response_errors: $[0].message
+          subgraph:
+            attributes:
+              subgraph_response_status: code
+              otel.name: subgraph
+              operation.name: "subgraph"
+              resource.name:
+                subgraph_operation_name: string
+              otel.status_code:
+                static: ERROR
+                condition:
+                  eq:
+                    - true
+                    - subgraph_on_graphql_error: true
+              error.message:
+                subgraph_response_errors: $[0].message
         instruments:
           default_requirement_level: required
           router:
             http.server.request.duration:
               attributes:
-                graphql.operation.name:
-                  operation_name: string
                 graphql.errors:
                   on_graphql_error: true
             http.server.request.body.size: true
@@ -79,9 +114,11 @@ spec:
             http.client.request.duration:
               attributes:
                 subgraph.name: true
-            http.client.request.body.size:
-              attributes:
-                subgraph.name: true
+                http.response.status_code: 
+                  subgraph_response_status: code
+                graphql.errors:
+                  subgraph_on_graphql_error: true
+            http.client.request.body.size: true
             http.client.response.body.size: true
       exporters:
         tracing:
@@ -94,4 +131,8 @@ spec:
             enabled: true
             endpoint: http://collector.monitoring.svc.cluster.local:4318
             protocol: http
+          prometheus:
+            enabled: true
+            listen: 0.0.0.0:9090
+            path: /metrics
 
