@@ -66,6 +66,8 @@ spec:
           router:
             http.server.request.duration:
               attributes:
+                graphql.operation.name:
+                  operation_name: string
                 graphql.errors:
                   on_graphql_error: true
             http.server.request.body.size: true
