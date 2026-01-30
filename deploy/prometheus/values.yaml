@@ -1,5 +1,5 @@
 # Prometheus Helm Chart Values
-# Used by scripts/minikube/10-deploy-telemetry.sh
+# Used by scripts/minikube/11-deploy-telemetry.sh
 
 server:
   retention: 30d

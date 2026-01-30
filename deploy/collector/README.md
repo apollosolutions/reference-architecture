@@ -22,7 +22,7 @@ Apollo Router (OTLP) ──┘
 The collector is deployed via the telemetry deployment script:
 
 ```bash
-./scripts/minikube/10-deploy-telemetry.sh
+./scripts/minikube/11-deploy-telemetry.sh
 ```
 
 This script:

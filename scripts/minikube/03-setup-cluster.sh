@@ -75,7 +75,8 @@ helm upgrade --install --atomic apollo-operator \
     -n apollo-operator \
     --create-namespace \
     --wait \
-    -f deploy/operator-resources/operator-values.yaml
+    -f deploy/operator-resources/operator-values.yaml \
+    --version 1.0.1
 
 echo "Apollo GraphOS Operator installed successfully"
 

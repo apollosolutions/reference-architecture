@@ -150,12 +150,25 @@ This script:
 - Deploys the coprocessor using Helm
 - Waits for coprocessor pods to be ready
 
-**Note:** The coprocessor validates JWT tokens from the users subgraph's JWKS endpoint and enables the `@authenticated` directive to work properly. It must be deployed before the router (script 07).
+**Note:** The coprocessor validates JWT tokens from the users subgraph's JWKS endpoint and enables the `@authenticated` directive to work properly. It must be deployed before the router (script 08).
 
-### Script 07: Deploy Operator Resources
+### Script 07: Deploy Redis (for Router response caching)
+
+If you’re enabling Apollo Router response caching, deploy Redis first:
 
 ```bash
-./scripts/minikube/07-deploy-operator-resources.sh
+./scripts/minikube/07-deploy-redis.sh
+```
+
+This script:
+- Creates a dedicated `redis` namespace
+- Installs Redis via Helm (standalone, no auth, no persistence)
+- Waits for Redis to be ready
+
+### Script 08: Deploy Operator Resources
+
+```bash
+./scripts/minikube/08-deploy-operator-resources.sh
 ```
 
 This script:
@@ -165,7 +178,7 @@ This script:
 
 **Note:** The coprocessor (script 06) must be deployed before running this script.
 
-**Note:** The router is configured with telemetry enabled. If you plan to use distributed tracing, it's recommended to deploy the telemetry stack (script 10) before deploying the router to avoid connection errors in the router logs. However, the router will still function correctly even if the telemetry collector is not available - you'll just see connection errors in the logs until the collector is deployed.
+**Note:** The router is configured with telemetry enabled. If you plan to use distributed tracing, it's recommended to deploy the telemetry stack (script 11) before deploying the router to avoid connection errors in the router logs. However, the router will still function correctly even if the telemetry collector is not available - you'll just see connection errors in the logs until the collector is deployed.
 
 Monitor router deployment:
 
@@ -175,10 +188,10 @@ kubectl get pods -n apollo
 kubectl describe supergraph reference-architecture-${ENVIRONMENT} -n apollo
 ```
 
-### Script 08: Setup Router Access
+### Script 09: Setup Router Access
 
 ```bash
-./scripts/minikube/08-setup-router-access.sh
+./scripts/minikube/09-setup-router-access.sh
 ```
 
 This script:
@@ -187,10 +200,10 @@ This script:
 - Determines and saves the router URL to `.env` file
 - **Note:** The router does not use an Ingress resource - the client's nginx proxies to it internally. The ingress controller is needed for the client's Ingress.
 
-### Script 09: Deploy Client
+### Script 10: Deploy Client
 
 ```bash
-./scripts/minikube/09-deploy-client.sh
+./scripts/minikube/10-deploy-client.sh
 ```
 
 This script:
@@ -199,12 +212,12 @@ This script:
 
 **Note:** The client is required if you want to access the router via the ingress controller (minikube tunnel or NodePort). If you only need direct router access, you can use port-forward (Option 2 in Step 4) and skip this script.
 
-### Script 10: Deploy Telemetry Stack (Optional)
+### Script 11: Deploy Telemetry Stack (Optional)
 
 Deploy Zipkin and OpenTelemetry Collector for distributed tracing:
 
 ```bash
-./scripts/minikube/10-deploy-telemetry.sh
+./scripts/minikube/11-deploy-telemetry.sh
 ```
 
 This script:
@@ -215,7 +228,7 @@ This script:
 
 **Note:** This script is optional. Telemetry is configured for all environments (dev and prod) but the telemetry stack only needs to be deployed once per cluster. The collector receives traces from all subgraphs and the router, then exports them to Zipkin.
 
-**Recommended:** Deploy telemetry (script 10) before deploying the router (script 07) to avoid connection errors in router logs. If you've already deployed the router, you can deploy telemetry at any time - the router will automatically start sending traces once the collector is available.
+**Recommended:** Deploy telemetry (script 11) before deploying the router (script 08) to avoid connection errors in router logs. If you've already deployed the router, you can deploy telemetry at any time - the router will automatically start sending traces once the collector is available.
 
 **Access Zipkin UI:**
 
@@ -299,7 +312,7 @@ curl http://localhost:4000/health
 
 ## Step 5: Logging Into the Client Application
 
-If you deployed the client application (script 09), you can log in using the following test credentials:
+If you deployed the client application (script 10), you can log in using the following test credentials:
 
 ### Test Users
 
@@ -346,9 +359,9 @@ source .env
 ./scripts/minikube/04-build-images.sh
 ./scripts/minikube/05-deploy-subgraphs.sh
 ./scripts/minikube/06-deploy-coprocessor.sh
-./scripts/minikube/07-deploy-operator-resources.sh
-./scripts/minikube/08-setup-router-access.sh
-./scripts/minikube/09-deploy-client.sh
+./scripts/minikube/08-deploy-operator-resources.sh
+./scripts/minikube/09-setup-router-access.sh
+./scripts/minikube/10-deploy-client.sh
 ```
 
 **Note:** Script 10 (telemetry) only needs to be run once per cluster, not per environment. All environments share the same telemetry stack.

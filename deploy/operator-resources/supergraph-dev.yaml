@@ -6,7 +6,7 @@ metadata:
 spec:
   replicas: 3
   podTemplate:
-    routerVersion: 2.9.0
+    routerVersion: 2.10.0
     env:
       - name: APOLLO_ROUTER_LOG
         value: "debug"
@@ -24,6 +24,15 @@ spec:
     supergraph:
       listen: 0.0.0.0:4000
       introspection: true
+    response_cache:
+      enabled: true
+      debug: true
+      subgraph:
+        all:
+          enabled: true
+          ttl: 5m
+          redis:
+            urls: ["redis://redis-master.redis.svc.cluster.local:6379"]
     headers:
       all:
         request:
@@ -65,6 +74,12 @@ spec:
       instrumentation:
         instruments:
           default_requirement_level: required
+          cache: # Cache instruments configuration
+            apollo.router.response.cache: # A counter which counts the number of cache hit and miss for subgraph requests
+              attributes:
+                graphql.type.name: true # Include the entity type name. default: false
+                subgraph.name: # Custom attributes to include the subgraph name in the metric
+                  subgraph_name: true
           router:
             http.server.request.duration:
               attributes:

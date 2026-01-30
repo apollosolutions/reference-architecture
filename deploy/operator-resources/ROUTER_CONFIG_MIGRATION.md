@@ -32,8 +32,8 @@ The router configuration is now implemented using the **native operator approach
 | Configuration | Location | Status |
 |--------------|----------|--------|
 | Router Config | `deploy/operator-resources/supergraph-{dev\|prod}.yaml` (spec.routerConfig) | ✅ Native operator support |
-| SupergraphSchema | Created by `07-deploy-operator-resources.sh` | ✅ Operator-managed |
-| Supergraph | Created by `07-deploy-operator-resources.sh` | ✅ Operator-managed |
+| SupergraphSchema | Created by `08-deploy-operator-resources.sh` | ✅ Operator-managed |
+| Supergraph | Created by `08-deploy-operator-resources.sh` | ✅ Operator-managed |
 
 ## 📋 Configuration Details
 

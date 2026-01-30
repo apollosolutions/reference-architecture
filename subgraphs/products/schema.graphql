@@ -4,6 +4,22 @@ extend schema
     import: ["@key", "@tag"]
   )
 
+"""
+The scope of the cache control directive
+PUBLIC (default): The data is identical for all users and can be shared in the cache
+PRIVATE: The data is user-specific and requires a private_id configuration to cache per-user
+"""
+enum CacheControlScope {
+  PUBLIC
+  PRIVATE
+}
+
+directive @cacheControl(
+  maxAge: Int
+  scope: CacheControlScope
+  inheritMaxAge: Boolean
+) on FIELD_DEFINITION | OBJECT | INTERFACE | UNION
+
 type Query {
   """
   Get all available products to shop for. Optionally provide some search filters
@@ -18,7 +34,7 @@ type Query {
   """
   Get a specific product by id. Useful for the product details page or checkout page
   """
-  product(id: ID!): Product
+  product(id: ID!): Product @cacheControl(maxAge: 120)
 
   """
   Get a specific variant by id. Useful for the product details page or checkout page
@@ -49,7 +65,7 @@ input VariantSearchInput {
 A specific product sold by our store. This contains all the high level details but is not the purchasable item.
 See Variant for more info.
 """
-type Product @key(fields: "id") @key(fields: "upc") @tag(name: "partner") {
+type Product @key(fields: "id") @key(fields: "upc") @tag(name: "partner")  @cacheControl(maxAge: 3600, scope: PUBLIC) {
   id: ID! @tag(name: "internal")
   upc: ID!
   title: String

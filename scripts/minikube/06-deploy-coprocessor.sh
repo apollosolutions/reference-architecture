@@ -95,5 +95,5 @@ echo ""
 echo "Coprocessor is now available at:"
 echo "  http://coprocessor.apollo.svc.cluster.local:8081"
 echo ""
-echo "Next step: Run ./scripts/minikube/07-deploy-operator-resources.sh to deploy the router with coprocessor configuration"
+echo "Next step: Run ./scripts/minikube/07-deploy-redis.sh (optional, for response caching), then ./scripts/minikube/08-deploy-operator-resources.sh to deploy the router with coprocessor configuration"
 
