@@ -6,7 +6,7 @@ metadata:
 spec:
   replicas: 3
   podTemplate:
-    routerVersion: 2.7.0
+    routerVersion: 2.10.0
     env:
       - name: APOLLO_ROUTER_LOG
         value: "debug"
@@ -18,4 +18,3 @@ spec:
     resource:
       name: ${RESOURCE_NAME}
       namespace: apollo
-

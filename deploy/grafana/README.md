@@ -9,7 +9,7 @@ This directory contains Grafana configuration files for visualizing Apollo Route
 
 ## Deployment
 
-Grafana is deployed via `scripts/minikube/10-deploy-telemetry.sh`, which:
+Grafana is deployed via `scripts/minikube/11-deploy-telemetry.sh`, which:
 - Creates a ConfigMap from `graphos-template.json`
 - Labels it with `grafana_dashboard=1` so the Grafana sidecar automatically loads it
 - Deploys Grafana using the Helm chart with Prometheus datasource configured

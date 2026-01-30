@@ -422,6 +422,39 @@ dial tcp: lookup registry.kube-system.svc.cluster.local on 192.168.65.254:53: se
 | Docker daemon (minikube docker-env) | ClusterIP | Docker in Minikube VM may not resolve service DNS |
 | Host Docker (not minikube docker-env) | Minikube IP + port-forward | Requires socat or port-forward |
 
+## Response caching (Redis)
+
+### Verify Redis is deployed (Helm chart)
+
+```bash
+kubectl get ns redis
+kubectl get svc -n redis
+kubectl get statefulset -n redis
+kubectl get pods -n redis
+```
+
+Expected:
+- A `redis` namespace
+- A `redis-master` Service (and usually a `redis-headless` Service)
+- A `redis-master` StatefulSet with at least 1 ready pod
+
+### Verify the router is configured to use Redis
+
+```bash
+kubectl get supergraph reference-architecture-${ENVIRONMENT} -n apollo -o yaml | grep -A 15 "response_cache"
+```
+
+You should see:
+- `response_cache.enabled: true`
+- a required `ttl` (fallback), e.g. `5m`
+- Redis URL: `redis://redis-master.redis.svc.cluster.local:6379`
+
+### Verify caching behavior
+
+Response caching requires the router to have a configured TTL **and** for subgraph responses to include cache semantics (for example `Cache-Control: max-age=...`) or for schemas/subgraphs to apply directives like `@cacheControl` (depending on your subgraph server support). See Apollo docs:
+- [Response Caching Quickstart](https://www.apollographql.com/docs/graphos/routing/performance/caching/response-caching/quickstart)
+- [Response Cache Customization](https://www.apollographql.com/docs/graphos/routing/performance/caching/response-caching/customization)
+
 ## Quick Debug Scripts
 
 ### Complete Registry Debug

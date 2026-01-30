@@ -1,17 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
-# Script 09: Deploy Client
+# Script 10: Deploy Client
 # This script deploys the client application and sets up port-forwarding
 
 # Ensure script is run from repository root
 if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
     echo "Error: This script must be run from the repository root directory"
-    echo "Please run: ./scripts/minikube/09-deploy-client.sh"
+    echo "Please run: ./scripts/minikube/10-deploy-client.sh"
     exit 1
 fi
 
-echo "=== Step 09: Deploying Client Application ==="
+echo "=== Step 10: Deploying Client Application ==="
 
 # Load environment variables from .env if it exists
 if [ -f .env ]; then
@@ -48,7 +48,7 @@ fi
 # Get router URL from .env file
 if [[ -z "${ROUTER_URL:-}" ]]; then
     echo "Error: ROUTER_URL is not set"
-    echo "Please run ./scripts/minikube/08-setup-router-access.sh first to set up the router URL"
+    echo "Please run ./scripts/minikube/09-setup-router-access.sh first to set up the router URL"
     exit 1
 fi
 

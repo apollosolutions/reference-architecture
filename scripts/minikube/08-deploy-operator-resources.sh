@@ -1,18 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-# Script 07: Deploy Operator Resources
+# Script 08: Deploy Operator Resources
 # This script deploys SupergraphSchema and Supergraph CRDs
 # Note: The coprocessor (script 06) must be deployed first as the router requires it
+# Note: Redis (script 07) should be deployed first if enabling response caching
 
 # Ensure script is run from repository root
 if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
     echo "Error: This script must be run from the repository root directory"
-    echo "Please run: ./scripts/minikube/07-deploy-operator-resources.sh"
+    echo "Please run: ./scripts/minikube/08-deploy-operator-resources.sh"
     exit 1
 fi
 
-echo "=== Step 07: Deploying Operator Resources ==="
+echo "=== Step 08: Deploying Operator Resources ==="
 
 # Load environment variables from .env if it exists
 if [ -f .env ]; then
@@ -117,5 +118,5 @@ echo "Monitor router status with:"
 echo "  kubectl get supergraphs -n apollo"
 echo "  kubectl get pods -n apollo"
 echo ""
-echo "Next step: Run ./scripts/minikube/08-setup-router-access.sh to configure external access"
+echo "Next step: Run ./scripts/minikube/09-setup-router-access.sh to configure external access"
 

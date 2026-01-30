@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import gql from "graphql-tag";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import { ApolloServer, ContextFunction } from "@apollo/server";
+import { ApolloServerPluginCacheControl } from "@apollo/server/plugin/cacheControl";
 import {
   StandaloneServerContextFunctionArgument,
   startStandaloneServer,
@@ -34,6 +35,11 @@ async function main() {
   );
   const server = new ApolloServer({
     schema: buildSubgraphSchema({ typeDefs, resolvers }),
+    plugins: [
+      ApolloServerPluginCacheControl({
+        calculateHttpHeaders: true,
+      }),
+    ],
   });
   const { url } = await startStandaloneServer(server, {
     context,

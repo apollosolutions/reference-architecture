@@ -1,18 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
-# Script 10: Deploy Telemetry Stack
+# Script 11: Deploy Telemetry Stack
 # This script deploys Zipkin and OpenTelemetry Collector for distributed tracing
 # Both services are deployed in the monitoring namespace
 
 # Ensure script is run from repository root
 if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
     echo "Error: This script must be run from the repository root directory"
-    echo "Please run: ./scripts/minikube/10-deploy-telemetry.sh"
+    echo "Please run: ./scripts/minikube/11-deploy-telemetry.sh"
     exit 1
 fi
 
-echo "=== Step 10: Deploying Telemetry Stack ==="
+echo "=== Step 11: Deploying Telemetry Stack ==="
 
 # Load environment variables from .env if it exists
 if [ -f .env ]; then

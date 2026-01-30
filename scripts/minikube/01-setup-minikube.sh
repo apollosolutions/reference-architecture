@@ -30,10 +30,10 @@ fi
 # Check if minikube cluster already exists
 if minikube status &> /dev/null; then
     echo "Minikube cluster already exists. Starting it..."
-    minikube start
+    minikube start --memory 6144
 else
     echo "Creating new Minikube cluster..."
-    minikube start
+    minikube start --memory 6144
 fi
 
 # Enable ingress addon for external access
