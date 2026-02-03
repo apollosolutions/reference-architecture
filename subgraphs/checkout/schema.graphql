@@ -1,11 +1,11 @@
 extend schema
   @link(
-    url: "https://specs.apollo.dev/federation/v2.0"
-    import: ["@key", "@external", "@requires"]
+    url: "https://specs.apollo.dev/federation/v2.5"
+    import: ["@key", "@external", "@requires", "@authenticated"]
   )
 
 type Mutation {
-  cart: CartMutations
+  cart: CartMutations @authenticated
 }
 
 type CartMutations {
@@ -30,7 +30,7 @@ type User @key(fields: "id") {
   """
   The user's active cart session. Once the cart items have been purchases, they transition to an Order
   """
-  cart: Cart
+  cart: Cart @authenticated
 }
 
 """
