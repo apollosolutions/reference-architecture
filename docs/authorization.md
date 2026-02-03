@@ -254,11 +254,13 @@ curl -X POST http://localhost:4000/graphql \
 ### Testing Scope-Based Authorization
 
 ```bash
-# Login without user:read:email scope
+# Login as a user without user:read:email scope (e.g., user without scopes assigned)
+# Note: Scopes are server-assigned based on user data, not client-provided
 mutation {
-  login(username: "alice", password: "password", scopes: []) {
+  login(username: "userWithoutScopes", password: "password") {
     ... on LoginSuccessful {
       token
+      scopes  # Will show server-assigned scopes (empty array if none assigned)
     }
   }
 }
@@ -271,11 +273,13 @@ query {
   }
 }
 
-# Login with user:read:email scope
+# Login as a user with user:read:email scope (e.g., user1, user2, user3, or inventoryManager)
+# All users have user:read:email scope assigned by default
 mutation {
-  login(username: "alice", password: "password", scopes: ["user:read:email"]) {
+  login(username: "user1", password: "password") {
     ... on LoginSuccessful {
       token
+      scopes  # Will include ["user:read:email"] from server-assigned scopes
     }
   }
 }
@@ -287,14 +291,36 @@ query {
     email  # Returns email with user:read:email scope
   }
 }
+
+# Login as inventoryManager to test inventory:read scope
+mutation {
+  login(username: "inventoryManager", password: "password") {
+    ... on LoginSuccessful {
+      token
+      scopes  # Will include ["user:read:email", "inventory:read"]
+    }
+  }
+}
+
+# Query inventory with inventory:read scope - should succeed
+query {
+  variant(id: "variant:1") {
+    id
+    inventory {  # Requires inventory:read scope
+      inStock
+      inventory
+    }
+  }
+}
 ```
 
 ### Testing Resource-Level Authorization
 
 ```bash
 # Login as user:1
+# Note: Scopes are server-assigned based on user data
 mutation {
-  login(username: "alice", password: "password", scopes: []) {
+  login(username: "user1", password: "password") {
     ... on LoginSuccessful {
       token
     }

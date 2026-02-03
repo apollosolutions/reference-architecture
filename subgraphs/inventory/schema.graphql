@@ -1,5 +1,5 @@
 extend schema
-  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@requiresScopes"])
 
 type Variant @key(fields: "id") {
   id: ID!
@@ -7,7 +7,7 @@ type Variant @key(fields: "id") {
   """
   Checks the warehouse API for inventory information.
   """
-  inventory: Inventory
+  inventory: Inventory @requiresScopes(scopes: [["inventory:read"]])
 }
 
 """

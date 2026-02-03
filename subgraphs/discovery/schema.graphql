@@ -1,5 +1,5 @@
 extend schema
-  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@authenticated"])
 
 type User @key(fields: "id") {
   id: ID!
@@ -7,7 +7,7 @@ type User @key(fields: "id") {
   """
   Suggest products for this user, optionally pass in a specific product id to compare too
   """
-  recommendedProducts(productId: ID = null): [Product]
+  recommendedProducts(productId: ID = null): [Product] @authenticated
 }
 
 type Product @key(fields: "id") {

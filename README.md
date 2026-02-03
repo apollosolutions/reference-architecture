@@ -179,7 +179,7 @@ sequenceDiagram
     participant UsersSubgraph
     participant Subgraphs
 
-    Client->>UsersSubgraph: login(username, password, scopes)
+    Client->>UsersSubgraph: login(username, password)
     UsersSubgraph->>Client: JWT token + user data
     
     Client->>Router: GraphQL request + Authorization: Bearer <token>
