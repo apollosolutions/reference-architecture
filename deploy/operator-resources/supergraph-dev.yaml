@@ -6,7 +6,7 @@ metadata:
 spec:
   replicas: 3
   podTemplate:
-    routerVersion: 2.10.0
+    routerVersion: 2.11.0
     env:
       - name: APOLLO_ROUTER_LOG
         value: "debug"
@@ -109,4 +109,7 @@ spec:
             enabled: true
             endpoint: http://collector.monitoring.svc.cluster.local:4318
             protocol: http
-
+    experimental_diagnostics:
+      enabled: true
+      listen: 0.0.0.0:8089
+      output_directory: /tmp/router-diagnostics
