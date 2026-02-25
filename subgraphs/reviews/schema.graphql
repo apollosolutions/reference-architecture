@@ -1,5 +1,5 @@
 extend schema
-  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key"])
+  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
 
 "A review of a given product by a specific user"
 type Review @key(fields: "id") {

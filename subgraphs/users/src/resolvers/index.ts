@@ -48,7 +48,7 @@ export const resolvers: Resolvers = {
     me: (_, __, { user }) => user ? getUserById(user.sub) : null
   },
   Mutation: {
-    async login(_, { username, password, scopes }) {
+    async login(_, { username, password }) {
       try {
         let user = getUserbyUsername(username)
         if (!user || password === "") {
@@ -62,7 +62,10 @@ export const resolvers: Resolvers = {
 
         const alg = "ES256";
         const privateKey = createPrivateKey(privateKeyText);
-        const scopesArray = (scopes && Array.isArray(scopes)) ? scopes : [];
+
+        // Use server-assigned scopes from user data
+        const scopesArray = user.scopes || [];
+
         const token = await new jose.SignJWT({
           sub: user.id,
           scope: scopesArray.join(' '),

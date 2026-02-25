@@ -6,6 +6,7 @@ export type DataUserType = {
   orders: DataOrderType[];
   shippingAddress: string;
   email: string;
+  scopes?: string[];
 }
 type DataPaymentMethodType = {
   id: string;
@@ -44,7 +45,8 @@ export const users = [
     },
     orders: [{ id: "order:1" }, { id: "order:2" }],
     shippingAddress: "123 Main St",
-    email: "user1@contoso.org"
+    email: "user1@contoso.org",
+    scopes: ["user:read:email"]
   },
   {
     id: "user:2",
@@ -62,9 +64,10 @@ export const users = [
     },
     orders: [{ id: "order:3" }],
     shippingAddress: "123 Main St",
-    email: "user2@contoso.org"
+    email: "user2@contoso.org",
+    scopes: ["user:read:email"]
   },
-  
+
   {
     id: "user:3",
     username: "user3",
@@ -83,6 +86,23 @@ export const users = [
     cart: {},
     orders: [{ id: "order:4" }, { id: "order:5" }, { id: "order:6" }],
     shippingAddress: "123 Main St",
-    email: "user3@contoso.org"
+    email: "user3@contoso.org",
+    scopes: ["user:read:email"]
+  },
+  {
+    id: "user:4",
+    username: "inventoryManager",
+    paymentMethods: [
+      {
+        id: "paymentMethod:6",
+        name: "Inventory Manager's credit card",
+        type: "CREDIT_CARD",
+      },
+    ],
+    cart: {},
+    orders: [],
+    shippingAddress: "456 Warehouse Blvd",
+    email: "inventoryManager@contoso.org",
+    scopes: ["user:read:email", "inventory:read"]
   },
 ];

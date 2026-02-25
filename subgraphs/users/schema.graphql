@@ -6,12 +6,12 @@ type Query {
   Get the current user from our fake "auth" headers
   Set the "x-user-id" header to the user id.
   """
-  user(id: ID!): User
+  user(id: ID!): User @authenticated
   me: User @authenticated
 }
 
 type Mutation {
-  login(username: String!, password: String!, scopes: [String!]! = []): LoginResponse
+  login(username: String!, password: String!): LoginResponse
 }
 
 union LoginResponse = LoginSuccessful | LoginFailed
@@ -27,7 +27,7 @@ type LoginFailed {
 }
 
 "An user account in our system"
-type User @key(fields: "id") {
+type User @key(fields: "id") @authenticated {
   id: ID!
 
   """
