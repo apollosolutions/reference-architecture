@@ -11,6 +11,9 @@ import {
   Image,
   Text,
   Spacer,
+  Badge,
+  Wrap,
+  WrapItem,
 } from '@chakra-ui/react'
 import ShowMoreText from 'react-show-more-text'
 import { StarIcon } from '../Icons/Star'
@@ -43,7 +46,27 @@ export default function ProductCard(props: ProductCardProps) {
       flexDirection="column"
       overflow="hidden"
     >
-      <CardHeader p={{ base: 2, md: 4 }} pb={0}>
+      <CardHeader p={{ base: 2, md: 4 }} pb={0} position="relative">
+        {product.promotions && product.promotions.length > 0 && (
+          <Wrap position="absolute" top={2} left={2} zIndex={1} spacing={1}>
+            {product.promotions.map((promo) => (
+              <WrapItem key={promo.id}>
+                <Badge
+                  colorScheme="orange"
+                  fontSize="xs"
+                  px={2}
+                  py={1}
+                  borderRadius="md"
+                  title={promo.description}
+                >
+                  {promo.discountType === 'PERCENTAGE'
+                    ? `${promo.value}% off`
+                    : `$${promo.value} off`}
+                </Badge>
+              </WrapItem>
+            ))}
+          </Wrap>
+        )}
         <Center>
           <Image
             src={product.mediaUrl}

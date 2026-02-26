@@ -25,6 +25,8 @@ kubectl delete supergraphschemas ${RESOURCE_NAME} -n apollo || true
 kubectl delete subgraph --all --all-namespaces || true
 ```
 
+This removes all Subgraph CRDs, including the eight GraphQL subgraphs (checkout, discovery, inventory, orders, products, reviews, shipping, users) and the promotions Connector subgraph (schema-only, no deployment).
+
 **Note:** The client's Ingress resource is managed by Helm and will be automatically deleted when you uninstall the Helm release in the next step.
 
 ## Uninstall Helm Releases
@@ -37,14 +39,19 @@ helm uninstall coprocessor -n apollo || true
 for subgraph in checkout discovery inventory orders products reviews shipping users; do
   helm uninstall $subgraph -n $subgraph || true
 done
+for service in promotions-api; do
+  helm uninstall $service -n $service || true
+done
 ```
+
+**Note:** The promotions subgraph is schema-only (Apollo Connector); it has no Helm deployment. Its Subgraph CRD is removed in the previous step when you run `kubectl delete subgraph --all --all-namespaces`. The `promotions-api` service is the REST API that the Connector calls and is uninstalled above.
 
 ## Delete Namespaces
 
 After deleting CRDs and uninstalling Helm releases, delete all application namespaces. This will remove any remaining resources:
 
 ```bash
-kubectl delete namespace checkout discovery inventory orders products reviews shipping users || true
+kubectl delete namespace checkout discovery inventory orders products reviews shipping users promotions promotions-api || true
 kubectl delete namespace client || true
 kubectl delete secret apollo-api-key -n apollo-operator || true
 helm uninstall apollo-operator -n apollo-operator || true
@@ -84,7 +91,7 @@ If you want to remove the local Docker images built for this project:
 eval $(minikube docker-env)
 docker rmi checkout:local discovery:local inventory:local orders:local \
   products:local reviews:local shipping:local users:local \
-  coprocessor:local client:local || true
+  promotions-api:local coprocessor:local client:local || true
 ```
 
 ## Clean Up Environment Variables (Optional)

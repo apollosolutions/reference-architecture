@@ -1,0 +1,7 @@
+apiVersion: v2
+name: promotions-api
+description: REST API for product promotions
+
+type: application
+version: 0.1.0
+appVersion: main

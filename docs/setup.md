@@ -116,7 +116,6 @@ This script:
 This script:
 - Configures Docker to use Minikube's Docker daemon
 - Builds all subgraph images locally
-- Tags images as `{subgraph}:local`
 - Builds coprocessor and client images (for future use)
 
 ### Script 05: Deploy Subgraphs
@@ -126,8 +125,9 @@ This script:
 ```
 
 This script:
-- Deploys each subgraph using Helm charts
-- Creates Subgraph CRDs with inline SDL schemas
+- Deploys eight GraphQL subgraphs (checkout, discovery, inventory, orders, products, reviews, shipping, users) using Helm charts
+- Deploys the promotions-api REST API service (data source for the promotions Connector)
+- Creates Subgraph CRDs with inline SDL schemas for all nine subgraphs, including the promotions Connector (schema-only; uses `http://ignore` as endpoint)
 - Configures images to use local builds
 
 Monitor subgraph deployment:

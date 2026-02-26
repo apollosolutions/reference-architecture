@@ -7,7 +7,8 @@ Once the architecture is fully stood up, you'll have:
 - An Apollo Router running and managed by the [Apollo GraphOS Operator](https://www.apollographql.com/docs/apollo-operator/), utilizing:
   - [A coprocessor for handling customizations outside of the router](https://www.apollographql.com/docs/router/customizations/coprocessor)
   - [Authorization/Authentication directives](https://www.apollographql.com/docs/router/configuration/authorization)
-- Eight subgraphs, each handling a portion of the overall supergraph schema, with schemas automatically published to GraphOS via the operator using inline SDL
+- Eight subgraphs plus a connector-based promotions subgraph, each handling a portion of the overall supergraph schema, with schemas automatically published to GraphOS via the operator using inline SDL
+- A promotions REST API (Node/Express) deployed as a data source for the [Apollo Connector](https://www.apollographql.com/docs/graphos/connectors/) that extends products with promotion data
 - A React-based frontend application utilizing Apollo Client (optional)
 - Apollo GraphOS Operator for automated schema publishing, composition, and deployment
 - Step-by-step scripts for easy local setup and deployment
@@ -39,6 +40,10 @@ graph TB
             Users[Users Subgraph]
         end
         
+        subgraph "REST API Services"
+            PromotionsAPI[Promotions REST API]
+        end
+        
         Ingress[NGINX Ingress Controller]
     end
     
@@ -56,6 +61,7 @@ graph TB
     Router -->|GraphQL| Reviews
     Router -->|GraphQL| Shipping
     Router -->|GraphQL| Users
+    Router -->|REST/Connector| PromotionsAPI
     
     Operator -->|Manages| SupergraphSchema
     Operator -->|Manages| Supergraph

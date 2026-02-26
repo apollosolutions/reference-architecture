@@ -16,7 +16,7 @@ The Apollo GraphOS Operator automates the management of GraphQL subgraphs and su
 
 The operator manages three types of Kubernetes resources:
 
-1. **Subgraph** - Defines a GraphQL subgraph with its schema location and endpoint
+1. **Subgraph** - Defines a GraphQL subgraph (or Connector schema) with its schema location and endpoint. Connector subgraphs (e.g., promotions) use `http://ignore` as the endpoint since the router executes the Connector logic directly rather than calling a GraphQL server.
 2. **SupergraphSchema** - Selects Subgraphs and composes them into a supergraph schema
 3. **Supergraph** - Deploys the composed schema as a running Apollo Router
 
@@ -39,7 +39,7 @@ graph TB
 ```
 
 When a Subgraph CRD is deployed:
-1. The operator extracts the schema from the container image (`/app/schema.graphql`)
+1. The operator extracts the schema from the Subgraph CRD (inline SDL) or container image
 2. Publishes the schema to Apollo GraphOS Studio
 3. SupergraphSchema triggers composition of all matching subgraphs
 4. The composed schema is available in GraphOS Studio
@@ -51,7 +51,9 @@ When a Subgraph CRD is deployed:
 
 - **apollo-operator**: Operator installation and controller
 - **apollo**: SupergraphSchema and Supergraph resources, router deployment
-- **checkout, discovery, inventory, orders, products, reviews, shipping, users**: Individual subgraph services
+- **checkout, discovery, inventory, orders, products, reviews, shipping, users**: Individual subgraph services (GraphQL servers)
+- **promotions**: Connector subgraph (schema-only via Subgraph CRD; no GraphQL server—router executes the Connector directly)
+- **promotions-api**: REST API service that the promotions Connector calls
 
 ### Prod Environment (`apollo-supergraph-k8s-prod` cluster)
 
