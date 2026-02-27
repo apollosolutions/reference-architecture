@@ -107,9 +107,20 @@ export default function Cart(props: Props) {
                         <Flex align="center" gap={2} wrap="wrap">
                           <Heading size="md">{item.product?.title || 'Product'}</Heading>
                           {item.product?.promotions?.length > 0 && (
-                            <HStack spacing={1}>
+                            <HStack spacing={2}>
                               {item.product.promotions.map((promo: { id: string; discountType: string; value: number }) => (
-                                <Badge key={promo.id} colorScheme="orange" fontSize="xs">
+                                <Badge
+                                  key={promo.id}
+                                  colorScheme="orange"
+                                  variant="solid"
+                                  fontSize="sm"
+                                  fontWeight="bold"
+                                  px={3}
+                                  py={1}
+                                  boxShadow="md"
+                                  textTransform="uppercase"
+                                  letterSpacing="wider"
+                                >
                                   {promo.discountType === 'PERCENTAGE'
                                     ? `${promo.value}% off`
                                     : `$${promo.value} off`}

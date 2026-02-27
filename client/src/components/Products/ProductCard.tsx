@@ -48,16 +48,21 @@ export default function ProductCard(props: ProductCardProps) {
     >
       <CardHeader p={{ base: 2, md: 4 }} pb={0} position="relative">
         {product.promotions && product.promotions.length > 0 && (
-          <Wrap position="absolute" top={2} left={2} zIndex={1} spacing={1}>
+          <Wrap position="absolute" top={2} left={2} zIndex={1} spacing={2}>
             {product.promotions.map((promo) => (
               <WrapItem key={promo.id}>
                 <Badge
                   colorScheme="orange"
-                  fontSize="xs"
-                  px={2}
-                  py={1}
+                  variant="solid"
+                  fontSize="sm"
+                  fontWeight="bold"
+                  px={3}
+                  py={1.5}
                   borderRadius="md"
                   title={promo.description}
+                  boxShadow="md"
+                  textTransform="uppercase"
+                  letterSpacing="wider"
                 >
                   {promo.discountType === 'PERCENTAGE'
                     ? `${promo.value}% off`
