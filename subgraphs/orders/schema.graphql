@@ -1,13 +1,11 @@
 extend schema
-  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key"])
+  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@authenticated"])
 
 type Query {
   """
   Get a specific order by id. Meant to be used for a detailed view of an order
   """
-  order(id: ID!): Order
-  "Testing"
-  anotherOciTest: String
+  order(id: ID!): Order @authenticated
 }
 
 """

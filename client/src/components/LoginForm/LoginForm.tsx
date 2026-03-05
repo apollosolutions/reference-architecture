@@ -96,7 +96,7 @@ const LoginForm = () => {
               bg="navy.400"
               borderWidth="2px"
               borderColor="beige.400"
-              placeholder="user1, user2, or user3"
+              placeholder="user1, user2, user3, or inventoryManager"
               value={username}
               onChange={handleChangeUsername}
             />

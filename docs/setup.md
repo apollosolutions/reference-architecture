@@ -316,15 +316,20 @@ The application includes three test users:
 2. Click "Login" in the navigation menu
 3. Enter one of the test usernames (e.g., `user1`)
 4. Enter any non-empty password (e.g., `password`)
-5. Optionally enter scopes (comma-separated, e.g., `user:read:email`)
+5. Enter username and password (scopes are server-assigned based on user data)
 6. Click "Sign In"
 
 **Note:** The password validation only checks that it's not empty. Any non-empty password will work for authentication.
 
 ### Scopes
 
-Scopes are optional but can be used to control access to certain fields:
-- `user:read:email` - Allows reading the user's email address
+Scopes are server-assigned based on user data and control access to certain fields:
+- `user:read:email` - Allows reading the user's email address (assigned to all users by default)
+- `inventory:read` - Allows reading inventory levels (assigned to `inventoryManager` user)
+
+Available test users and their scopes:
+- `user1`, `user2`, `user3` - Have `user:read:email` scope
+- `inventoryManager` - Has `user:read:email` and `inventory:read` scopes
 
 ## Creating Additional Environments
 
