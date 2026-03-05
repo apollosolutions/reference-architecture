@@ -1,0 +1,34 @@
+# Get the cart of the current user making the inquiry. An "Authorization" header will be passed by the MCP server with a bearer token to authorize this request. Please pass that bearer token to the MCP server in an "Authorization" header.
+query MyCart {
+  me {
+    id
+    cart {
+      items {
+        product {
+          id
+          upc
+          title
+          description
+          mediaUrl
+          releaseDate
+          variants {
+            id
+            price
+            inventory {
+              inStock
+              inventory
+            }
+            colorway
+            size
+            dimensions
+            weight
+          }
+          reviews {
+            id
+            body
+          }
+        }
+      }
+    }
+  }
+}

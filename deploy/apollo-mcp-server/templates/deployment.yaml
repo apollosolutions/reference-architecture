@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-deployment
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      containers:
+      - name: apollo-mcp-server
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 8000
+          name: http
+        envFrom:
+        - secretRef:
+            name: mcp-credentials
+        resources:
+          limits:
+            cpu: {{ .Values.resources.limits.cpu }}
+            memory: {{ .Values.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.resources.requests.cpu }}
+            memory: {{ .Values.resources.requests.memory }}
+        volumeMounts:
+        - name: config-volume
+          mountPath: /data/mcp.yaml
+          subPath: mcp.yaml
+        - name: operations-volume
+          mountPath: /data/operations
+        command: ["mcp-server"]
+        args: ["/data/mcp.yaml"]
+      volumes:
+      - name: config-volume
+        configMap:
+          name: {{ .Chart.Name }}-config
+      - name: operations-volume
+        configMap:
+          name: {{ .Chart.Name }}-operations

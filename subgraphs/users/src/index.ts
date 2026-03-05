@@ -60,6 +60,20 @@ async function main() {
     res.json(JSON.parse(jwks));
   })
 
+  // OAuth metadata endpoint
+  app.get('/.well-known/oauth-authorization-server', (req, res) => {
+    console.log("Did I make it?", req)
+    const issuer = `http://graphql.users.svc.cluster.local:${port}`;
+
+    res.json({
+      issuer: issuer,
+      jwks_uri: `${issuer}/.well-known/jwks.json`,
+      response_types_supported: ["code", "token"],
+      token_endpoint: `${issuer}/token`,
+      authorization_endpoint: `${issuer}/authorize`,
+    });
+  });
+
   // Log warning if trace context is missing
   app.use((req, res, next) => {
     if (!req.headers['traceparent']) {

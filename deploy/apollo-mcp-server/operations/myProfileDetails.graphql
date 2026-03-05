@@ -1,0 +1,11 @@
+# Get the profile details of the current user making the inquiry. An "Authorization" header will be passed by the MCP server with a bearer token to authorize this request. Please pass that bearer token to the MCP server in an "Authorization" header.
+query MyProfileDetails {
+  me {
+    id
+    shippingAddress
+    username
+    email
+    previousSessions
+    loyaltyPoints
+  }
+}

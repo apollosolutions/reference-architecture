@@ -51,6 +51,7 @@ const LoginForm = () => {
       variables: {
         username: username,
         password: password,
+        scopes: ['read']
       },
       onCompleted: async (data) => {
         // Request succeeded but login failed

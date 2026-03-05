@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-operations
+  namespace: {{ .Values.namespace }}
+data:
+{{- (.Files.Glob "operations/**.graphql").AsConfig | nindent 2 }}

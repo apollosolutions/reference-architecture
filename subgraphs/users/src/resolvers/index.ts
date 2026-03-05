@@ -60,6 +60,7 @@ export const resolvers: Resolvers = {
           encoding: "utf8"
         });
 
+        // TODO: Ensure that the user is logged out if the JWT is expired
         const alg = "ES256";
         const privateKey = createPrivateKey(privateKeyText);
         const scopesArray = (scopes && Array.isArray(scopes)) ? scopes : [];
@@ -67,7 +68,12 @@ export const resolvers: Resolvers = {
           sub: user.id,
           scope: scopesArray.join(' '),
           username,
-        }).setProtectedHeader({ alg }).setIssuedAt().setExpirationTime('2h').sign(privateKey);
+        }).setProtectedHeader({ alg, kid: 'main-key-2024' })
+          .setIssuer('http://graphql.users.svc.cluster.local:4001')
+          .setAudience('apollo-mcp')
+          .setIssuedAt()
+          .setExpirationTime('2h')
+          .sign(privateKey);
 
         return {
           token,

@@ -1,0 +1,22 @@
+endpoint: http://reference-architecture-dev/
+transport:
+  type: streamable_http
+  auth:
+    servers:
+      - http://graphql.users.svc.cluster.local:4001
+    audiences:
+      - apollo-mcp
+    scopes:
+      - read
+    allow_any_audience: false
+    resource: http://localhost:5001/mcp
+logging:
+  level: debug 
+introspection:
+  introspect:
+    enabled: true
+operations:
+  source: local
+  paths:
+    - /data/operations/myCart.graphql
+    - /data/operations/myProfileDetails.graphql

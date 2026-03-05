@@ -30,6 +30,7 @@ Before you begin, ensure you have:
 2. Navigate to [User Settings > API Keys](https://studio.apollographql.com/user-settings/api-keys)
 3. Create a new Personal API key or use an existing one
 4. Copy the API key value
+5. Ensure that your account has the "Org Admin" role within your GraphOS organization and that you are on the Developer plan or higher
 
 ## Step 1: Install Minikube and Dependencies
 
@@ -79,6 +80,10 @@ This script:
 - Starts or creates a Minikube cluster
 - Enables the ingress addon for external access
 - Configures kubectl to use the Minikube context
+
+*note*: Please be advised that if you have an existing cluster, the script will attempt to reuse that. You need at least XXXX for the setup to succeed.
+
+*note*: Please ensure that docker is configured to run with at least 4 cpu's, 12 GB of ram and 40 GB of disk space.
 
 ### Script 02: Setup Apollo GraphOS Graph
 
@@ -130,6 +135,12 @@ This script:
 - Creates Subgraph CRDs with inline SDL schemas
 - Configures images to use local builds
 
+*note*: Make sure that your minikube cluster's apiserver service is running by running:
+
+```bash
+minikube status
+```
+
 Monitor subgraph deployment:
 
 ```bash
@@ -165,6 +176,30 @@ This script:
 - Installs Redis via Helm (standalone, no auth, no persistence)
 - Waits for Redis to be ready
 
+### Script 11: Deploy Telemetry Stack (Optional) (TODO: Update this to be an optional step 8 before deploying the router)
+
+Deploy Zipkin and OpenTelemetry Collector for distributed tracing:
+
+```bash
+./scripts/minikube/11-deploy-telemetry.sh
+```
+
+This script:
+- Creates the `monitoring` namespace
+- Deploys Zipkin for trace visualization
+- Deploys OpenTelemetry Collector to receive traces from router and subgraphs
+- Waits for both services to be ready
+
+**Note:** This script is optional. Telemetry is configured for all environments (dev and prod) but the telemetry stack only needs to be deployed once per cluster. The collector receives traces from all subgraphs and the router, then exports them to Zipkin.
+
+**Access Zipkin UI:**
+
+```bash
+kubectl port-forward -n monitoring svc/zipkin 9411:9411
+```
+
+Then open http://localhost:9411 in your browser to view traces.
+
 ### Script 08: Deploy Operator Resources
 
 ```bash
@@ -175,6 +210,9 @@ This script:
 - Deploys SupergraphSchema CRD (triggers composition)
 - Deploys Supergraph CRD with router configuration (deploys the Apollo Router)
 - Waits for the router deployment to be created
+
+TODO: Mine timed out after 60 seconds but everything was indeed deployed properly.
+TODO: More error handling/messaging needed here maybe?
 
 **Note:** The coprocessor (script 06) must be deployed before running this script.
 
@@ -212,63 +250,11 @@ This script:
 
 **Note:** The client is required if you want to access the router via the ingress controller (minikube tunnel or NodePort). If you only need direct router access, you can use port-forward (Option 2 in Step 4) and skip this script.
 
-### Script 11: Deploy Telemetry Stack (Optional)
-
-Deploy Zipkin and OpenTelemetry Collector for distributed tracing:
-
-```bash
-./scripts/minikube/11-deploy-telemetry.sh
-```
-
-This script:
-- Creates the `monitoring` namespace
-- Deploys Zipkin for trace visualization
-- Deploys OpenTelemetry Collector to receive traces from router and subgraphs
-- Waits for both services to be ready
-
-**Note:** This script is optional. Telemetry is configured for all environments (dev and prod) but the telemetry stack only needs to be deployed once per cluster. The collector receives traces from all subgraphs and the router, then exports them to Zipkin.
-
-**Recommended:** Deploy telemetry (script 11) before deploying the router (script 08) to avoid connection errors in router logs. If you've already deployed the router, you can deploy telemetry at any time - the router will automatically start sending traces once the collector is available.
-
-**Access Zipkin UI:**
-
-```bash
-kubectl port-forward -n monitoring svc/zipkin 9411:9411
-```
-
-Then open http://localhost:9411 in your browser to view traces.
-
 ## Step 4: Access Your Supergraph
 
 After running all scripts, you can access your supergraph in several ways:
 
-### Option 1: Using Minikube Tunnel (requires Script 09)
-
-**Note:** This option requires the client application to be deployed (Script 09) because it uses the client's Ingress resource.
-
-The ingress controller has been configured as a LoadBalancer service. To access it via `minikube tunnel`:
-
-```bash
-minikube tunnel
-```
-
-**Troubleshooting if tunnel hangs:**
-- Check if tunnel is already running: `ps aux | grep 'minikube tunnel'`
-- Stop existing tunnel: `pkill -f 'minikube tunnel'`
-- Try running with explicit cleanup: `minikube tunnel --cleanup`
-- On macOS, if sudo password isn't prompted, try: `sudo minikube tunnel`
-
-**Important notes:**
-- You may see a message "Starting tunnel for service router" - **this can be safely ignored**
-- The "router" is an Ingress resource (not a service), so it doesn't need tunneling
-- Only the `ingress-nginx-controller` LoadBalancer service needs tunneling
-- Wait for the "Status: running" message
-- Access the client UI at: `http://127.0.0.1/`
-
-**Why you see "router" in the tunnel output:**
-The ingress controller automatically sets a LoadBalancer status on Ingress resources, which makes `minikube tunnel` think it needs to tunnel them. However, since the ingress controller is already being tunneled, the router is accessible through it. You can safely ignore this message.
-
-### Option 2: Using Port Forwarding (no client required)
+### Option 1: Using Port Forwarding (no client required)
 
 Port forward directly to the router service. This method does not require the client application:
 
@@ -280,7 +266,7 @@ Then access at `http://localhost:4000` in your browser.
 
 **Note:** Keep the port-forward command running in a terminal while you access the router.
 
-### Option 3: Using Ingress via NodePort (requires Script 09)
+### Option 2: Using Ingress via NodePort (requires Script 09)
 
 **Note:** This option requires the client application to be deployed (Script 09) because it uses the client's Ingress resource.
 
