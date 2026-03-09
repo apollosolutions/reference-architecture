@@ -1,0 +1,35 @@
+# Fetches the authenticated user's shopping cart with full product details.
+# Requires an Authorization header with a valid Bearer token.
+query MyCart {
+  me {
+    id
+    cart {
+      items {
+        product {
+          id
+          upc
+          title
+          description
+          mediaUrl
+          releaseDate
+          variants {
+            id
+            price
+            inventory {
+              inStock
+              inventory
+            }
+            colorway
+            size
+            dimensions
+            weight
+          }
+          reviews {
+            id
+            body
+          }
+        }
+      }
+    }
+  }
+}

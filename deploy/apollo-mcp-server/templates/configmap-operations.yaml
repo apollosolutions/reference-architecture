@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apollo-mcp-operations
+data:
+{{- range $path, $_ := .Files.Glob "operations/**.graphql" }}
+  {{ base $path }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}

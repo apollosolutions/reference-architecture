@@ -1,0 +1,28 @@
+endpoint: ${env.ROUTER_ENDPOINT:-http://reference-architecture-dev.apollo.svc.cluster.local:80}
+
+transport:
+  type: streamable_http
+  port: 8000
+  auth:
+    servers:
+      - http://graphql.users.svc.cluster.local:4001
+    audiences:
+      - apollo-mcp
+    allow_any_audience: false
+    resource: ${env.MCP_RESOURCE_URL:-http://localhost:5001/mcp}
+    scopes:
+      - user:read:email
+    scope_mode: require_any
+
+logging:
+  level: debug
+
+introspection:
+  introspect:
+    enabled: true
+
+operations:
+  source: local
+  paths:
+    - /data/operations/myCart.graphql
+    - /data/operations/myProfileDetails.graphql

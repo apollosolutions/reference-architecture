@@ -10,6 +10,8 @@ This guide will walk you through setting up the Apollo Federation Supergraph ref
   - [Step 2: Configure Environment Variables](#step-2-configure-environment-variables)
   - [Step 3: Run Setup Scripts](#step-3-run-setup-scripts)
   - [Step 4: Access Your Supergraph](#step-4-access-your-supergraph)
+  - [Step 5: Logging Into the Client Application](#step-5-logging-into-the-client-application)
+  - [Step 6: Connect AI Agents via MCP](#step-6-connect-ai-agents-via-mcp)
   - [Creating Additional Environments](#creating-additional-environments)
 
 ## Prerequisites
@@ -238,6 +240,52 @@ kubectl port-forward -n monitoring svc/zipkin 9411:9411
 
 Then open http://localhost:9411 in your browser to view traces.
 
+### Script 12: Deploy Apollo MCP Server (Optional)
+
+Deploy the Apollo MCP Server to expose your supergraph to AI agents and LLM tools via the Model Context Protocol:
+
+```bash
+./scripts/minikube/12-deploy-mcp-server.sh
+```
+
+This script:
+- Creates a Kubernetes secret with Apollo GraphOS credentials
+- Deploys the Apollo MCP Server via Helm into the `apollo` namespace
+- Configures the MCP server to connect to the local Router instance
+- Enables OAuth 2.1 authentication using the users subgraph as the auth server
+- Waits for the MCP server pod to be ready
+
+**Prerequisites:** The router (script 08) and subgraphs (script 05) must be deployed first. The MCP server connects to the router and uses the users subgraph for authentication.
+
+**Access the MCP Server:**
+
+```bash
+kubectl port-forward -n apollo svc/apollo-mcp-server 5001:8000
+```
+
+Then configure your MCP client to connect to `http://localhost:5001/mcp`.
+
+**Claude Desktop configuration** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "apollo-reference-arch": {
+      "command": "npx",
+      "args": ["mcp-remote", "http://localhost:5001/mcp"]
+    }
+  }
+}
+```
+
+**Test with MCP Inspector:**
+
+```bash
+npx @modelcontextprotocol/inspector http://localhost:5001/mcp --transport http
+```
+
+**Authentication flow:** The MCP server uses OAuth 2.1 with the users subgraph as the authorization server. MCP clients obtain a JWT by calling the `login` mutation on the Router, then pass it as a Bearer token to the MCP server. The MCP server validates the token and forwards it to the Router for authenticated GraphQL operations.
+
 ## Step 4: Access Your Supergraph
 
 After running all scripts, you can access your supergraph in several ways:
@@ -344,6 +392,66 @@ Scopes are server-assigned based on user data and control access to certain fiel
 Available test users and their scopes:
 - `user1`, `user2`, `user3` - Have `user:read:email` scope
 - `inventoryManager` - Has `user:read:email` and `inventory:read` scopes
+
+## Step 6: Connect AI Agents via MCP
+
+If you deployed the Apollo MCP Server (script 12), you can connect AI agents and LLM tools to your supergraph.
+
+### How Authentication Works
+
+The MCP server uses OAuth 2.1 authentication with the users subgraph acting as the authorization server:
+
+1. The MCP client (e.g., Claude Desktop) discovers the auth server via the `/.well-known/oauth-authorization-server` endpoint
+2. The user authenticates by calling the `login` mutation to obtain a JWT
+3. The JWT is passed as a Bearer token to the MCP server
+4. The MCP server validates the token (signature, audience, expiry) and forwards it to the Router
+5. The Router enforces `@authenticated` and `@requiresScopes` directives as usual
+
+### Available MCP Tools
+
+The MCP server exposes two pre-defined operations as tools:
+
+| Tool | Description |
+|------|-------------|
+| `MyCart` | Fetches the authenticated user's shopping cart with full product details |
+| `MyProfileDetails` | Fetches the authenticated user's profile information |
+
+### Connecting Claude Desktop
+
+1. Ensure the MCP server is port-forwarded:
+   ```bash
+   kubectl port-forward -n apollo svc/apollo-mcp-server 5001:8000
+   ```
+
+2. Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+   ```json
+   {
+     "mcpServers": {
+       "apollo-reference-arch": {
+         "command": "npx",
+         "args": ["mcp-remote", "http://localhost:5001/mcp"]
+       }
+     }
+   }
+   ```
+
+3. Restart Claude Desktop. The MCP tools should appear in the tool list.
+
+### Connecting Claude Code
+
+```bash
+claude mcp add apollo-mcp npx mcp-remote http://localhost:5001/mcp
+```
+
+### Verifying the Connection
+
+Use MCP Inspector to verify tools are available:
+
+```bash
+npx @modelcontextprotocol/inspector http://localhost:5001/mcp --transport http
+```
+
+This opens a browser at `http://127.0.0.1:6274` where you can click Connect and List Tools to verify the available operations.
 
 ## Creating Additional Environments
 

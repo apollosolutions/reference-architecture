@@ -60,6 +60,19 @@ async function main() {
     res.json(JSON.parse(jwks));
   })
 
+  // OAuth 2.0 Authorization Server Metadata (RFC 8414)
+  // Required by the Apollo MCP Server for auth discovery
+  app.get('/.well-known/oauth-authorization-server', (req, res) => {
+    const issuer = `http://graphql.users.svc.cluster.local:${port}`;
+    res.json({
+      issuer,
+      jwks_uri: `${issuer}/.well-known/jwks.json`,
+      response_types_supported: ['code', 'token'],
+      token_endpoint: `${issuer}/token`,
+      authorization_endpoint: `${issuer}/authorize`,
+    });
+  })
+
   // Log warning if trace context is missing
   app.use((req, res, next) => {
     if (!req.headers['traceparent']) {
