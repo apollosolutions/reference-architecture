@@ -17,3 +17,18 @@ The promotions subgraph is deployed as a Subgraph CRD with inline SDL by `script
 ## Data Source
 
 The [promotions-api](../../services/promotions-api) service provides the REST API that this Connector calls.
+
+## Environment / base URL
+
+The `@source` base URL in `schema.graphql` defaults to the Minikube cluster DNS name (`http://api.promotions-api.svc.cluster.local:4010`), which matches the deployment from `scripts/minikube/05-deploy-subgraphs.sh`.
+
+**To use a different URL** (e.g. for `rover dev` locally or another cluster), override it in the **Router configuration**—not in the schema. In your router YAML config, set:
+
+```yaml
+connectors:
+  sources:
+    promotions.promotions_api:
+      override_url: "http://your-api-host:4010"
+```
+
+The key is `subgraph_name.source_name` (our subgraph is `promotions`, and the source name in the schema is `promotions_api`). This requires [Router v2.0.0 or later](https://www.apollographql.com/docs/graphos/connectors/deployment/overriding-base-urls).

@@ -11,7 +11,6 @@ import {
   Image,
   Text,
   Spacer,
-  Badge,
   Wrap,
   WrapItem,
 } from '@chakra-ui/react'
@@ -19,6 +18,7 @@ import ShowMoreText from 'react-show-more-text'
 import { StarIcon } from '../Icons/Star'
 import { Product } from '../../apollo/types'
 import { useCart } from '../../hooks/useCart'
+import { PromotionBadge } from '../PromotionBadge'
 
 type ProductCardProps = {
   product: Product
@@ -51,23 +51,7 @@ export default function ProductCard(props: ProductCardProps) {
           <Wrap position="absolute" top={2} left={2} zIndex={1} spacing={2}>
             {product.promotions.map((promo) => (
               <WrapItem key={promo.id}>
-                <Badge
-                  colorScheme="orange"
-                  variant="solid"
-                  fontSize="sm"
-                  fontWeight="bold"
-                  px={3}
-                  py={1.5}
-                  borderRadius="md"
-                  title={promo.description}
-                  boxShadow="md"
-                  textTransform="uppercase"
-                  letterSpacing="wider"
-                >
-                  {promo.discountType === 'PERCENTAGE'
-                    ? `${promo.value}% off`
-                    : `$${promo.value} off`}
-                </Badge>
+                <PromotionBadge promo={promo} />
               </WrapItem>
             ))}
           </Wrap>
