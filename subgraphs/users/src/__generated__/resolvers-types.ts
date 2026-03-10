@@ -30,7 +30,19 @@ export type LoginSuccessful = {
   __typename?: 'LoginSuccessful';
   scopes: Array<Scalars['String']['output']>;
   token: Scalars['String']['output'];
-  user: User;
+  /** User info for the logged-in user. No auth required (returned as part of login). */
+  user: LoginUser;
+};
+
+/**
+ * User info returned in login response. Not protected by @authenticated
+ * since the client does not have a token yet during the login mutation.
+ */
+export type LoginUser = {
+  __typename?: 'LoginUser';
+  id: Scalars['ID']['output'];
+  previousSessions?: Maybe<Array<Scalars['ID']['output']>>;
+  username: Scalars['String']['output'];
 };
 
 export type Mutation = {
@@ -41,7 +53,6 @@ export type Mutation = {
 
 export type MutationLoginArgs = {
   password: Scalars['String']['input'];
-  scopes?: Array<Scalars['String']['input']>;
   username: Scalars['String']['input'];
 };
 
@@ -192,9 +203,10 @@ export type ResolversTypes = ResolversObject<{
   String: ResolverTypeWrapper<DeepPartial<Scalars['String']['output']>>;
   LoginResponse: DeepPartial<ResolverTypeWrapper<ResolversUnionTypes<ResolversTypes>['LoginResponse']>>;
   LoginSuccessful: ResolverTypeWrapper<DeepPartial<LoginSuccessful>>;
+  LoginUser: ResolverTypeWrapper<DeepPartial<LoginUser>>;
+  ID: ResolverTypeWrapper<DeepPartial<Scalars['ID']['output']>>;
   Mutation: ResolverTypeWrapper<{}>;
   Order: ResolverTypeWrapper<DeepPartial<Order>>;
-  ID: ResolverTypeWrapper<DeepPartial<Scalars['ID']['output']>>;
   PaymentMethod: ResolverTypeWrapper<DeepPartial<PaymentMethod>>;
   PaymentType: ResolverTypeWrapper<DeepPartial<PaymentType>>;
   Query: ResolverTypeWrapper<{}>;
@@ -209,9 +221,10 @@ export type ResolversParentTypes = ResolversObject<{
   String: DeepPartial<Scalars['String']['output']>;
   LoginResponse: DeepPartial<ResolversUnionTypes<ResolversParentTypes>['LoginResponse']>;
   LoginSuccessful: DeepPartial<LoginSuccessful>;
+  LoginUser: DeepPartial<LoginUser>;
+  ID: DeepPartial<Scalars['ID']['output']>;
   Mutation: {};
   Order: DeepPartial<Order>;
-  ID: DeepPartial<Scalars['ID']['output']>;
   PaymentMethod: DeepPartial<PaymentMethod>;
   Query: {};
   User: DeepPartial<User>;
@@ -231,12 +244,19 @@ export type LoginResponseResolvers<ContextType = DataSourceContext, ParentType e
 export type LoginSuccessfulResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['LoginSuccessful'] = ResolversParentTypes['LoginSuccessful']> = ResolversObject<{
   scopes?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
   token?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  user?: Resolver<ResolversTypes['User'], ParentType, ContextType>;
+  user?: Resolver<ResolversTypes['LoginUser'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+}>;
+
+export type LoginUserResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['LoginUser'] = ResolversParentTypes['LoginUser']> = ResolversObject<{
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  previousSessions?: Resolver<Maybe<Array<ResolversTypes['ID']>>, ParentType, ContextType>;
+  username?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 }>;
 
 export type MutationResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = ResolversObject<{
-  login?: Resolver<Maybe<ResolversTypes['LoginResponse']>, ParentType, ContextType, RequireFields<MutationLoginArgs, 'password' | 'scopes' | 'username'>>;
+  login?: Resolver<Maybe<ResolversTypes['LoginResponse']>, ParentType, ContextType, RequireFields<MutationLoginArgs, 'password' | 'username'>>;
 }>;
 
 export type OrderResolvers<ContextType = DataSourceContext, ParentType extends ResolversParentTypes['Order'] = ResolversParentTypes['Order']> = ResolversObject<{
@@ -275,6 +295,7 @@ export type Resolvers<ContextType = DataSourceContext> = ResolversObject<{
   LoginFailed?: LoginFailedResolvers<ContextType>;
   LoginResponse?: LoginResponseResolvers<ContextType>;
   LoginSuccessful?: LoginSuccessfulResolvers<ContextType>;
+  LoginUser?: LoginUserResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   Order?: OrderResolvers<ContextType>;
   PaymentMethod?: PaymentMethodResolvers<ContextType>;
