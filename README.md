@@ -126,6 +126,14 @@ Learn about the authorization implementation, including:
 - Resource-level authorization patterns
 - Testing authorization scenarios
 
+### [MCP Production Guide](/docs/mcp-production.md)
+
+Guidance for deploying the Apollo MCP Server in production with a real OAuth 2.1 identity provider:
+- Configuring Auth0, Okta, Keycloak, or other IdPs
+- Scope strategy and per-operation access control
+- Security considerations (HTTPS, token passthrough, audience validation)
+- Networking and DNS (no `/etc/hosts` workarounds)
+
 ### [Cleanup](/docs/cleanup.md)
 
 Once finished, you can cleanup your environments following the above document.

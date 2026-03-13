@@ -13,12 +13,15 @@ spec:
     metadata:
       labels:
         app: apollo-mcp-server
+      annotations:
+        checksum/config: {{ .Files.Get "mcp.yaml" | sha256sum }}
     spec:
+      enableServiceLinks: false
       containers:
         - name: apollo-mcp-server
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["mcp-server", "/data/mcp.yaml"]
+          command: ["apollo-mcp-server", "/data/mcp.yaml"]
           ports:
             - containerPort: {{ .Values.service.port }}
               protocol: TCP

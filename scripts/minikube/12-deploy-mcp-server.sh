@@ -68,6 +68,7 @@ kubectl create secret generic apollo-mcp-credentials \
   --from-literal=APOLLO_KEY="$APOLLO_KEY" \
   --from-literal=ROUTER_ENDPOINT="http://reference-architecture-${ENVIRONMENT}.${NAMESPACE}.svc.cluster.local:80" \
   --from-literal=MCP_RESOURCE_URL="http://localhost:5001/mcp" \
+  --from-literal=AUTH_SERVER_URL="http://localhost:4001" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo -e "${GREEN}MCP credentials secret created/updated.${NC}"
@@ -94,22 +95,32 @@ kubectl wait --for=condition=ready pod \
 echo ""
 echo -e "${GREEN}=== Apollo MCP Server Deployed Successfully ===${NC}"
 echo ""
-echo -e "To access the MCP server locally, run:"
+echo -e "To access the MCP server locally, start both port-forwards:"
+echo ""
+echo -e "  ${YELLOW}# Terminal 1: MCP server${NC}"
 echo -e "  ${YELLOW}kubectl port-forward -n $NAMESPACE svc/apollo-mcp-server 5001:8000${NC}"
+echo ""
+echo -e "  ${YELLOW}# Terminal 2: Auth server (users subgraph for OAuth)${NC}"
+echo -e "  ${YELLOW}kubectl port-forward -n users svc/graphql 4001:4001${NC}"
 echo ""
 echo -e "Then configure your MCP client to connect to:"
 echo -e "  ${YELLOW}http://localhost:5001/mcp${NC}"
+echo ""
+echo -e "Add a DNS entry so your machine can reach the OAuth server by its in-cluster name:"
+echo -e "  ${YELLOW}echo '127.0.0.1 graphql.users.svc.cluster.local' | sudo tee -a /etc/hosts${NC}"
 echo ""
 echo -e "Example: Add to Claude Desktop config (~/Library/Application Support/Claude/claude_desktop_config.json):"
 echo -e '  {
     "mcpServers": {
       "apollo-reference-arch": {
         "command": "npx",
-        "args": ["mcp-remote", "http://localhost:5001/mcp"]
+        "args": ["mcp-remote", "http://localhost:5001/mcp", "--transport", "http-only"]
       }
     }
   }'
 echo ""
 echo -e "To test with MCP Inspector:"
 echo -e "  ${YELLOW}npx @modelcontextprotocol/inspector http://localhost:5001/mcp --transport http${NC}"
+echo ""
+echo -e "For full instructions, see docs/setup.md (Step 6) and docs/mcp-production.md."
 echo ""
