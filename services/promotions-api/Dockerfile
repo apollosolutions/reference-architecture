@@ -3,9 +3,9 @@ FROM node:22-bookworm-slim AS builder
 WORKDIR /usr/src/app
 
 COPY package.json .
-COPY package-lock.json* ./
+COPY package-lock.json ./
 
-RUN npm install
+RUN npm ci
 
 COPY tsconfig.json .
 COPY src ./src
@@ -17,9 +17,9 @@ FROM node:22-bookworm-slim
 WORKDIR /usr/src/app
 
 COPY package.json .
-COPY package-lock.json* ./
+COPY package-lock.json ./
 
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
 COPY --from=builder /usr/src/app/dist ./dist
 

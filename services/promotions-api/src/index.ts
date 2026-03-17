@@ -2,7 +2,7 @@ import express from "express";
 import { PROMOTIONS } from "./data";
 
 const app = express();
-const PORT = process.env.PORT ?? "4010";
+const PORT = process.env.PORT || "4010";
 
 app.use(express.json());
 
@@ -34,6 +34,19 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.listen(Number(PORT), () => {
+const server = app.listen(Number(PORT), () => {
   console.log(`Promotions API listening on port ${PORT}`);
+});
+
+server.on("error", (err) => {
+  console.error("Server failed to start:", err);
+  process.exit(1);
+});
+
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received — draining connections...");
+  server.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
 });

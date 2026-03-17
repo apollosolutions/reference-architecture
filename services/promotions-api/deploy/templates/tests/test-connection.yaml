@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "promotions-api.fullname" . }}-test-connection"
+  labels:
+    {{- include "promotions-api.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "promotions-api.fullname" . }}:{{ .Values.service.port }}/api/health']
+  restartPolicy: Never

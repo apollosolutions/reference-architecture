@@ -23,6 +23,7 @@ export function PromotionBadge({ promo, size = 'default' }: PromotionBadgeProps)
       py={size === 'compact' ? 1 : 1.5}
       borderRadius="md"
       title={promo.description}
+      aria-label={`${promo.name}: ${label}`}
       boxShadow="md"
       textTransform="uppercase"
       letterSpacing="wider"

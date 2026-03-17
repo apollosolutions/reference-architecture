@@ -9,6 +9,17 @@ extend schema
   http: { baseURL: "http://api.promotions-api.svc.cluster.local:4010" }
 )
 
+directive @cacheControl(
+  maxAge: Int
+  scope: CacheControlScope
+  inheritMaxAge: Boolean
+) on FIELD_DEFINITION | OBJECT | INTERFACE | UNION
+
+enum CacheControlScope {
+  PUBLIC
+  PRIVATE
+}
+
 # Extends Product with promotions from the promotions REST API.
 extend type Product @key(fields: "id") {
   id: ID!
@@ -16,7 +27,8 @@ extend type Product @key(fields: "id") {
   Active promotions for this product (e.g. percentage off, fixed discount).
   Sourced from the promotions REST API via Apollo Connector.
   """
-  promotions: [Promotion]
+  promotions: [Promotion!]
+    @cacheControl(maxAge: 300)
     @connect(
       source: "promotions_api"
       http: { GET: "/api/promotions/product/{$this.id}" }

@@ -91,9 +91,16 @@ for service in "${SERVICES[@]}"; do
         continue
     fi
     
-    docker build -t "${service}:${IMAGE_TAG}" "services/${service}"
+    # Copy root lockfile into service build context for reproducible builds (npm ci)
+    cp package-lock.json "services/${service}/package-lock.json"
     
-    if [ $? -eq 0 ]; then
+    docker build -t "${service}:${IMAGE_TAG}" "services/${service}"
+    build_result=$?
+    
+    # Clean up copied lockfile
+    rm -f "services/${service}/package-lock.json"
+    
+    if [ $build_result -eq 0 ]; then
         echo "✓ Successfully built ${service}:${IMAGE_TAG}"
         docker tag "${service}:${IMAGE_TAG}" "${service}:local"
     else

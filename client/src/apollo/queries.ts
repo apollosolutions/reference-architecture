@@ -68,6 +68,7 @@ const USER_PROFILE_FULL = gql`
             promotions {
               id
               name
+              description
               discountType
               value
             }

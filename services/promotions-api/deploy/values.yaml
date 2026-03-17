@@ -10,6 +10,14 @@ fullnameOverride: api
 
 serviceAccount:
   create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+securityContext: {}
+
+podSecurityContext: {}
 
 service:
   type: ClusterIP
