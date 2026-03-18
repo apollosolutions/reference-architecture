@@ -257,7 +257,21 @@ This script:
 
 **Prerequisites:** The router (script 08) and subgraphs (script 05) must be deployed first. The MCP server connects to the router and uses the users subgraph for authentication.
 
-After deployment, see [Step 6: Connect AI Agents via MCP](#step-6-connect-ai-agents-via-mcp) for connection instructions.
+### Script 12a: Start MCP Port Forwards (Optional)
+
+After deploying the MCP server, start the required port-forwards for local access:
+
+```bash
+./scripts/minikube/12a-mcp-port-forwards.sh
+```
+
+This script:
+- Starts port-forwards for the MCP server (localhost:5001) and the OAuth auth server (localhost:4001)
+- Adds the required `/etc/hosts` entry for the OAuth flow (prompts for sudo)
+- Verifies connectivity to both services
+- Keeps running until you press Ctrl+C
+
+After running this script, see [Step 6: Connect AI Agents via MCP](#step-6-connect-ai-agents-via-mcp) for MCP client configuration.
 
 ## Step 4: Access Your Supergraph
 
@@ -380,7 +394,19 @@ If you deployed the Apollo MCP Server (script 12), you can connect AI agents and
 
 ### Step 6a: Start Port Forwards
 
-The MCP server and the OAuth authorization server (users subgraph) both need to be reachable from your local machine. Open two terminal windows:
+The MCP server and the OAuth authorization server (users subgraph) both need to be reachable from your local machine.
+
+**Option A: Use the helper script (recommended)**
+
+```bash
+./scripts/minikube/12a-mcp-port-forwards.sh
+```
+
+This starts both port-forwards, adds the `/etc/hosts` entry (Step 6b), and verifies connectivity. Keep the script running — press Ctrl+C to stop.
+
+**Option B: Manual port-forwards**
+
+Open two terminal windows:
 
 **Terminal 1 — MCP Server:**
 
@@ -397,6 +423,8 @@ kubectl port-forward -n users svc/graphql 4001:4001
 Keep both terminals running. If either port-forward drops (e.g., after a pod restart), restart it.
 
 ### Step 6b: Add DNS Entry for the Authorization Server
+
+> If you used the helper script (12a) in Step 6a, this was already handled for you. Skip to Step 6c.
 
 The MCP server's OAuth configuration references the users subgraph by its in-cluster DNS name (`graphql.users.svc.cluster.local`). For the OAuth flow to work from your local machine, this hostname must resolve to `localhost` where the port-forward is listening.
 

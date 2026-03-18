@@ -15,10 +15,6 @@ query MyCart {
           variants {
             id
             price
-            inventory {
-              inStock
-              inventory
-            }
             colorway
             size
             dimensions
