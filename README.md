@@ -38,7 +38,11 @@ graph TB
             Shipping[Shipping Subgraph]
             Users[Users Subgraph]
         end
-        
+
+        subgraph "Redis Namespace"
+            Redis[(Redis Cache)]
+        end
+
         Ingress[NGINX Ingress Controller]
     end
     
@@ -57,6 +61,8 @@ graph TB
     Router -->|GraphQL| Shipping
     Router -->|GraphQL| Users
     
+    Router -->|Cache reads/writes| Redis
+
     Operator -->|Manages| SupergraphSchema
     Operator -->|Manages| Supergraph
     Operator -->|Publishes Schemas| GraphOS
@@ -77,6 +83,7 @@ graph TB
     style Operator fill:#fff4e1
     style GraphOS fill:#e8f5e9
     style Client fill:#f3e5f5
+    style Redis fill:#ffe8e8
 ```
 
 
@@ -133,6 +140,14 @@ Guidance for deploying the Apollo MCP Server in production with a real OAuth 2.1
 - Scope strategy and per-operation access control
 - Security considerations (HTTPS, token passthrough, audience validation)
 - Networking and DNS (no `/etc/hosts` workarounds)
+
+### [Response Caching Guide](/docs/response-caching-guide.md)
+
+Learn about response caching in this architecture, including:
+- How the router caches subgraph responses in Redis
+- Schema-level cache control with `@cacheControl` directives
+- Dev vs. production caching configuration
+- Verifying cache behavior using Apollo Sandbox
 
 ### [Cleanup](/docs/cleanup.md)
 
