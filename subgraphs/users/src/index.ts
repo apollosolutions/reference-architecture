@@ -27,7 +27,7 @@ const joseJWKS = jose.createLocalJWKSet(JSON.parse(jwks));
 
 // In-memory stores for OAuth (demo purposes)
 const registeredClients = new Map<string, { client_id: string; client_secret: string; redirect_uris: string[] }>();
-const authorizationCodes = new Map<string, { client_id: string; redirect_uri: string; scope: string; user_id: string; username: string; expires_at: number }>();
+const authorizationCodes = new Map<string, { client_id: string; redirect_uri: string; scope: string; user_id: string; username: string; code_challenge: string; code_challenge_method: string; expires_at: number }>();
 
 // --- Client ID Metadata Documents (draft-ietf-oauth-client-id-metadata-document-00) ---
 
@@ -113,6 +113,16 @@ function getRedirectHostname(redirectUri: string): string {
   try { return new URL(redirectUri).hostname; } catch { return redirectUri; }
 }
 
+function escapeHtml(str: string | undefined): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getIssuer(req: express.Request): string {
   const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${port}`;
   const protocol = req.headers['x-forwarded-proto'] || 'http';
@@ -144,18 +154,18 @@ type OAuthParams = { client_id: string; redirect_uri: string; state: string; sco
 type CimdDisplayInfo = { client_name: string; client_uri?: string; logo_uri?: string; redirect_hostname: string };
 
 function renderLoginPage(res: express.Response, params: OAuthParams, error?: string, cimd?: CimdDisplayInfo) {
-  const errorHtml = error ? `<div class="error">${error}</div>` : '';
+  const errorHtml = error ? `<div class="error">${escapeHtml(error)}</div>` : '';
 
   const clientLogoHtml = cimd?.logo_uri
-    ? `<img src="${cimd.logo_uri}" alt="${cimd.client_name}" class="client-logo">`
+    ? `<img src="${escapeHtml(cimd.logo_uri)}" alt="${escapeHtml(cimd.client_name)}" class="client-logo">`
     : '';
   const clientNameHtml = cimd?.client_name
     ? (cimd.client_uri
-        ? `<a href="${cimd.client_uri}" target="_blank" rel="noopener" class="client-link">${cimd.client_name}</a>`
-        : `<span>${cimd.client_name}</span>`)
+        ? `<a href="${escapeHtml(cimd.client_uri)}" target="_blank" rel="noopener" class="client-link">${escapeHtml(cimd.client_name)}</a>`
+        : `<span>${escapeHtml(cimd.client_name)}</span>`)
     : '';
   const clientInfoHtml = cimd
-    ? `<div class="client-info">${clientLogoHtml}<p>${clientNameHtml} wants to access your account</p><p class="redirect-host">Redirecting to <strong>${cimd.redirect_hostname}</strong></p></div>`
+    ? `<div class="client-info">${clientLogoHtml}<p>${clientNameHtml} wants to access your account</p><p class="redirect-host">Redirecting to <strong>${escapeHtml(cimd.redirect_hostname)}</strong></p></div>`
     : '';
 
   res.type('html').send(`<!DOCTYPE html>
@@ -194,17 +204,17 @@ function renderLoginPage(res: express.Response, params: OAuthParams, error?: str
       <svg viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M128 0C57.308 0 0 57.308 0 128s57.308 128 128 128 128-57.308 128-128S198.692 0 128 0z" fill="#311B92"/><path d="M176.5 198.5h-22.4l-10.6-29.8H112l-10.6 29.8H79.5L122 68h13.5l41 130.5zm-40.2-50.3l-15.5-46.8h-.6l-15.5 46.8h31.6z" fill="#fff"/></svg>
       <h1>Apollo Reference Architecture</h1>
       <p>Sign in to authorize MCP access</p>
-      ${params.scope ? `<span class="scope-badge">${params.scope}</span>` : ''}
+      ${params.scope ? `<span class="scope-badge">${escapeHtml(params.scope)}</span>` : ''}
     </div>
     ${clientInfoHtml}
     ${errorHtml}
     <form method="POST" action="/authorize">
-      <input type="hidden" name="client_id" value="${params.client_id || ''}">
-      <input type="hidden" name="redirect_uri" value="${params.redirect_uri || ''}">
-      <input type="hidden" name="state" value="${params.state || ''}">
-      <input type="hidden" name="scope" value="${params.scope || ''}">
-      <input type="hidden" name="code_challenge" value="${params.code_challenge || ''}">
-      <input type="hidden" name="code_challenge_method" value="${params.code_challenge_method || ''}">
+      <input type="hidden" name="client_id" value="${escapeHtml(params.client_id)}">
+      <input type="hidden" name="redirect_uri" value="${escapeHtml(params.redirect_uri)}">
+      <input type="hidden" name="state" value="${escapeHtml(params.state)}">
+      <input type="hidden" name="scope" value="${escapeHtml(params.scope)}">
+      <input type="hidden" name="code_challenge" value="${escapeHtml(params.code_challenge)}">
+      <input type="hidden" name="code_challenge_method" value="${escapeHtml(params.code_challenge_method)}">
       <label for="username">Username</label>
       <input type="text" id="username" name="username" placeholder="e.g. user1" autocomplete="username" autofocus required>
       <label for="password">Password</label>
@@ -300,6 +310,16 @@ async function main() {
       return;
     }
 
+    const registeredClient = registeredClients.get(client_id as string);
+    if (!registeredClient) {
+      res.status(400).json({ error: 'invalid_client', error_description: 'Unknown client_id. Register via /register or use a CIMD URL.' });
+      return;
+    }
+    if (!validateRedirectUri(redirect_uri as string, registeredClient.redirect_uris)) {
+      res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not registered for this client' });
+      return;
+    }
+
     renderLoginPage(res, params);
   });
 
@@ -320,6 +340,16 @@ async function main() {
         res.status(400).json({ error: 'invalid_client', error_description: String(err) });
         return;
       }
+    } else {
+      const registeredClient = registeredClients.get(client_id);
+      if (!registeredClient) {
+        res.status(400).json({ error: 'invalid_client', error_description: 'Unknown client_id. Register via /register or use a CIMD URL.' });
+        return;
+      }
+      if (!validateRedirectUri(redirect_uri, registeredClient.redirect_uris)) {
+        renderLoginPage(res, oauthParams, 'redirect_uri not registered for this client');
+        return;
+      }
     }
 
     if (!username || !password) {
@@ -334,7 +364,20 @@ async function main() {
     }
 
     const userScopes = user.scopes || [];
-    const grantedScope = (scope as string) || userScopes.join(' ') || 'user:read:email';
+    const requestedScopes = scope ? (scope as string).split(' ').filter(Boolean) : [];
+    const grantedScopes = requestedScopes.length > 0
+      ? requestedScopes.filter(s => userScopes.includes(s))
+      : userScopes;
+    if (requestedScopes.length > 0 && grantedScopes.length === 0) {
+      renderLoginPage(res, oauthParams, `Your account does not have any of the requested scopes: ${requestedScopes.join(', ')}`);
+      return;
+    }
+    const grantedScope = grantedScopes.join(' ') || 'user:read:email';
+
+    if (!code_challenge || code_challenge_method !== 'S256') {
+      renderLoginPage(res, oauthParams, 'PKCE with S256 is required.');
+      return;
+    }
 
     const code = crypto.randomUUID();
     console.log('[OAuth /authorize] login success for', username, '- created code:', code);
@@ -344,6 +387,8 @@ async function main() {
       scope: grantedScope,
       user_id: user.id,
       username: user.username,
+      code_challenge,
+      code_challenge_method,
       expires_at: Date.now() + 5 * 60 * 1000,
     });
 
@@ -358,7 +403,7 @@ async function main() {
   // CIMD clients are public clients (no client_secret required).
   // Dynamically registered clients also don't enforce client_secret here (demo).
   app.post('/token', express.urlencoded({ extended: true }), express.json(), async (req, res): Promise<void> => {
-    const { grant_type, code, redirect_uri, client_id } = req.body;
+    const { grant_type, code, redirect_uri, client_id, code_verifier } = req.body;
     console.log('[OAuth /token] body:', JSON.stringify(req.body));
     console.log('[OAuth /token] stored codes:', [...authorizationCodes.keys()]);
 
@@ -386,6 +431,28 @@ async function main() {
     if (!authCode || authCode.expires_at < Date.now()) {
       console.log('[OAuth /token] rejected: invalid_grant, code found:', !!authCode, 'expired:', authCode ? authCode.expires_at < Date.now() : 'N/A');
       res.status(400).json({ error: 'invalid_grant' });
+      return;
+    }
+
+    if (authCode.client_id !== client_id) {
+      console.log('[OAuth /token] rejected: client_id mismatch, expected:', authCode.client_id, 'got:', client_id);
+      authorizationCodes.delete(code);
+      res.status(400).json({ error: 'invalid_grant', error_description: 'client_id does not match the authorization request' });
+      return;
+    }
+
+    if (!code_verifier) {
+      console.log('[OAuth /token] rejected: missing code_verifier');
+      res.status(400).json({ error: 'invalid_request', error_description: 'code_verifier is required' });
+      return;
+    }
+    const expectedChallenge = crypto
+      .createHash('sha256')
+      .update(code_verifier)
+      .digest('base64url');
+    if (expectedChallenge !== authCode.code_challenge) {
+      console.log('[OAuth /token] rejected: PKCE verification failed');
+      res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
       return;
     }
 
