@@ -384,7 +384,7 @@ Available test users and their scopes:
 
 If you deployed the Apollo MCP Server (script 12), you can connect AI agents and LLM tools to your supergraph. This requires a few networking steps because both the MCP server and its OAuth authorization server run inside the Minikube cluster.
 
-> For production deployment guidance (external OAuth providers, no auto-approval), see [MCP Production Guide](./mcp-production.md).
+> For production deployment guidance — including provider-specific IdP configuration (redirect URLs, logout URLs, scopes, audience) for Auth0, Okta, and Keycloak — see the [MCP Production Guide](./mcp-production.md#step-2-configure-the-identity-provider).
 
 ### Prerequisites
 

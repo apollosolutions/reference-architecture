@@ -76,8 +76,66 @@ In your IdP, create a new application with these settings:
 
 - **Application type:** Single Page Application or Native (public client)
 - **Grant type:** Authorization Code with PKCE
-- **Redirect URIs:** Add the callback URLs for your MCP clients. For `mcp-remote`, this is typically `http://localhost:<port>/oauth/callback` (the port is auto-selected)
-- **Scopes:** Define scopes that match your GraphQL authorization requirements
+- **Redirect URIs:** Add the callback URLs for your MCP clients (see provider-specific examples below)
+- **Allowed Logout URIs:** Add any post-logout redirect URLs your clients need
+- **Scopes:** Define custom scopes that match your GraphQL authorization requirements
+
+#### Auth0
+
+1. Go to **Applications > Create Application**, select **Single Page Application**, and click **Create**.
+
+2. In the **Settings** tab, configure these fields:
+
+   | Field | Value | Notes |
+   |-------|-------|-------|
+   | **Allowed Callback URLs** | `https://mcp-client.yourdomain.com/callback` | The URL your MCP client redirects to after authorization. For `mcp-remote` during local testing, add `http://localhost:<port>/callback` and `http://127.0.0.1:<port>/callback` as additional entries. |
+   | **Allowed Logout URLs** | `https://mcp-client.yourdomain.com` | Optional — needed only if your client supports logout flows. |
+   | **Allowed Web Origins** | `https://mcp-client.yourdomain.com` | Required for silent token refresh via CORS. |
+
+   > **Local testing:** You can add `http://localhost` entries alongside production URLs. Auth0 accepts comma-separated lists. Remove localhost entries before going live.
+
+3. Under **Advanced Settings > Grant Types**, ensure **Authorization Code** is enabled (PKCE is automatic for SPAs in Auth0).
+
+4. Note the **Domain** (e.g., `your-tenant.auth0.com`) and **Client ID** from the top of the Settings page.
+
+5. To define custom scopes, go to **Applications > APIs**, select your API (or create one), and add scopes under the **Permissions** tab. Enter each scope as a **Permission** value with a description:
+
+   | Permission (Scope) | Description |
+   |--------------------|-------------|
+   | `user:read:email` | Read user email addresses |
+   | `inventory:read` | Read inventory levels |
+   | `order:read` | Read order data |
+   | `cart:write` | Modify shopping cart |
+
+   The **Identifier** you set for the API becomes the `audience` value used in token requests and `mcp.yaml`.
+
+For a complete walkthrough, see [Apollo's Auth0 guide](https://www.apollographql.com/docs/apollo-mcp-server/guides/auth-auth0).
+
+#### Okta
+
+1. Go to **Applications > Create App Integration**, select **OIDC** and **Single-Page Application**.
+
+2. Configure:
+   - **Sign-in redirect URIs:** `https://mcp-client.yourdomain.com/callback`
+   - **Sign-out redirect URIs:** `https://mcp-client.yourdomain.com` (optional)
+   - **Controlled access:** Assign to the relevant groups or allow everyone
+
+   > **Local testing:** Add `http://localhost:<port>/callback` as an additional redirect URI during development.
+
+3. To define scopes, go to **Security > API > Authorization Servers**, select your server (or use `default`), and add scopes under the **Scopes** tab. The authorization server's **Issuer URI** is your IdP URL.
+
+#### Keycloak
+
+1. Go to your realm, then **Clients > Create client**. Set the client type to **OpenID Connect** and enable **Standard flow**.
+
+2. Configure:
+   - **Valid redirect URIs:** `https://mcp-client.yourdomain.com/*`
+   - **Valid post logout redirect URIs:** `https://mcp-client.yourdomain.com` (optional)
+   - **Web origins:** `https://mcp-client.yourdomain.com`
+
+   > **Local testing:** Add `http://localhost:*` as an additional valid redirect URI during development. Remove it before going live.
+
+3. To define scopes, go to **Client scopes**, create each scope, then assign them to your client under the **Client scopes** tab.
 
 ### Define Scopes
 
@@ -90,6 +148,8 @@ Map your GraphQL authorization scopes to IdP scopes. This reference architecture
 | `order:read` | Read order data | Resolver-level checks |
 | `cart:write` | Modify cart contents | Resolver-level checks |
 
+These scopes must be defined in your IdP (see the provider-specific instructions above) and included in the token's `scope` claim. The Router's `@requiresScopes` directives and the MCP server's `scopes` configuration both reference these values.
+
 ### Configure the Audience
 
 Set the audience (`aud` claim) to a value that identifies your MCP server. For example:
@@ -99,13 +159,21 @@ Set the audience (`aud` claim) to a value that identifies your MCP server. For e
 
 The same audience must be configured on both the MCP server and the Router.
 
+| Provider | Where to Set Audience |
+|----------|----------------------|
+| Auth0 | **Applications > APIs** — the API **Identifier** becomes the `aud` claim |
+| Okta | **Security > API > Authorization Servers** — add an **Audience** restriction |
+| Keycloak | **Client Scopes** — configure an audience mapper on the client or use a hardcoded audience protocol mapper |
+
 ### Note the IdP URL
 
-Record the base URL of your IdP. For example:
+Record the base URL of your IdP. This is the issuer URL that appears in the OAuth/OIDC metadata document:
 
-- Auth0: `https://your-tenant.auth0.com`
-- Okta: `https://your-org.okta.com/oauth2/default`
-- Keycloak: `https://keycloak.yourdomain.com/realms/your-realm`
+| Provider | IdP URL Format | Where to Find |
+|----------|---------------|---------------|
+| Auth0 | `https://your-tenant.auth0.com` | **Settings > General > Domain** |
+| Okta | `https://your-org.okta.com/oauth2/default` | **Security > API > Authorization Servers > Issuer URI** |
+| Keycloak | `https://keycloak.yourdomain.com/realms/your-realm` | Realm settings; the OIDC discovery endpoint is at `{issuer}/.well-known/openid-configuration` |
 
 ### Client Registration Approach
 
