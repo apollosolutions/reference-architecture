@@ -1,0 +1,21 @@
+---
+description: MCP OAuth auth verification and CIMD conventions
+globs: subgraphs/users/src/index.ts, deploy/apollo-mcp-server/mcp.yaml, tests/mcp-auth-verification.md
+alwaysApply: false
+---
+
+# MCP Auth Configuration
+
+## After making changes to OAuth or MCP auth
+
+When modifying `subgraphs/users/src/index.ts` (the authorization server) or `deploy/apollo-mcp-server/mcp.yaml`, verify changes are working by following `tests/mcp-auth-verification.md`.
+
+To run verification: port-forwards must be active on `localhost:5001` (MCP) and `localhost:4001` (auth). Use the curl commands from the test doc to validate each section. All checks should pass before considering the change complete.
+
+## Key architecture facts
+
+- The Apollo MCP Server binary handles Protected Resource Metadata (RFC 9728) automatically via the `resource` config field in `mcp.yaml`. Do not add `/.well-known/oauth-protected-resource` to the users subgraph.
+- The authorization server supports both Client ID Metadata Documents (CIMD) and Dynamic Client Registration (RFC 7591). CIMD is the preferred approach per the MCP spec.
+- URL-formatted `client_id` values (HTTPS with a path) trigger the CIMD flow. Non-URL values fall back to the `registeredClients` map.
+- `allow_anonymous_mcp_discovery: true` lets clients call `initialize` and `tools/list` without auth. All tool invocations still require a valid OAuth token.
+- After rebuilding the users subgraph image, tag it to match the deployment tag in `.image-tag` and restart the deployment.

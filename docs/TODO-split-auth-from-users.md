@@ -35,6 +35,7 @@ The auth subgraph participates in the supergraph (contributes `login` mutation, 
 
 - [ ] Create `subgraphs/auth/` with `schema.graphql` (login mutation, LoginResponse types, User entity stub), `src/index.ts` (Express with all OAuth routes moved from users, login mutation resolver, JWKS endpoint, renderLoginPage), `keys/` (copy from users), `package.json`, `tsconfig.json`, `Dockerfile`, `deploy/` Helm chart (port 4011, replicaCount 1)
 - [ ] Create `subgraphs/auth/src/credentials.ts` with minimal user credential data (id, username, scopes only) for login validation -- keeps domain boundary clean vs importing full user profile data
+- [ ] Carry over Client ID Metadata Document (CIMD) support: the `isUrlClientId`, `fetchClientMetadata`, `cimdCache`, SSRF guards, `CimdDisplayInfo`, and the CIMD-aware logic in `/authorize` and `/token` handlers. Ensure `client_id_metadata_document_supported: true` is included in the AS metadata endpoint
 
 ### 2. Clean up the users subgraph
 

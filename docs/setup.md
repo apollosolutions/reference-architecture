@@ -543,11 +543,12 @@ MCP Client (mcp-remote)                    MCP Server                    Users S
         |<-- tool results ----------------------|                              |
 ```
 
-1. **Discovery** — `mcp-remote` fetches `/.well-known/oauth-authorization-server` from the MCP server, which returns the users subgraph as the authorization server
-2. **Client Registration** — `mcp-remote` dynamically registers itself via RFC 7591
-3. **Authorization** — The user is redirected to a login page at the `/authorize` endpoint, where they sign in with their username and password
-4. **Token Exchange** — `mcp-remote` exchanges the authorization code for a JWT access token
-5. **Authenticated Requests** — The MCP server validates the JWT, then forwards it to the Router as a Bearer token. The Router enforces `@authenticated` and `@requiresScopes` directives as usual
+1. **Tool Discovery** — The MCP server allows unauthenticated `initialize` and `tools/list` calls (`allow_anonymous_mcp_discovery: true`), so MCP clients can display available tools before the user signs in
+2. **Auth Server Discovery** — When a tool is invoked, `mcp-remote` gets a `401` with a `WWW-Authenticate` header pointing to the Protected Resource Metadata, which in turn references the users subgraph as the authorization server
+3. **Client Registration** — `mcp-remote` registers itself either via [Client ID Metadata Documents](https://modelcontextprotocol.io/specification/draft/basic/authorization#client-id-metadata-documents) (if supported) or dynamically via RFC 7591. The authorization server advertises `client_id_metadata_document_supported: true` and supports both approaches
+4. **Authorization** — The user's browser opens a login page at the `/authorize` endpoint, where they sign in with their username and password. For CIMD clients, the login page shows the client's name and redirect hostname
+5. **Token Exchange** — `mcp-remote` exchanges the authorization code for a JWT access token
+6. **Authenticated Requests** — The MCP server validates the JWT, then forwards it to the Router as a Bearer token. The Router enforces `@authenticated` and `@requiresScopes` directives as usual
 
 ### Available MCP Tools
 

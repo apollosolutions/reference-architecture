@@ -44,7 +44,7 @@ MCP Client                   MCP Server              Identity Provider       Rou
 | Identity Provider | Users subgraph (built-in OAuth endpoints) | External IdP (Auth0, Okta, Keycloak, etc.) |
 | Authorization | Login form on users subgraph (any non-empty password) | Real user login via IdP consent screen |
 | Token Issuance | In-memory auth codes, local key signing | IdP-managed token lifecycle |
-| Client Registration | Dynamic (RFC 7591) | Pre-registered in IdP dashboard |
+| Client Registration | Client ID Metadata Documents + Dynamic (RFC 7591) fallback | Pre-registered in IdP dashboard or Client ID Metadata Documents |
 | HTTPS | Not required (localhost) | Required for all endpoints |
 | DNS | `/etc/hosts` workaround for port-forward | Real DNS records |
 | Host Validation | Disabled | Enabled with explicit allowed hosts |
@@ -107,6 +107,49 @@ Record the base URL of your IdP. For example:
 - Okta: `https://your-org.okta.com/oauth2/default`
 - Keycloak: `https://keycloak.yourdomain.com/realms/your-realm`
 
+### Client Registration Approach
+
+The [MCP authorization specification](https://modelcontextprotocol.io/specification/draft/basic/authorization#client-registration-approaches) defines three client registration mechanisms. Choose based on your scenario:
+
+| Approach | When to Use | Spec Priority |
+|----------|-------------|---------------|
+| **Client ID Metadata Documents** | Client and server have no prior relationship (most common for MCP) | 1st (recommended) |
+| **Pre-registration** | Client is known to the IdP ahead of time | 2nd |
+| **Dynamic Client Registration (RFC 7591)** | Backwards compatibility or specific requirements | 3rd (fallback) |
+
+**Client ID Metadata Documents** (CIMD) allow MCP clients to use an HTTPS URL as their `client_id`. The URL points to a JSON document describing the client (name, redirect URIs, grant types). The authorization server fetches and validates this document during the OAuth flow, eliminating the need for pre-registration or dynamic registration.
+
+This reference architecture's built-in authorization server supports CIMD out of the box. It advertises `client_id_metadata_document_supported: true` in its [Authorization Server Metadata](https://datatracker.ietf.org/doc/html/rfc8414). When a URL-formatted `client_id` is presented during authorization, the server fetches the metadata document, validates the redirect URI against the document's `redirect_uris`, and displays the `client_name` on the consent screen.
+
+Example metadata document hosted by an MCP client:
+
+```json
+{
+  "client_id": "https://app.example.com/oauth/client-metadata.json",
+  "client_name": "Example MCP Client",
+  "client_uri": "https://app.example.com",
+  "redirect_uris": [
+    "http://127.0.0.1:3000/callback",
+    "http://localhost:3000/callback"
+  ],
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}
+```
+
+For production IdPs (Auth0, Okta, etc.), check whether your IdP supports CIMD natively. If not, pre-register your MCP clients in the IdP dashboard.
+
+### Protected Resource Metadata (RFC 9728)
+
+The Apollo MCP Server binary automatically serves [Protected Resource Metadata](https://datatracker.ietf.org/doc/html/rfc9728) using the `resource` field in `mcp.yaml`. No additional configuration is needed. When a client sends an unauthenticated request, the MCP server returns a `401` with a `WWW-Authenticate` header containing the `resource_metadata` URL, which clients use to discover the authorization server:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://mcp.yourdomain.com/.well-known/oauth-protected-resource",
+                         scope="user:read:email"
+```
+
 ## Step 3: Configure the Apollo MCP Server
 
 Replace the local dev auth configuration in `mcp.yaml`:
@@ -152,6 +195,18 @@ Key differences from the local dev config:
 - **`auth.audiences`**: Uses your production audience value
 - **`auth.resource`**: Uses your production MCP URL
 - **`logging.level`**: Set to `info` instead of `debug`
+
+### Anonymous MCP Discovery
+
+The local dev config enables `allow_anonymous_mcp_discovery`, which lets MCP clients call `initialize`, `tools/list`, and `resources/list` without a Bearer token. This lets users browse available tools before authenticating. All other MCP methods still require a valid OAuth token.
+
+In production, consider whether exposing your tool catalog to unauthenticated callers is acceptable. If your tool names and descriptions are not sensitive, enabling this improves client compatibility (some agent frameworks need to discover tools before initiating OAuth). If tool metadata is confidential, leave it disabled (the default):
+
+```yaml
+transport:
+  auth:
+    allow_anonymous_mcp_discovery: false  # default; require auth for all methods
+```
 
 ### Disabling Token Passthrough
 

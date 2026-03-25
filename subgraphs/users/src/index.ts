@@ -29,6 +29,90 @@ const joseJWKS = jose.createLocalJWKSet(JSON.parse(jwks));
 const registeredClients = new Map<string, { client_id: string; client_secret: string; redirect_uris: string[] }>();
 const authorizationCodes = new Map<string, { client_id: string; redirect_uri: string; scope: string; user_id: string; username: string; expires_at: number }>();
 
+// --- Client ID Metadata Documents (draft-ietf-oauth-client-id-metadata-document-00) ---
+
+interface ClientMetadataDocument {
+  client_id: string;
+  client_name: string;
+  redirect_uris: string[];
+  client_uri?: string;
+  logo_uri?: string;
+  grant_types?: string[];
+  response_types?: string[];
+  token_endpoint_auth_method?: string;
+}
+
+const cimdCache = new Map<string, { doc: ClientMetadataDocument; expires_at: number }>();
+
+const PRIVATE_IP_PATTERNS = [
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^0\./,
+];
+
+function isUrlClientId(clientId: string | undefined): boolean {
+  if (!clientId) return false;
+  try {
+    const url = new URL(clientId);
+    const isHttps = url.protocol === 'https:';
+    const isLocalDev = (url.protocol === 'http:') &&
+      (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+    return (isHttps || isLocalDev) && url.pathname.length > 1;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchClientMetadata(clientIdUrl: string): Promise<ClientMetadataDocument> {
+  const cached = cimdCache.get(clientIdUrl);
+  if (cached && cached.expires_at > Date.now()) return cached.doc;
+
+  const url = new URL(clientIdUrl);
+
+  if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+    throw new Error('client_id URL must use HTTPS (http allowed only for localhost)');
+  }
+
+  if (url.protocol === 'https:' && PRIVATE_IP_PATTERNS.some(p => p.test(url.hostname))) {
+    throw new Error('client_id URL must not point to a private IP address');
+  }
+
+  const resp = await fetch(clientIdUrl, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!resp.ok) throw new Error(`Failed to fetch client metadata: HTTP ${resp.status}`);
+
+  const doc: ClientMetadataDocument = await resp.json();
+
+  if (doc.client_id !== clientIdUrl) {
+    throw new Error('client_id in metadata document does not match the URL');
+  }
+  if (!doc.client_name || typeof doc.client_name !== 'string') {
+    throw new Error('Metadata document missing required field: client_name');
+  }
+  if (!Array.isArray(doc.redirect_uris) || doc.redirect_uris.length === 0) {
+    throw new Error('Metadata document missing required field: redirect_uris');
+  }
+
+  const cacheControl = resp.headers.get('cache-control');
+  const maxAge = cacheControl?.match(/max-age=(\d+)/)?.[1];
+  const ttl = maxAge ? parseInt(maxAge, 10) * 1000 : 5 * 60 * 1000;
+  cimdCache.set(clientIdUrl, { doc, expires_at: Date.now() + ttl });
+
+  return doc;
+}
+
+function validateRedirectUri(redirectUri: string, allowedUris: string[]): boolean {
+  return allowedUris.includes(redirectUri);
+}
+
+function getRedirectHostname(redirectUri: string): string {
+  try { return new URL(redirectUri).hostname; } catch { return redirectUri; }
+}
+
 function getIssuer(req: express.Request): string {
   const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${port}`;
   const protocol = req.headers['x-forwarded-proto'] || 'http';
@@ -57,9 +141,23 @@ const context: ContextFunction<
 };
 
 type OAuthParams = { client_id: string; redirect_uri: string; state: string; scope: string; code_challenge: string; code_challenge_method: string };
+type CimdDisplayInfo = { client_name: string; client_uri?: string; logo_uri?: string; redirect_hostname: string };
 
-function renderLoginPage(res: express.Response, params: OAuthParams, error?: string) {
+function renderLoginPage(res: express.Response, params: OAuthParams, error?: string, cimd?: CimdDisplayInfo) {
   const errorHtml = error ? `<div class="error">${error}</div>` : '';
+
+  const clientLogoHtml = cimd?.logo_uri
+    ? `<img src="${cimd.logo_uri}" alt="${cimd.client_name}" class="client-logo">`
+    : '';
+  const clientNameHtml = cimd?.client_name
+    ? (cimd.client_uri
+        ? `<a href="${cimd.client_uri}" target="_blank" rel="noopener" class="client-link">${cimd.client_name}</a>`
+        : `<span>${cimd.client_name}</span>`)
+    : '';
+  const clientInfoHtml = cimd
+    ? `<div class="client-info">${clientLogoHtml}<p>${clientNameHtml} wants to access your account</p><p class="redirect-host">Redirecting to <strong>${cimd.redirect_hostname}</strong></p></div>`
+    : '';
+
   res.type('html').send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -75,6 +173,12 @@ function renderLoginPage(res: express.Response, params: OAuthParams, error?: str
     .logo h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; margin-top: 8px; }
     .logo p { font-size: 13px; color: #6b7280; margin-top: 4px; }
     .scope-badge { display: inline-block; background: #ede9fe; color: #5b21b6; font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 4px; margin-top: 8px; }
+    .client-info { background: #f0f4ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; text-align: center; }
+    .client-info p { font-size: 13px; color: #374151; margin-top: 4px; }
+    .client-logo { width: 32px; height: 32px; border-radius: 6px; margin-bottom: 4px; }
+    .client-link { color: #4338ca; text-decoration: none; font-weight: 600; }
+    .client-link:hover { text-decoration: underline; }
+    .redirect-host { font-size: 12px; color: #6b7280; margin-top: 4px; }
     label { display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 6px; margin-top: 16px; }
     input[type="text"], input[type="password"] { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px; outline: none; transition: border-color 0.15s; }
     input[type="text"]:focus, input[type="password"]:focus { border-color: #6d28d9; box-shadow: 0 0 0 3px rgba(109,40,217,0.1); }
@@ -92,6 +196,7 @@ function renderLoginPage(res: express.Response, params: OAuthParams, error?: str
       <p>Sign in to authorize MCP access</p>
       ${params.scope ? `<span class="scope-badge">${params.scope}</span>` : ''}
     </div>
+    ${clientInfoHtml}
     ${errorHtml}
     <form method="POST" action="/authorize">
       <input type="hidden" name="client_id" value="${params.client_id || ''}">
@@ -140,6 +245,8 @@ async function main() {
       token_endpoint: `${issuer}/token`,
       authorization_endpoint: `${issuer}/authorize`,
       registration_endpoint: `${issuer}/register`,
+      scopes_supported: ['user:read:email', 'inventory:read', 'order:read', 'cart:write'],
+      client_id_metadata_document_supported: true,
     });
   })
 
@@ -161,22 +268,59 @@ async function main() {
   });
 
   // OAuth Authorization Endpoint — renders a login form
-  app.get('/authorize', (req, res) => {
+  // Supports both CIMD (URL-based client_id) and dynamically registered clients
+  app.get('/authorize', async (req, res) => {
     const { client_id, redirect_uri, state, scope, code_challenge, code_challenge_method } = req.query;
-    renderLoginPage(res, {
+    const params: OAuthParams = {
       client_id: client_id as string,
       redirect_uri: redirect_uri as string,
       state: state as string,
       scope: scope as string,
       code_challenge: code_challenge as string,
       code_challenge_method: code_challenge_method as string,
-    });
+    };
+
+    if (isUrlClientId(client_id as string)) {
+      try {
+        const cimd = await fetchClientMetadata(client_id as string);
+        if (!validateRedirectUri(redirect_uri as string, cimd.redirect_uris)) {
+          res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not registered in client metadata document' });
+          return;
+        }
+        renderLoginPage(res, params, undefined, {
+          client_name: cimd.client_name,
+          client_uri: cimd.client_uri,
+          logo_uri: cimd.logo_uri,
+          redirect_hostname: getRedirectHostname(redirect_uri as string),
+        });
+      } catch (err) {
+        console.error('[OAuth /authorize] CIMD fetch failed:', err);
+        res.status(400).json({ error: 'invalid_client', error_description: String(err) });
+      }
+      return;
+    }
+
+    renderLoginPage(res, params);
   });
 
   // OAuth Authorization Endpoint — processes the login form submission
-  app.post('/authorize', express.urlencoded({ extended: true }), (req, res) => {
+  app.post('/authorize', express.urlencoded({ extended: true }), async (req, res) => {
     const { username, password, client_id, redirect_uri, state, scope, code_challenge, code_challenge_method } = req.body;
-    const oauthParams = { client_id, redirect_uri, state, scope, code_challenge, code_challenge_method };
+    const oauthParams: OAuthParams = { client_id, redirect_uri, state, scope, code_challenge, code_challenge_method };
+
+    if (isUrlClientId(client_id)) {
+      try {
+        const cimd = await fetchClientMetadata(client_id);
+        if (!validateRedirectUri(redirect_uri, cimd.redirect_uris)) {
+          renderLoginPage(res, oauthParams, 'redirect_uri not registered in client metadata document');
+          return;
+        }
+      } catch (err) {
+        console.error('[OAuth /authorize POST] CIMD validation failed:', err);
+        res.status(400).json({ error: 'invalid_client', error_description: String(err) });
+        return;
+      }
+    }
 
     if (!username || !password) {
       renderLoginPage(res, oauthParams, 'Username and password are required.');
@@ -211,6 +355,8 @@ async function main() {
   });
 
   // OAuth Token Endpoint
+  // CIMD clients are public clients (no client_secret required).
+  // Dynamically registered clients also don't enforce client_secret here (demo).
   app.post('/token', express.urlencoded({ extended: true }), express.json(), async (req, res): Promise<void> => {
     const { grant_type, code, redirect_uri, client_id } = req.body;
     console.log('[OAuth /token] body:', JSON.stringify(req.body));
@@ -220,6 +366,20 @@ async function main() {
       console.log('[OAuth /token] rejected: unsupported_grant_type', grant_type);
       res.status(400).json({ error: 'unsupported_grant_type' });
       return;
+    }
+
+    if (isUrlClientId(client_id)) {
+      try {
+        const cimd = await fetchClientMetadata(client_id);
+        if (redirect_uri && !validateRedirectUri(redirect_uri, cimd.redirect_uris)) {
+          res.status(400).json({ error: 'invalid_grant', error_description: 'redirect_uri does not match client metadata' });
+          return;
+        }
+      } catch (err) {
+        console.error('[OAuth /token] CIMD validation failed:', err);
+        res.status(400).json({ error: 'invalid_client', error_description: String(err) });
+        return;
+      }
     }
 
     const authCode = authorizationCodes.get(code);

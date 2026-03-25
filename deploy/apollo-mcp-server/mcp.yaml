@@ -16,6 +16,7 @@ transport:
     scopes:
       - user:read:email
     scope_mode: require_any
+    allow_anonymous_mcp_discovery: true
 
 logging:
   level: debug
