@@ -1,3 +1,11 @@
+export type Promotion = {
+  id: string
+  name: string
+  description: string
+  discountType: 'PERCENTAGE' | 'FIXED'
+  value: number
+}
+
 export type Product = {
   id: string
   upc: string
@@ -5,6 +13,7 @@ export type Product = {
   description: string
   mediaUrl: string
   releaseDate: string
+  promotions?: Promotion[]
   variants: Variant[]
 }
 

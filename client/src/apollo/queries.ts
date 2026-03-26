@@ -9,6 +9,13 @@ const SEARCH_PRODUCTS = gql`
       description
       mediaUrl
       releaseDate
+      promotions {
+        id
+        name
+        description
+        discountType
+        value
+      }
       variants {
         id
         colorway
@@ -58,6 +65,13 @@ const USER_PROFILE_FULL = gql`
             description
             mediaUrl
             releaseDate
+            promotions {
+              id
+              name
+              description
+              discountType
+              value
+            }
           }
           colorway
           size

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Script 05: Deploy Subgraphs
-# This script deploys all subgraphs using Helm and creates Subgraph CRDs with inline SDL
+# This script deploys all subgraphs using Helm and creates Subgraph CRDs with inline SDL.
 
 # Ensure script is run from repository root
 if [ ! -d "scripts/minikube" ] || [ ! -d "subgraphs" ] || [ ! -d "deploy" ]; then
@@ -45,8 +45,14 @@ if ! kubectl cluster-info &> /dev/null; then
     exit 1
 fi
 
-# List of subgraphs
+# List of subgraphs (with GraphQL servers)
 SUBGRAPHS=("checkout" "discovery" "inventory" "orders" "products" "reviews" "shipping" "users")
+
+# Connector-only subgraphs (schema only, no deployment - router calls REST APIs directly)
+CONNECTOR_SUBGRAPHS=("promotions")
+
+# REST API services (deployed separately from subgraphs)
+SERVICES=("promotions-api")
 
 # Deploy each subgraph
 for subgraph in "${SUBGRAPHS[@]}"; do
@@ -94,24 +100,74 @@ for subgraph in "${SUBGRAPHS[@]}"; do
         exit 1
     fi
     
-    # Read schema and indent for YAML (6 spaces to be indented relative to 'sdl:')
     SCHEMA_CONTENT=$(cat "$SCHEMA_FILE" | sed 's/^/      /')
-    
-    # Create Subgraph CRD YAML using template
-    # Replace SUBGRAPH_NAME, then replace SCHEMA_CONTENT placeholder with actual schema
     TEMP_TEMPLATE=$(mktemp)
     TEMP_SCHEMA=$(mktemp)
     echo "$SCHEMA_CONTENT" > "$TEMP_SCHEMA"
     sed "s/\${SUBGRAPH_NAME}/${subgraph}/g" deploy/operator-resources/subgraph.yaml.template > "$TEMP_TEMPLATE"
-    # Replace the SCHEMA_CONTENT placeholder line with the actual schema content using sed
     sed "/\${SCHEMA_CONTENT}/r $TEMP_SCHEMA" "$TEMP_TEMPLATE" | sed '/\${SCHEMA_CONTENT}/d' | kubectl apply -f -
     rm -f "$TEMP_TEMPLATE" "$TEMP_SCHEMA"
     
     echo "✓ ${subgraph} deployed successfully"
 done
 
+# Deploy REST API services
+for service in "${SERVICES[@]}"; do
+    echo ""
+    echo "Deploying ${service}..."
+    
+    kubectl create namespace "${service}" --dry-run=client -o yaml | kubectl apply -f -
+    
+    VALUES_FILE="services/${service}/deploy/values.yaml"
+    if [ ! -f "$VALUES_FILE" ]; then
+        echo "Error: Values file not found: $VALUES_FILE"
+        exit 1
+    fi
+    
+    if [ -f ".image-tag" ]; then
+        IMAGE_TAG=$(head -n 1 .image-tag | tr -d '[:space:]')
+    else
+        IMAGE_TAG="local"
+    fi
+    
+    helm upgrade --install "${service}" "services/${service}/deploy" \
+        -f "$VALUES_FILE" \
+        --set image.tag="${IMAGE_TAG}" \
+        -n "${service}" \
+        --wait
+    
+    echo "✓ ${service} deployed successfully"
+done
+
+# Create Subgraph CRDs for connector-only subgraphs (schema only, no Helm deployment)
+for subgraph in "${CONNECTOR_SUBGRAPHS[@]}"; do
+    echo ""
+    echo "Creating Subgraph CRD for connector ${subgraph}..."
+    
+    kubectl create namespace "${subgraph}" --dry-run=client -o yaml | kubectl apply -f -
+    
+    SCHEMA_FILE="subgraphs/${subgraph}/schema.graphql"
+    if [ ! -f "$SCHEMA_FILE" ]; then
+        echo "Error: Schema file not found: $SCHEMA_FILE"
+        exit 1
+    fi
+    
+    SCHEMA_CONTENT=$(cat "$SCHEMA_FILE" | sed 's/^/      /')
+    TEMP_TEMPLATE=$(mktemp)
+    TEMP_SCHEMA=$(mktemp)
+    echo "$SCHEMA_CONTENT" > "$TEMP_SCHEMA"
+    sed "s/\${SUBGRAPH_NAME}/${subgraph}/g" deploy/operator-resources/subgraph.yaml.template > "$TEMP_TEMPLATE"
+    # Connectors don't use a GraphQL endpoint - router executes connector logic directly.
+    # Use placeholder URL per https://www.apollographql.com/docs/guides/onboarding/apis/connect-rest-apis
+    sed "s|http://graphql.${subgraph}.svc.cluster.local:4001|http://ignore|g" "$TEMP_TEMPLATE" > "${TEMP_TEMPLATE}.tmp" && mv "${TEMP_TEMPLATE}.tmp" "$TEMP_TEMPLATE"
+    sed "/\${SCHEMA_CONTENT}/r $TEMP_SCHEMA" "$TEMP_TEMPLATE" | sed '/\${SCHEMA_CONTENT}/d' | kubectl apply -f -
+    rm -f "$TEMP_TEMPLATE" "$TEMP_SCHEMA"
+    
+    echo "✓ ${subgraph} connector schema registered"
+done
+
 echo ""
-echo "✓ All subgraphs deployed!"
+echo "✓ All subgraphs and services deployed!"
 echo ""
 echo "Monitor subgraph status with:"
 echo "  kubectl get subgraphs --all-namespaces"

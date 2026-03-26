@@ -1,7 +1,7 @@
 extend schema
   @link(
-    url: "https://specs.apollo.dev/federation/v2.5"
-    import: ["@key", "@external", "@requires"]
+    url: "https://specs.apollo.dev/federation/v2.12"
+    import: ["@key", "@external", "@requires", "@authenticated"]
   )
 
 type Order @key(fields: "id") {
@@ -13,6 +13,7 @@ type Order @key(fields: "id") {
   Calculate the cost to ship all the variants to the users address
   """
   shippingCost: Float
+    @authenticated
     @requires(fields: "items { weight } buyer { shippingAddress }")
 }
 

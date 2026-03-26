@@ -46,3 +46,6 @@ lockfile.sh
 
 *.pid
 .image-tag
+
+# Built output (Docker/build generates these)
+services/promotions-api/dist/
