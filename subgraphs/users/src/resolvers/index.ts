@@ -83,7 +83,11 @@ export const resolvers: Resolvers = {
 
         return {
           token,
-          user,
+          user: {
+            id: user.id,
+            username: user.username,
+            previousSessions: [uuidv4(), uuidv4()],
+          },
           scopes: scopesArray
         }
       } catch (error) {

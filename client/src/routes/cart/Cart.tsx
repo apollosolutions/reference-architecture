@@ -15,10 +15,13 @@ import {
   AlertIcon,
   Spinner,
   Center,
+  HStack,
 } from '@chakra-ui/react'
 import { useQuery } from '@apollo/client'
 import { QUERIES } from '../../apollo/queries'
 import { User } from '../../hooks/useAuth'
+import { Promotion } from '../../apollo/types'
+import { PromotionBadge } from '../../components/PromotionBadge'
 
 type Props = {
   user: User
@@ -102,7 +105,16 @@ export default function Cart(props: Props) {
                         />
                       )}
                       <VStack align="start" flex="1" spacing={2}>
-                        <Heading size="md">{item.product?.title || 'Product'}</Heading>
+                        <Flex align="center" gap={2} wrap="wrap">
+                          <Heading size="md">{item.product?.title || 'Product'}</Heading>
+                          {item.product?.promotions?.length > 0 && (
+                            <HStack spacing={2}>
+                              {item.product.promotions.map((promo: Promotion) => (
+                                <PromotionBadge key={promo.id} promo={promo} size="compact" />
+                              ))}
+                            </HStack>
+                          )}
+                        </Flex>
                         {item.product?.description && (
                           <Text fontSize="sm" color="gray.500" noOfLines={2}>
                             {item.product.description}

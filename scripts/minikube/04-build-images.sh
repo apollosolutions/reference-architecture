@@ -56,6 +56,9 @@ echo "# Timestamp: $(date -Iseconds)" >> .image-tag
 # List of subgraphs
 SUBGRAPHS=("checkout" "discovery" "inventory" "orders" "products" "reviews" "shipping" "users")
 
+# Services (REST APIs, etc.)
+SERVICES=("promotions-api")
+
 # Build each subgraph image
 for subgraph in "${SUBGRAPHS[@]}"; do
     echo ""
@@ -71,10 +74,37 @@ for subgraph in "${SUBGRAPHS[@]}"; do
     
     if [ $? -eq 0 ]; then
         echo "✓ Successfully built ${subgraph}:${IMAGE_TAG}"
-        # Also tag as "local" for backward compatibility
         docker tag "${subgraph}:${IMAGE_TAG}" "${subgraph}:local"
     else
         echo "✗ Failed to build ${subgraph}:${IMAGE_TAG}"
+        exit 1
+    fi
+done
+
+# Build service images
+for service in "${SERVICES[@]}"; do
+    echo ""
+    echo "Building ${service} image..."
+    
+    if [ ! -d "services/${service}" ]; then
+        echo "Warning: services/${service} directory not found, skipping..."
+        continue
+    fi
+    
+    # Copy root lockfile into service build context for reproducible builds (npm ci)
+    cp package-lock.json "services/${service}/package-lock.json"
+    
+    docker build -t "${service}:${IMAGE_TAG}" "services/${service}"
+    build_result=$?
+    
+    # Clean up copied lockfile
+    rm -f "services/${service}/package-lock.json"
+    
+    if [ $build_result -eq 0 ]; then
+        echo "✓ Successfully built ${service}:${IMAGE_TAG}"
+        docker tag "${service}:${IMAGE_TAG}" "${service}:local"
+    else
+        echo "✗ Failed to build ${service}:${IMAGE_TAG}"
         exit 1
     fi
 done
@@ -97,8 +127,6 @@ fi
 
 echo ""
 echo "✓ All images built successfully!"
-echo ""
-echo "Note: Images are loaded into Minikube's Docker daemon"
 echo ""
 echo "Next step: Run ./scripts/minikube/05-deploy-subgraphs.sh to deploy subgraphs"
 

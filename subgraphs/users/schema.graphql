@@ -1,5 +1,5 @@
 extend schema
-  @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@authenticated", "@requiresScopes"])
+  @link(url: "https://specs.apollo.dev/federation/v2.12", import: ["@key", "@authenticated", "@requiresScopes"])
 
 type Query {
   """
@@ -19,7 +19,20 @@ union LoginResponse = LoginSuccessful | LoginFailed
 type LoginSuccessful {
   token: String! 
   scopes: [String!]!
-  user: User!
+  """
+  User info for the logged-in user. No auth required (returned as part of login).
+  """
+  user: LoginUser!
+}
+
+"""
+User info returned in login response. Not protected by @authenticated
+since the client does not have a token yet during the login mutation.
+"""
+type LoginUser {
+  id: ID!
+  username: String!
+  previousSessions: [ID!]
 }
 
 type LoginFailed {

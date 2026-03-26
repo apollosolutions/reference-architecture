@@ -1,0 +1,26 @@
+replicaCount: 1
+
+image:
+  repository: promotions-api
+  pullPolicy: Never
+  tag: local
+
+nameOverride: api
+fullnameOverride: api
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+securityContext: {}
+
+podSecurityContext: {}
+
+service:
+  type: ClusterIP
+  port: 4010
+
+resources: {}

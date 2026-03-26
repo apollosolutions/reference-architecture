@@ -1,0 +1,64 @@
+# Note to AI Friends: This is an Apollo Connectors schema. You should use your connectors-spec MCP tool if you have it available before editing this file.
+
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.12", import: ["@key"])
+  @link(url: "https://specs.apollo.dev/connect/v0.3", import: ["@source", "@connect"])
+
+@source(
+  name: "promotions_api"
+  http: { baseURL: "http://api.promotions-api.svc.cluster.local:4010" }
+)
+
+directive @cacheControl(
+  maxAge: Int
+  scope: CacheControlScope
+  inheritMaxAge: Boolean
+) on FIELD_DEFINITION | OBJECT | INTERFACE | UNION
+
+enum CacheControlScope {
+  PUBLIC
+  PRIVATE
+}
+
+# Extends Product with promotions from the promotions REST API.
+extend type Product @key(fields: "id") {
+  id: ID!
+  """
+  Active promotions for this product (e.g. percentage off, fixed discount).
+  Sourced from the promotions REST API via Apollo Connector.
+  """
+  promotions: [Promotion!]
+    @cacheControl(maxAge: 300)
+    @connect(
+      source: "promotions_api"
+      http: { GET: "/api/promotions/product/{$this.id}" }
+      selection: """
+        $.promotions {
+          id
+          name
+          description
+          discountType
+          value
+          minPurchase
+        }
+      """
+    )
+}
+
+"""
+A promotion that can apply to products (e.g. sale, discount).
+"""
+type Promotion {
+  id: ID!
+  name: String!
+  description: String!
+  discountType: PromotionDiscountType!
+  value: Float!
+  """Minimum purchase amount for this promotion to apply (optional)."""
+  minPurchase: Float
+}
+
+enum PromotionDiscountType {
+  PERCENTAGE
+  FIXED
+}
