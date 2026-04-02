@@ -1,0 +1,16 @@
+[allowlist]
+description = "Allowlist for example/placeholder values in documentation"
+
+# Allowlist by commit hash — these commits contained JWT example values
+# (eyJ... prefixes) in documentation that were flagged as generic-api-key.
+# The values were replaced with <signed-jwt> placeholders in a follow-up commit.
+commits = [
+  "55023d8", # Add CIMD wire-level docs, Auth0 guide, query plan plugin, and PKCE bug fix
+]
+
+# Allowlist by file path — documentation files may contain example JWT/token
+# strings for illustration purposes. These are never real credentials.
+paths = [
+  "docs/mcp-production.md",
+  "docs/mcp-auth0-claude-desktop.md",
+]

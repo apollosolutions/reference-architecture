@@ -1,0 +1,32 @@
+endpoint: ${env.ROUTER_ENDPOINT:-http://reference-architecture-dev.apollo.svc.cluster.local:80}
+
+transport:
+  type: streamable_http
+  port: 8000
+  stateful_mode: false # Required for mcp-remote compatibility; can be enabled in production
+  host_validation:
+    enabled: false # Local dev only — enable with allowed_hosts in production
+  auth:
+    servers:
+      - http://graphql.users.svc.cluster.local:4001
+    audiences:
+      - apollo-mcp
+    allow_any_audience: false
+    resource: ${env.MCP_RESOURCE_URL:-http://localhost:5001/mcp}
+    scopes:
+      - user:read:email
+    scope_mode: require_any
+    allow_anonymous_mcp_discovery: true
+
+logging:
+  level: debug
+
+introspection:
+  introspect:
+    enabled: true
+
+operations:
+  source: local
+  paths:
+    - /data/operations/myCart.graphql
+    - /data/operations/myProfileDetails.graphql

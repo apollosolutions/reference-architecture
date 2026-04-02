@@ -1,0 +1,12 @@
+# Fetches the authenticated user's profile information.
+# Requires an Authorization header with a valid Bearer token.
+query MyProfileDetails {
+  me {
+    id
+    shippingAddress
+    username
+    email
+    previousSessions
+    loyaltyPoints
+  }
+}

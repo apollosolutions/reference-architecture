@@ -113,3 +113,5 @@ spec:
       enabled: true
       listen: 0.0.0.0:8089
       output_directory: /tmp/router-diagnostics
+    plugins:
+      experimental.expose_query_plan: true

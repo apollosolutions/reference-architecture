@@ -10,6 +10,8 @@ This guide will walk you through setting up the Apollo Federation Supergraph ref
   - [Step 2: Configure Environment Variables](#step-2-configure-environment-variables)
   - [Step 3: Run Setup Scripts](#step-3-run-setup-scripts)
   - [Step 4: Access Your Supergraph](#step-4-access-your-supergraph)
+  - [Step 5: Logging Into the Client Application](#step-5-logging-into-the-client-application)
+  - [Step 6: Connect AI Agents via MCP](#step-6-connect-ai-agents-via-mcp)
   - [Creating Additional Environments](#creating-additional-environments)
 
 ## Prerequisites
@@ -238,6 +240,39 @@ kubectl port-forward -n monitoring svc/zipkin 9411:9411
 
 Then open http://localhost:9411 in your browser to view traces.
 
+### Script 12: Deploy Apollo MCP Server (Optional)
+
+Deploy the [Apollo MCP Server](https://www.apollographql.com/docs/apollo-mcp-server) to expose your supergraph to AI agents and LLM tools via the [Model Context Protocol](https://modelcontextprotocol.io/):
+
+```bash
+./scripts/minikube/12-deploy-mcp-server.sh
+```
+
+This script:
+- Creates a Kubernetes secret with Apollo GraphOS credentials and endpoint configuration
+- Deploys the Apollo MCP Server via Helm into the `apollo` namespace
+- Configures the MCP server to connect to the local Router instance
+- Enables OAuth 2.1 authentication using the users subgraph as the authorization server
+- Waits for the MCP server pod to be ready
+
+**Prerequisites:** The router (script 08) and subgraphs (script 05) must be deployed first. The MCP server connects to the router and uses the users subgraph for authentication.
+
+### Script 12a: Start MCP Port Forwards (Optional)
+
+After deploying the MCP server, start the required port-forwards for local access:
+
+```bash
+./scripts/minikube/12a-mcp-port-forwards.sh
+```
+
+This script:
+- Starts port-forwards for the MCP server (localhost:5001) and the OAuth auth server (localhost:4001)
+- Adds the required `/etc/hosts` entry for the OAuth flow (prompts for sudo)
+- Verifies connectivity to both services
+- Keeps running until you press Ctrl+C
+
+After running this script, see [Step 6: Connect AI Agents via MCP](#step-6-connect-ai-agents-via-mcp) for MCP client configuration.
+
 ## Step 4: Access Your Supergraph
 
 After running all scripts, you can access your supergraph in several ways:
@@ -344,6 +379,188 @@ Scopes are server-assigned based on user data and control access to certain fiel
 Available test users and their scopes:
 - `user1`, `user2`, `user3` - Have `user:read:email` scope
 - `inventoryManager` - Has `user:read:email` and `inventory:read` scopes
+
+## Step 6: Connect AI Agents via MCP
+
+If you deployed the Apollo MCP Server (script 12), you can connect AI agents and LLM tools to your supergraph. This requires a few networking steps because both the MCP server and its OAuth authorization server run inside the Minikube cluster.
+
+> For production deployment guidance — including provider-specific IdP configuration (redirect URLs, logout URLs, scopes, audience) for Auth0, Okta, and Keycloak — see the [MCP Production Guide](./mcp-production.md#step-2-configure-the-identity-provider).
+
+### Prerequisites
+
+- Apollo MCP Server deployed (script 12)
+- `npx` available (comes with Node.js)
+- Two available terminal windows for port-forwarding
+
+### Step 6a: Start Port Forwards
+
+The MCP server and the OAuth authorization server (users subgraph) both need to be reachable from your local machine.
+
+**Option A: Use the helper script (recommended)**
+
+```bash
+./scripts/minikube/12a-mcp-port-forwards.sh
+```
+
+This starts both port-forwards, adds the `/etc/hosts` entry (Step 6b), and verifies connectivity. Keep the script running — press Ctrl+C to stop.
+
+**Option B: Manual port-forwards**
+
+Open two terminal windows:
+
+**Terminal 1 — MCP Server:**
+
+```bash
+kubectl port-forward -n apollo svc/apollo-mcp-server 5001:8000
+```
+
+**Terminal 2 — OAuth Authorization Server:**
+
+```bash
+kubectl port-forward -n users svc/graphql 4001:4001
+```
+
+Keep both terminals running. If either port-forward drops (e.g., after a pod restart), restart it.
+
+### Step 6b: Add DNS Entry for the Authorization Server
+
+> If you used the helper script (12a) in Step 6a, this was already handled for you. Skip to Step 6c.
+
+The MCP server's OAuth configuration references the users subgraph by its in-cluster DNS name (`graphql.users.svc.cluster.local`). For the OAuth flow to work from your local machine, this hostname must resolve to `localhost` where the port-forward is listening.
+
+Add this entry to your `/etc/hosts` file:
+
+```bash
+echo '127.0.0.1 graphql.users.svc.cluster.local' | sudo tee -a /etc/hosts
+```
+
+Verify it works:
+
+```bash
+curl -s http://graphql.users.svc.cluster.local:4001/.well-known/oauth-authorization-server | python3 -m json.tool
+```
+
+You should see OAuth metadata including `authorization_endpoint`, `token_endpoint`, and `registration_endpoint`.
+
+**Why is this needed?** The MCP server advertises its authorization server URL using the in-cluster DNS name. MCP clients (like `mcp-remote`) follow this URL to start the OAuth flow. Without the hosts entry, your local machine can't resolve the cluster-internal hostname. Inside the cluster, the same hostname resolves normally via Kubernetes DNS, so the MCP server can validate tokens by fetching JWKS from the same URL.
+
+### Step 6c: Configure Your MCP Client
+
+#### Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "apollo-reference-arch": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:5001/mcp",
+        "--transport",
+        "http-only"
+      ]
+    }
+  }
+}
+```
+
+Restart Claude Desktop. Your browser will open a login page where you enter your username and password (same test users as the client app — see [Step 5](#step-5-logging-into-the-client-application)). After signing in, the MCP tools should appear in the tool list.
+
+**Troubleshooting Claude Desktop:**
+
+- If you see `EADDRINUSE` errors, kill stale `mcp-remote` processes:
+
+```bash
+pkill -f "mcp-remote.*localhost:5001"
+```
+
+- If authorization fails, clear the `mcp-remote` auth cache and restart:
+
+```bash
+rm -rf ~/.mcp-auth/mcp-remote-*/
+```
+
+#### Claude Code (CLI)
+
+```bash
+claude mcp add --transport http apollo-mcp -- npx mcp-remote http://localhost:5001/mcp --transport http-only
+```
+
+#### Cursor
+
+Add to your MCP settings (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "apollo-reference-arch": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:5001/mcp",
+        "--transport",
+        "http-only"
+      ]
+    }
+  }
+}
+```
+
+### Step 6d: Verify the Connection
+
+Use MCP Inspector to verify tools are available:
+
+```bash
+npx @modelcontextprotocol/inspector http://localhost:5001/mcp --transport http
+```
+
+This opens a browser at `http://127.0.0.1:6274` where you can click **Connect** and then **List Tools** to verify the available operations.
+
+### How Authentication Works
+
+The MCP server uses [OAuth 2.1](https://www.apollographql.com/docs/apollo-mcp-server/auth) with the users subgraph acting as the authorization server. The full flow:
+
+```
+MCP Client (mcp-remote)                    MCP Server                    Users Subgraph
+        |                                       |                              |
+        |-- GET /.well-known/oauth-auth... ---->|                              |
+        |<-- auth server URL -------------------| (graphql.users.svc...:4001)  |
+        |                                       |                              |
+        |-- POST /register ---------------------------------------->|
+        |<-- client_id, client_secret ----------------------------- |
+        |                                       |                              |
+        |-- GET /authorize (browser) -------------------------------->|
+        |<-- redirect with auth code -------------------------------- |
+        |                                       |                              |
+        |-- POST /token (exchange code) ------------------------------>|
+        |<-- JWT access token ---------------------------------------- |
+        |                                       |                              |
+        |-- POST /mcp + Authorization: Bearer -->|                             |
+        |                                       |-- validate JWT (JWKS) ------>|
+        |                                       |-- GraphQL query + token ---> Router
+        |<-- tool results ----------------------|                              |
+```
+
+1. **Tool Discovery** — The MCP server allows unauthenticated `initialize` and `tools/list` calls (`allow_anonymous_mcp_discovery: true`), so MCP clients can display available tools before the user signs in
+2. **Auth Server Discovery** — When a tool is invoked, `mcp-remote` gets a `401` with a `WWW-Authenticate` header pointing to the Protected Resource Metadata, which in turn references the users subgraph as the authorization server
+3. **Client Registration** — `mcp-remote` registers itself either via [Client ID Metadata Documents](https://modelcontextprotocol.io/specification/draft/basic/authorization#client-id-metadata-documents) (if supported) or dynamically via RFC 7591. The authorization server advertises `client_id_metadata_document_supported: true` and supports both approaches
+4. **Authorization** — The user's browser opens a login page at the `/authorize` endpoint, where they sign in with their username and password. For CIMD clients, the login page shows the client's name and redirect hostname
+5. **Token Exchange** — `mcp-remote` exchanges the authorization code for a JWT access token
+6. **Authenticated Requests** — The MCP server validates the JWT, then forwards it to the Router as a Bearer token. The Router enforces `@authenticated` and `@requiresScopes` directives as usual
+
+### Available MCP Tools
+
+The MCP server exposes pre-defined GraphQL operations as tools:
+
+| Tool | Description | Operation |
+|------|-------------|-----------|
+| `MyProfileDetails` | Fetches the authenticated user's profile (username, email, address, loyalty points) | `query { me { id username email shippingAddress ... } }` |
+| `MyCart` | Fetches the authenticated user's shopping cart with full product details | `query { me { cart { items { product { ... } } } } }` |
+| `introspect` | Explores the GraphQL schema by type name | Built-in schema introspection |
+
+Operations are defined in `deploy/apollo-mcp-server/operations/` and can be customized by adding or modifying `.graphql` files.
 
 ## Creating Additional Environments
 

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apollo-mcp-config
+data:
+  mcp.yaml: |-
+{{ .Files.Get "mcp.yaml" | indent 4 }}

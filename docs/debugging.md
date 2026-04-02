@@ -10,6 +10,7 @@ This guide covers common issues and debugging steps for the reference architectu
 - [Schema Not Pushed to Registry](#schema-not-pushed-to-registry)
 - [Image Tag Issues](#image-tag-issues)
 - [Network and DNS Issues](#network-and-dns-issues)
+- [Composition Failures](#composition-failures)
 - [Quick Debug Scripts](#quick-debug-scripts)
 
 ## Registry Setup Issues
@@ -455,6 +456,85 @@ Response caching requires the router to have a configured TTL **and** for subgra
 - [Response Caching Quickstart](https://www.apollographql.com/docs/graphos/routing/performance/caching/response-caching/quickstart)
 - [Response Cache Customization](https://www.apollographql.com/docs/graphos/routing/performance/caching/response-caching/customization)
 
+## Composition Failures
+
+### `MISSING_TRANSITIVE_AUTH_REQUIREMENTS`
+
+**Symptoms:**
+- `SupergraphSchema` condition shows `MalformedSchema` / `CompositionPending: False`
+- `kubectl describe supergraphschema reference-architecture-dev -n apollo` shows an error like:
+  ```
+  composition failures: [CompositionError { message: "[shipping-shipping] Field \"Order.shippingCost\"
+  does not specify necessary @authenticated, @requiresScopes and/or @policy auth requirements to
+  access the transitive field \"Order.buyer\" data from @requires selection set.",
+  code: Some("MISSING_TRANSITIVE_AUTH_REQUIREMENTS") }]
+  ```
+
+**Cause:**
+
+Federation composition enforces a transitive authorization rule: if a field uses `@requires` to read data that is transitively protected by `@authenticated`, `@requiresScopes`, or `@policy` in another subgraph, the field itself must declare the matching auth directive.
+
+In this case:
+- `users` subgraph declares `type User @authenticated` — the entire `User` type is auth-gated.
+- `shipping` subgraph's `Order.shippingCost` uses `@requires(fields: "... buyer { shippingAddress }")`, which reads `User.shippingAddress` from the auth-protected `User` entity.
+- Because `shippingCost` reads through an `@authenticated` boundary, it must also declare `@authenticated`.
+
+**Debug Steps:**
+
+1. **Identify the failing subgraph and field from the error message** — the format is `[subgraph-name] Field "Type.field" ...`.
+
+2. **Inspect the `@requires` selection set on the failing field:**
+   ```bash
+   cat subgraphs/shipping/schema.graphql
+   ```
+   Look for the field's `@requires(fields: "...")` — note which external types/fields it reads.
+
+3. **Find where those referenced fields are defined and check their auth directives:**
+   ```bash
+   # Example: check if User type has @authenticated in users subgraph
+   grep -n "@authenticated\|@requiresScopes\|@policy" subgraphs/users/schema.graphql
+   ```
+
+4. **Check the `SupergraphSchema` status for the full composition error:**
+   ```bash
+   kubectl describe supergraphschema reference-architecture-dev -n apollo
+   ```
+
+**Solution:**
+
+Add the matching auth directive to the field that has `@requires`, and import it in the subgraph's `@link` declaration.
+
+Example fix for `Order.shippingCost` in `subgraphs/shipping/schema.graphql`:
+
+```graphql
+# Before
+extend schema
+  @link(
+    url: "https://specs.apollo.dev/federation/v2.5"
+    import: ["@key", "@external", "@requires"]
+  )
+
+type Order @key(fields: "id") {
+  shippingCost: Float
+    @requires(fields: "items { weight } buyer { shippingAddress }")
+}
+
+# After
+extend schema
+  @link(
+    url: "https://specs.apollo.dev/federation/v2.5"
+    import: ["@key", "@external", "@requires", "@authenticated"]
+  )
+
+type Order @key(fields: "id") {
+  shippingCost: Float
+    @authenticated
+    @requires(fields: "items { weight } buyer { shippingAddress }")
+}
+```
+
+After updating the schema, rebuild and redeploy the affected subgraph. The operator will detect the new SDL hash on the `Subgraph` CRD, re-run composition, and the `SupergraphSchema` condition should transition from `MalformedSchema` to `Available`.
+
 ## Quick Debug Scripts
 
 ### Complete Registry Debug
@@ -567,6 +647,10 @@ cat .image-tag 2>/dev/null || echo ".image-tag file not found"
 ### `Invalid image tag`
 **Cause:** Tag in `.image-tag` is empty or too short  
 **Solution:** Re-run `04-build-images.sh` to regenerate tag
+
+### `MISSING_TRANSITIVE_AUTH_REQUIREMENTS` (composition error)
+**Cause:** A field's `@requires` selection set transitively reads data protected by `@authenticated`, `@requiresScopes`, or `@policy` in another subgraph, but the field itself does not declare the same auth directive.  
+**Solution:** Add the matching auth directive to the field and import it in the subgraph's `@link`. See [Composition Failures](#composition-failures).
 
 ## Getting Help
 

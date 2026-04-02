@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apollo-mcp-server
+  labels:
+    app: apollo-mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apollo-mcp-server
+  template:
+    metadata:
+      labels:
+        app: apollo-mcp-server
+      annotations:
+        checksum/config: {{ .Files.Get "mcp.yaml" | sha256sum }}
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: apollo-mcp-server
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["apollo-mcp-server", "/data/mcp.yaml"]
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: apollo-mcp-credentials
+          volumeMounts:
+            - name: config-volume
+              mountPath: /data/mcp.yaml
+              subPath: mcp.yaml
+            - name: operations-volume
+              mountPath: /data/operations
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: apollo-mcp-config
+        - name: operations-volume
+          configMap:
+            name: apollo-mcp-operations

@@ -48,7 +48,7 @@ export const resolvers: Resolvers = {
     me: (_, __, { user }) => user ? getUserById(user.sub) : null
   },
   Mutation: {
-    async login(_, { username, password }) {
+    async login(_, { username, password }, context) {
       try {
         let user = getUserbyUsername(username)
         if (!user || password === "") {
@@ -63,14 +63,23 @@ export const resolvers: Resolvers = {
         const alg = "ES256";
         const privateKey = createPrivateKey(privateKeyText);
 
-        // Use server-assigned scopes from user data
         const scopesArray = user.scopes || [];
+
+        const host = context.headers?.['x-forwarded-host'] || context.headers?.host || 'localhost:4001';
+        const protocol = context.headers?.['x-forwarded-proto'] || 'http';
+        const issuer = `${protocol}://${host}`;
 
         const token = await new jose.SignJWT({
           sub: user.id,
           scope: scopesArray.join(' '),
           username,
-        }).setProtectedHeader({ alg }).setIssuedAt().setExpirationTime('2h').sign(privateKey);
+        })
+          .setProtectedHeader({ alg, kid: 'main-key-2024' })
+          .setIssuer(issuer)
+          .setAudience('apollo-mcp')
+          .setIssuedAt()
+          .setExpirationTime('2h')
+          .sign(privateKey);
 
         return {
           token,
