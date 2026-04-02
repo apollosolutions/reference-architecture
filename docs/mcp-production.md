@@ -15,6 +15,7 @@ This guide covers deploying the Apollo MCP Server in production with a real OAut
   - [Per-Operation Scope Requirements](#per-operation-scope-requirements)
   - [Networking and DNS](#networking-and-dns)
   - [Troubleshooting](#troubleshooting)
+  - [CIMD Auth Flow: Wire-Level Walkthrough](#cimd-auth-flow-wire-level-walkthrough)
 
 ## Architecture Overview
 
@@ -207,6 +208,229 @@ Example metadata document hosted by an MCP client:
 ```
 
 For production IdPs (Auth0, Okta, etc.), check whether your IdP supports CIMD natively. If not, pre-register your MCP clients in the IdP dashboard.
+
+#### CIMD Auth Flow: Wire-Level Walkthrough
+
+The following traces every HTTP exchange in the CIMD-based OAuth 2.1 flow. This is the exact sequence executed by this reference architecture's built-in authorization server (`subgraphs/users`).
+
+##### Step 1 — Discover the authorization server
+
+The MCP client fetches the Protected Resource Metadata to find the authorization server URL:
+
+```http
+GET /.well-known/oauth-protected-resource/mcp HTTP/1.1
+Host: localhost:5001
+```
+
+```json
+{
+  "resource": "http://localhost:5001/mcp",
+  "authorization_servers": ["http://localhost:4001"],
+  "scopes_supported": ["user:read:email"],
+  "bearer_methods_supported": ["header"]
+}
+```
+
+The client then fetches Authorization Server Metadata from the discovered issuer:
+
+```http
+GET /.well-known/oauth-authorization-server HTTP/1.1
+Host: localhost:4001
+```
+
+```json
+{
+  "issuer": "http://localhost:4001",
+  "authorization_endpoint": "http://localhost:4001/authorize",
+  "token_endpoint": "http://localhost:4001/token",
+  "registration_endpoint": "http://localhost:4001/register",
+  "jwks_uri": "http://localhost:4001/.well-known/jwks.json",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code"],
+  "code_challenge_methods_supported": ["S256"],
+  "client_id_metadata_document_supported": true
+}
+```
+
+`client_id_metadata_document_supported: true` tells the client it can use a URL as its `client_id` — no pre-registration needed.
+
+---
+
+##### Step 2 — Serve the Client ID Metadata Document
+
+The MCP client hosts a JSON document at a URL it controls. In development this can be `http://localhost:9999/mcp-client`; in production it must be `https://`.
+
+```http
+GET /mcp-client HTTP/1.1
+Host: localhost:9999
+```
+
+```json
+{
+  "client_id": "http://localhost:9999/mcp-client",
+  "client_name": "Reference Architecture MCP Client",
+  "client_uri": "http://localhost:9999",
+  "redirect_uris": [
+    "http://127.0.0.1:3000/callback",
+    "http://localhost:3000/callback"
+  ],
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}
+```
+
+The authorization server fetches this document on every `/authorize` and `/token` request. It validates that the `client_id` field in the document exactly matches the URL it was fetched from, then uses `redirect_uris` to validate the OAuth callback and `client_name` for the consent screen.
+
+---
+
+##### Step 3 — Generate PKCE parameters
+
+The client generates a random `code_verifier` and derives `code_challenge = BASE64URL(SHA256(code_verifier))`:
+
+```text
+code_verifier  = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+code_challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+method         = "S256"
+```
+
+---
+
+##### Step 4 — Authorization request
+
+```http
+GET /authorize?response_type=code
+  &client_id=http%3A%2F%2Flocalhost%3A9999%2Fmcp-client
+  &redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback
+  &scope=user%3Aread%3Aemail
+  &state=abc123
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  &code_challenge_method=S256 HTTP/1.1
+Host: localhost:4001
+```
+
+The server fetches the CIMD document from `http://localhost:9999/mcp-client`, verifies `redirect_uri` is in `redirect_uris`, and renders the login page with `client_name`:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: text/html
+
+<!-- Login form: "Reference Architecture MCP Client is requesting access" -->
+```
+
+---
+
+##### Step 5 — User submits credentials
+
+```http
+POST /authorize HTTP/1.1
+Host: localhost:4001
+Content-Type: application/x-www-form-urlencoded
+
+username=user1&password=password123
+  &client_id=http%3A%2F%2Flocalhost%3A9999%2Fmcp-client
+  &redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback
+  &scope=user%3Aread%3Aemail
+  &state=abc123
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  &code_challenge_method=S256
+```
+
+The server re-fetches the CIMD document, validates credentials, stores the authorization code with the PKCE challenge, and redirects:
+
+```http
+HTTP/1.1 302 Found
+Location: http://localhost:3000/callback?code=a1b2c3d4e5f6&state=abc123
+```
+
+---
+
+##### Step 6 — Token exchange
+
+```http
+POST /token HTTP/1.1
+Host: localhost:4001
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+  &code=a1b2c3d4e5f6
+  &redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback
+  &client_id=http%3A%2F%2Flocalhost%3A9999%2Fmcp-client
+  &code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+```
+
+The server re-fetches the CIMD document, then verifies:
+`BASE64URL(SHA256(code_verifier)) == stored_code_challenge`
+
+On success, it issues a signed JWT:
+
+```json
+{
+  "access_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6Im1haW4ta2V5LTIwMjQifQ...",
+  "token_type": "Bearer",
+  "expires_in": 7200,
+  "scope": "user:read:email"
+}
+```
+
+---
+
+##### Step 7 — Inspect the JWT
+
+Header:
+
+```json
+{
+  "alg": "ES256",
+  "kid": "main-key-2024"
+}
+```
+
+Payload:
+
+```json
+{
+  "sub": "user:1",
+  "scope": "user:read:email",
+  "aud": "apollo-mcp",
+  "iss": "http://localhost:4001",
+  "iat": 1710000000,
+  "exp": 1710007200
+}
+```
+
+The `kid` references the signing key published at `/.well-known/jwks.json`. Both the MCP server and the Apollo Router use this endpoint to verify the signature independently.
+
+---
+
+##### Step 8 — Authenticated MCP request
+
+```http
+POST /mcp HTTP/1.1
+Host: localhost:5001
+Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6Im1haW4ta2V5LTIwMjQifQ...
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "myProfileDetails",
+    "arguments": {}
+  },
+  "id": 1
+}
+```
+
+The MCP server validates the JWT signature and `scope`, then forwards the Bearer token to the Router. The Router re-validates the JWT independently and enforces `@requiresScopes` directives before resolving the query.
+
+---
+
+##### Implementation notes (built-in auth server)
+
+- The CIMD document is fetched on **every** `/authorize` and `/token` request, not cached permanently (only `Cache-Control: max-age` is respected). This ensures revoked or updated redirect URIs take effect quickly.
+- `isUrlClientId()` accepts `https://` URLs and `http://localhost` / `http://127.0.0.1` only. Cluster-internal HTTP URLs (e.g., `http://service.namespace.svc.cluster.local/...`) are rejected — this prevents an SSRF vector where an attacker controls an in-cluster HTTP service.
+- Authorization codes expire after 5 minutes. The server stores them in memory (a `Map`), so **restarts or multiple replicas will invalidate outstanding codes**. Use a shared cache (Redis) or sticky sessions if this is a concern.
 
 ### Protected Resource Metadata (RFC 9728)
 

@@ -452,6 +452,7 @@ async function main() {
       .digest('base64url');
     if (expectedChallenge !== authCode.code_challenge) {
       console.log('[OAuth /token] rejected: PKCE verification failed');
+      authorizationCodes.delete(code); // invalidate on failure to prevent brute-force replay
       res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
       return;
     }
