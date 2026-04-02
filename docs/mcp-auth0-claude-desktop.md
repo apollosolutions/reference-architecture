@@ -215,8 +215,8 @@ Auth0 verifies the PKCE challenge and returns:
 
 ```json
 {
-  "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6InNvbWUta2lkIn0...",
-  "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6InNvbWUta2lkIn0...",
+  "access_token": "<signed-jwt>",
+  "id_token": "<signed-id-token>",
   "token_type": "Bearer",
   "expires_in": 86400,
   "scope": "openid user:read:email"
@@ -270,7 +270,7 @@ Differences from the built-in JWT:
 ```http
 POST /mcp HTTP/1.1
 Host: mcp.yourdomain.com
-Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+Authorization: Bearer <signed-jwt>
 Content-Type: application/json
 
 {

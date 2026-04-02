@@ -366,7 +366,7 @@ On success, it issues a signed JWT:
 
 ```json
 {
-  "access_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6Im1haW4ta2V5LTIwMjQifQ...",
+  "access_token": "<signed-jwt>",
   "token_type": "Bearer",
   "expires_in": 7200,
   "scope": "user:read:email"
@@ -408,7 +408,7 @@ The `kid` references the signing key published at `/.well-known/jwks.json`. Both
 ```http
 POST /mcp HTTP/1.1
 Host: localhost:5001
-Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6Im1haW4ta2V5LTIwMjQifQ...
+Authorization: Bearer <signed-jwt>
 Content-Type: application/json
 
 {
