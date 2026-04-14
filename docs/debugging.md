@@ -11,6 +11,7 @@ This guide covers common issues and debugging steps for the reference architectu
 - [Image Tag Issues](#image-tag-issues)
 - [Network and DNS Issues](#network-and-dns-issues)
 - [Composition Failures](#composition-failures)
+- [MCP Auth: `invalid_client` After Pod Restart](#mcp-auth-invalid_client-after-pod-restart)
 - [Quick Debug Scripts](#quick-debug-scripts)
 
 ## Registry Setup Issues
@@ -535,6 +536,40 @@ type Order @key(fields: "id") {
 
 After updating the schema, rebuild and redeploy the affected subgraph. The operator will detect the new SDL hash on the `Subgraph` CRD, re-run composition, and the `SupergraphSchema` condition should transition from `MalformedSchema` to `Available`.
 
+## MCP Auth: `invalid_client` After Pod Restart
+
+**Symptoms:**
+- MCP client (Claude Desktop, Cursor, or MCP Inspector via `mcp-remote`) fails with:
+  ```json
+  {"error":"invalid_client","error_description":"Unknown client_id. Register via /register or use a CIMD URL."}
+  ```
+- The error appears after redeploying the users subgraph (e.g. re-running `12-deploy-mcp-server.sh` or `05-deploy-subgraphs.sh`)
+
+**Cause:** `mcp-remote` caches the `client_id` from dynamic registration (`POST /register`) in `~/.mcp-auth/`. The users subgraph stores registrations in memory, so any pod restart wipes them. The cached `client_id` is now unknown to the fresh process.
+
+**Debug Steps:**
+
+1. **Verify the auth server is up and port-forwarded:**
+   ```bash
+   curl -s -o /dev/null -w "%{http_code}" http://localhost:4001/.well-known/oauth-authorization-server
+   # Expected: 200
+   ```
+
+2. **Check for stale cached credentials:**
+   ```bash
+   cat ~/.mcp-auth/mcp-remote-*/*_client_info.json
+   ```
+   Look for a `client_id` that starts with `client_` — this was issued by the built-in auth server and is now stale.
+
+3. **Clear the stale cache:**
+   ```bash
+   rm -rf ~/.mcp-auth/
+   ```
+
+4. **Restart the MCP client** (quit and reopen Claude Desktop, or toggle the MCP server off/on). On next connect, `mcp-remote` will call `POST /register`, get a fresh `client_id`, and complete the OAuth flow.
+
+**Prevention:** Use CIMD (URL-based `client_id`) instead of dynamic registration — it doesn't require pre-registration and survives pod restarts. See [MCP Production Guide — Client Registration](mcp-production.md#client-registration-approach).
+
 ## Quick Debug Scripts
 
 ### Complete Registry Debug
@@ -651,6 +686,10 @@ cat .image-tag 2>/dev/null || echo ".image-tag file not found"
 ### `MISSING_TRANSITIVE_AUTH_REQUIREMENTS` (composition error)
 **Cause:** A field's `@requires` selection set transitively reads data protected by `@authenticated`, `@requiresScopes`, or `@policy` in another subgraph, but the field itself does not declare the same auth directive.  
 **Solution:** Add the matching auth directive to the field and import it in the subgraph's `@link`. See [Composition Failures](#composition-failures).
+
+### `invalid_client` — Unknown client_id (MCP auth)
+**Cause:** `mcp-remote` is using a cached `client_id` from a previous dynamic registration, but the users subgraph pod restarted and lost its in-memory registration map.  
+**Solution:** Delete `~/.mcp-auth/` and restart the MCP client. See [MCP Auth: invalid_client After Pod Restart](#mcp-auth-invalid_client-after-pod-restart).
 
 ## Getting Help
 

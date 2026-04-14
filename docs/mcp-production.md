@@ -766,6 +766,37 @@ transport:
        discovery_timeout: 10s
    ```
 
+### `invalid_client` — Unknown client_id
+
+**Symptom:** MCP client (e.g. Claude Desktop via `mcp-remote`) fails to connect with:
+
+```json
+{"error":"invalid_client","error_description":"Unknown client_id. Register via /register or use a CIMD URL."}
+```
+
+**Cause:** `mcp-remote` caches the OAuth `client_id` it receives from dynamic registration in `~/.mcp-auth/`. The built-in authorization server (users subgraph) stores registrations **in memory**, so any pod restart or redeployment wipes the `registeredClients` map. The cached `client_id` is now unknown to the fresh process.
+
+**Fix:**
+
+1. Delete the stale `mcp-remote` auth cache:
+   ```bash
+   # Remove all cached credentials (will re-register on next connect)
+   rm -rf ~/.mcp-auth/
+   ```
+
+   Or, to only clear a specific server's cache, list the files and identify the one with the stale `client_id`:
+   ```bash
+   cat ~/.mcp-auth/mcp-remote-*/*_client_info.json
+   # Find the file whose client_id matches the error, then delete that hash prefix:
+   # rm ~/.mcp-auth/mcp-remote-*/<hash>_*
+   ```
+
+2. Restart the MCP client (quit and reopen Claude Desktop, or toggle the MCP server off and on). On the next connection, `mcp-remote` will call `POST /register`, get a fresh `client_id`, and start the OAuth flow normally.
+
+**Note:** This will happen every time the users subgraph pod restarts. To avoid it, either:
+- Use **CIMD** (a URL-based `client_id` that doesn't require registration) — see [Client Registration Approach](#client-registration-approach)
+- Switch to an external IdP (Auth0, Okta) where registrations are persistent — see the [Auth0 guide](mcp-auth0-claude-desktop.md)
+
 ### Router Rejects Forwarded Tokens
 
 **Symptom:** MCP tools return GraphQL errors with `UNAUTHENTICATED` or fields return `null`.

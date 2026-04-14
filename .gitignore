@@ -47,5 +47,8 @@ lockfile.sh
 *.pid
 .image-tag
 
+# Local Apollo operator image tarball (large binary; optional dev artifact)
+operator-*.tar
+
 # Built output (Docker/build generates these)
 services/promotions-api/dist/
