@@ -1,0 +1,16 @@
+# Declarative form of the regcred secret, for GitOps tools.
+#
+# DO NOT commit real credentials. The .dockerconfigjson value here is the
+# placeholder from `echo -n '{"auths":{}}' | base64`. Replace it with the
+# real value or — strongly preferred — render it from a sealed/external
+# secret manager (Sealed Secrets, External Secrets Operator, SOPS, Vault).
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: regcred
+  namespace: apollo
+type: kubernetes.io/dockerconfigjson
+data:
+  # base64({"auths":{"registry.example.com":{"username":"...","password":"...","auth":"..."}}})
+  .dockerconfigjson: eyJhdXRocyI6e319
