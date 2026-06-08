@@ -22,11 +22,11 @@ Every active subscription costs the Router:
 
 - ~8–16 KB of heap (the WS frame buffer + the per-stream state machine).
 - One file descriptor.
-- One in-flight `apollo_router_session_count_active` slot.
+- One distinct open subscription tracked by `apollo_router_opened_subscriptions` (OTel: `apollo.router.opened.subscriptions`). After deduplication the same metric reflects the count of distinct upstream subscriptions, not the count of connected clients.
 
 A 4 vCPU / 8 GiB Router holds 50k–100k idle subscriptions comfortably, but only ~5k subscriptions that all receive an event every second. The bottleneck shifts from memory to CPU as event frequency rises.
 
-Plan capacity with `apollo_router_deduplicated_subscriptions_event_count_total` per second (the rate at which subgraph events are fanning out) as the primary input. Per-instance:
+Plan capacity with the rate of `apollo_router_opened_subscriptions` (distinct active subscriptions) and `apollo_router_skipped_event_count_total` (events dropped under backpressure) as the primary inputs. Per-instance:
 
 ```
 target_cpu_pct =
@@ -58,10 +58,10 @@ Pick (2) for B2C with short token TTLs; pick (1) for B2B with long-lived service
 
 Subgraphs can produce events faster than clients can consume them. Router applies backpressure by:
 
-- Dropping events when the per-client buffer is full (counted as `apollo_router_skipped_event_count_total`).
-- Coalescing events with identical payloads (counted as `apollo_router_deduplicated_subscriptions_event_count_total`).
+- Dropping events when the per-client buffer is full (counted as `apollo_router_skipped_event_count_total`; OTel: `apollo.router.skipped.event.count`).
+- Coalescing duplicate subgraph connections: when N clients subscribe to the same operation, the Router opens one upstream subscription and fans out events to all N. `apollo_router_opened_subscriptions` reflects the post-dedup count, not the client count — so a flat gauge with growing connection counts is healthy.
 
-Watch both metrics — both are healthy when bounded, alarming when growing unbounded. See [`router-grafana-template`](https://github.com/apollosolutions/router-grafana-template) for the dashboard wiring (AS-342).
+Watch `apollo_router_skipped_event_count_total` — bounded is healthy, growing unbounded is the canary for client buffers overflowing. See [`router-grafana-template`](https://github.com/apollosolutions/router-grafana-template) for the dashboard wiring (AS-342).
 
 ## Operational pitfalls
 
@@ -72,7 +72,7 @@ Watch both metrics — both are healthy when bounded, alarming when growing unbo
 
 ## See also
 
-- [Router subscriptions configuration](https://www.apollographql.com/docs/router/configuration/subscription)
+- [Router subscriptions configuration](https://www.apollographql.com/docs/graphos/routing/operations/subscriptions)
 - [TN0047: HTTP subscriptions through an API gateway](https://www.apollographql.com/docs/technotes/TN0047-using-http-subscriptions-api-gateway/)
 - [`router-grafana-template`](https://github.com/apollosolutions/router-grafana-template) — observability dashboard with subscription row (AS-342)
 - [`apollosolutions/subscriptions-best-practices-examples`](https://github.com/apollosolutions/subscriptions-best-practices-examples)
