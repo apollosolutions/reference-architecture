@@ -25,13 +25,23 @@ PQs scale linearly with the operations you ship per release. Build a CI step tha
 2. Pushes them to a [PQ manifest](https://www.apollographql.com/docs/graphos/operations/persisted-queries) under a client name + version.
 3. Configures the Router to require PQs and enforce per-client-version allowlists.
 
+Audit-mode posture (collect unmatched ids without rejecting them):
+
+```yaml title="router.yaml — PQ audit mode (don't enforce yet)"
+persisted_queries:
+  enabled: true
+  log_unknown: true   # log operations that don't match the manifest
+  # safelist is intentionally omitted here — enabling it rejects unknowns.
+```
+
+Once the unknown rate hits zero in production, flip on enforcement:
+
 ```yaml title="router.yaml — PQ enforcement"
 persisted_queries:
   enabled: true
   safelist:
     enabled: true
-    require_id: true # reject operations that don't carry an id
-  log_unknown: true # don't enforce yet; collect unmatched ids first
+    require_id: true  # reject operations that don't carry an id
 ```
 
 ## When to choose Automatic Persisted Queries
@@ -75,6 +85,6 @@ Most production outages from PQ rollouts come from skipping step 1.
 ## See also
 
 - [Apollo Persisted Queries](https://www.apollographql.com/docs/graphos/operations/persisted-queries)
-- [Automatic Persisted Queries](https://www.apollographql.com/docs/router/configuration/persisted-queries)
+- [Automatic Persisted Queries](https://www.apollographql.com/docs/graphos/routing/operations/apq)
 - [TN0024 Schema Deprecations](https://www.apollographql.com/docs/technotes/TN0024-deprecations/) — PQ manifests are also the cleanest way to know whether deprecating a field is safe.
 - [Apollo Client PQ link](https://www.apollographql.com/docs/react/api/link/persisted-queries/)
