@@ -11,7 +11,7 @@ Both patterns can run independently or together. End-to-end, the inbound JWT pro
 
 ## Pattern 1 — Validate inbound JWTs at the Router
 
-The Router's [JWT authentication plugin](https://www.apollographql.com/docs/router/configuration/authn-jwt) validates a `Bearer` token against one or more JWKS endpoints and rejects unauthenticated traffic before composition. With AWS-hosted IdPs the JWKS URL is fully managed for you.
+The Router's [JWT authentication plugin](https://www.apollographql.com/docs/graphos/routing/security/jwt) validates a `Bearer` token against one or more JWKS endpoints and rejects unauthenticated traffic before composition. With AWS-hosted IdPs the JWKS URL is fully managed for you.
 
 ```yaml title="router.yaml"
 authentication:
@@ -23,7 +23,8 @@ authentication:
         - url: https://cognito-idp.${AWS_REGION}.amazonaws.com/${USER_POOL_ID}/.well-known/jwks.json
           # Optionally pin audiences/issuers to lock the token to this graph.
           audiences: ["graphos-router"]
-          issuer: https://cognito-idp.${AWS_REGION}.amazonaws.com/${USER_POOL_ID}
+          issuers:
+            - https://cognito-idp.${AWS_REGION}.amazonaws.com/${USER_POOL_ID}
 
 authorization:
   # Reject any operation that hits a field requiring auth without a valid JWT.
@@ -32,19 +33,19 @@ authorization:
     enabled: true
 ```
 
-The plugin populates [request claims](https://www.apollographql.com/docs/router/configuration/authn-jwt#token-claims) (sub, scope, custom Cognito groups) into the supergraph context. From there, the [`@requiresScopes`](https://www.apollographql.com/docs/router/configuration/authorization#requiresscopes) and [`@policy`](https://www.apollographql.com/docs/router/configuration/authorization#policy) directives let you enforce per-field authorization without modifying subgraph code.
+The plugin populates [request claims](https://www.apollographql.com/docs/graphos/routing/security/jwt#working-with-jwt-claims) (sub, scope, custom Cognito groups) into the supergraph context. From there, the [`@requiresScopes`](https://www.apollographql.com/docs/graphos/routing/security/authorization#requiresscopes) and [`@policy`](https://www.apollographql.com/docs/graphos/routing/security/authorization#policy) directives let you enforce per-field authorization without modifying subgraph code.
 
 ### Cognito-specific gotchas
 
 - **Access tokens vs ID tokens** — point Router at access tokens. Cognito ID tokens have `aud` claims that match the client ID, not your graph, and they aren't intended for downstream APIs.
-- **Token TTL** — Cognito access tokens default to 60 min; for long subscriptions, set the [`exp` window](https://www.apollographql.com/docs/router/configuration/authn-jwt#renewing-tokens) and refresh client-side rather than extending the JWT lifetime.
+- **Token TTL** — Cognito access tokens default to 60 min; for long subscriptions, refresh client-side rather than extending the JWT lifetime. See the [JWT authentication](https://www.apollographql.com/docs/graphos/routing/security/jwt) reference for the supported claim set.
 - **Region awareness** — JWKS URLs are regional. Use the same region as your Cognito user pool, not your Router region, in the JWKS URL.
 
 ## Pattern 2 — Sign outbound subgraph requests with SigV4
 
 When a subgraph is an IAM-authenticated AWS service (HTTP API Gateway with IAM auth, Lambda Function URL with `AWS_IAM`, AppSync with `AWS_IAM`, App Runner private services), the Router must sign every subgraph request with [AWS Signature V4](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html).
 
-The native way to do this in the Router is the [AWS Sigv4 auth plugin](https://www.apollographql.com/docs/router/configuration/authn-aws-sigv4) (Router 1.43+, GA in 2.x). It picks up credentials from the standard AWS provider chain — environment variables, IRSA on EKS, ECS task role, or EC2 instance profile.
+The native way to do this in the Router is the [SigV4 subgraph authentication plugin](https://www.apollographql.com/docs/graphos/routing/security/subgraph-authentication) (Router 1.43+, GA in 2.x). It picks up credentials from the standard AWS provider chain — environment variables, IRSA on EKS, ECS task role, or EC2 instance profile.
 
 ```yaml title="router.yaml"
 authentication:
@@ -114,8 +115,8 @@ headers:
 
 ## Further reading
 
-- [Router JWT authentication](https://www.apollographql.com/docs/router/configuration/authn-jwt)
-- [Router AWS SigV4 authentication](https://www.apollographql.com/docs/router/configuration/authn-aws-sigv4)
-- [Router authorization directives](https://www.apollographql.com/docs/router/configuration/authorization)
+- [Router JWT authentication](https://www.apollographql.com/docs/graphos/routing/security/jwt)
+- [Router subgraph authentication (SigV4)](https://www.apollographql.com/docs/graphos/routing/security/subgraph-authentication)
+- [Router authorization directives](https://www.apollographql.com/docs/graphos/routing/security/authorization)
 - [IAM authentication for API Gateway](https://docs.aws.amazon.com/apigateway/latest/developerguide/permissions.html)
 - [Lambda Function URL IAM auth](https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html)
