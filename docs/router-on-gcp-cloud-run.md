@@ -22,11 +22,13 @@ spec:
         # larger memory, and faster cold starts. First-gen will work but
         # without HTTP/2 between Cloud Run and the Router.
         run.googleapis.com/execution-environment: gen2
-        # Limit concurrent in-flight requests per instance. Router is happy
-        # at 80-200 depending on shape; start at 80 and tune from metrics.
+        # Cap horizontal autoscaling. Adjust based on subgraph capacity,
+        # not Router CPU — Router scales sub-linearly with concurrency.
         autoscaling.knative.dev/maxScale: "20"
         run.googleapis.com/cpu-throttling: "false" # keep CPU during idle for keepalives
     spec:
+      # Per-instance concurrent in-flight requests. Router is happy at
+      # 80–200 depending on operation shape; start at 80 and tune from metrics.
       containerConcurrency: 80
       timeoutSeconds: 60 # Cloud Run hard ceiling unless you opt into 60min preview
       serviceAccountName: apollo-router@PROJECT.iam.gserviceaccount.com
@@ -77,7 +79,7 @@ Cloud Run's request timeout maxes at **60 minutes** (preview) or **60 seconds** 
 
 Cloud Run does support WebSockets in second-gen. Two caveats:
 
-1. The WebSocket lifetime is capped by `timeoutSeconds`. Long-lived subscriptions need either short request timeouts on the client (and reconnect on close) or Router's [callback subscriptions](https://www.apollographql.com/docs/router/configuration/subscription) (HTTP polling-based).
+1. The WebSocket lifetime is capped by `timeoutSeconds`. Long-lived subscriptions need either short request timeouts on the client (and reconnect on close) or Router's [callback subscriptions](https://www.apollographql.com/docs/graphos/routing/operations/subscriptions/multi-cloud-callback-setup) (HTTP polling-based).
 2. Cookies-based sticky sessions don't exist on Cloud Run. If your subscription transport needs the same backend across reconnects, use callback mode.
 
 ### Cold starts and Uplink
@@ -96,29 +98,62 @@ Cloud Run egress hits the public internet by default. Outbound calls to Uplink a
 
 ## Authenticating to private subgraphs
 
-Cloud Run services authenticate to each other with [Google-signed OIDC tokens](https://cloud.google.com/run/docs/authenticating/service-to-service). Router doesn't natively mint these — use a [coprocessor](https://www.apollographql.com/docs/router/customizations/coprocessor) or a [Rhai script](https://www.apollographql.com/docs/router/customizations/rhai) to fetch the metadata-server token and set it as `Authorization: Bearer …` per-subgraph.
+Cloud Run services authenticate to each other with [Google-signed OIDC tokens](https://cloud.google.com/run/docs/authenticating/service-to-service). Router doesn't natively mint these, and **Rhai is the wrong tool here** — the Rhai surface has no outbound HTTP primitive (no `fetch()`/`http_post()`), and `request.subgraph.headers` is only writable from `subgraph_service`, not `supergraph_service`. Use a [coprocessor](https://www.apollographql.com/docs/graphos/routing/customization/coprocessor) at the `SubgraphRequest` stage: have it mint the OIDC token from the Cloud Run metadata server and inject the `Authorization: Bearer …` header before the Router calls the subgraph.
 
-```rhai
-// router.rhai (excerpt)
-fn supergraph_service(service){
-    let svc = service;
-    svc.map_request(|request|{
-        // Cloud Run metadata server — only available inside the Cloud Run runtime
-        let audience = `https://${request.context.entries.subgraph_host}`;
-        let token = fetch(`http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${audience}`,
-                         #{ headers: #{ "Metadata-Flavor": "Google" }});
-        request.subgraph.headers.set("authorization", `Bearer ${token}`);
-    });
-}
+```yaml title="router.yaml — coprocessor wire-up"
+coprocessor:
+  url: http://127.0.0.1:8080
+  subgraph:
+    all:
+      request:
+        headers: true
 ```
+
+```js title="coprocessor (Node) — issue an OIDC ID token per subgraph and inject it"
+import express from "express";
+
+const app = express();
+app.use(express.json({ limit: "5mb" }));
+
+// Cache tokens by audience; Cloud Run ID tokens are valid for ~1 hour.
+const tokenCache = new Map();
+const tokenFor = async (audience) => {
+  const cached = tokenCache.get(audience);
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
+  const res = await fetch(
+    `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`,
+    { headers: { "Metadata-Flavor": "Google" } },
+  );
+  if (!res.ok) throw new Error(`metadata server ${res.status}`);
+  const token = await res.text();
+  tokenCache.set(audience, { token, expiresAt: Date.now() + 55 * 60_000 });
+  return token;
+};
+
+app.post("/", async (req, res) => {
+  const payload = req.body;
+  // Audience is the subgraph's Cloud Run URL (https://service-...-run.app).
+  const subgraphUrl = payload.context?.entries?.["apollo::subgraph::request_url"];
+  if (payload.stage === "SubgraphRequest" && subgraphUrl) {
+    const audience = new URL(subgraphUrl).origin;
+    const token = await tokenFor(audience);
+    payload.headers ??= {};
+    payload.headers["authorization"] = [`Bearer ${token}`];
+  }
+  res.json(payload);
+});
+app.listen(8080);
+```
+
+Run the coprocessor as a sidecar on the same Cloud Run revision so it can reach the metadata server with the Router's service account identity.
 
 ## Known issue references
 
-- [`apollographql/router#3517`](https://github.com/apollographql/router/issues/3517) — Cloud Run startup probe + Router default port behaviour. Resolved in Router 1.x but worth verifying on each version bump.
+- [`apollographql/router#3517`](https://github.com/apollographql/router/issues/3517) — Cloud Run container startup failure (`/usr/bin/env: 'bash': No such file or directory`). The official Router images are intentionally distroless and ship no shell; do not depend on `bash` in image-entrypoint hooks or Cloud Run launch scripts. Use a Cloud Run job, an init container, or invoke the Router binary directly.
 
 ## See also
 
-- [Router self-hosted runtime](https://www.apollographql.com/docs/router/containerization/docker)
-- [Router health checks](https://www.apollographql.com/docs/router/configuration/health-check)
-- [Router callback subscriptions](https://www.apollographql.com/docs/router/configuration/subscription#callback)
+- [Router self-hosted runtime](https://www.apollographql.com/docs/graphos/routing/self-hosted/containerization/docker)
+- [Router health checks](https://www.apollographql.com/docs/graphos/routing/self-hosted/health-checks)
+- [Router subscriptions (callback mode)](https://www.apollographql.com/docs/graphos/routing/operations/subscriptions/multi-cloud-callback-setup)
 - [Cloud Run timeouts](https://cloud.google.com/run/docs/configuring/request-timeout)
