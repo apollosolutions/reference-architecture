@@ -22,20 +22,22 @@ It is a poor fit when:
 ## Configuration shape
 
 ```yaml title="router.yaml — entity caching at the subgraph level"
-preview_entity_cache:
+response_cache:
   enabled: true
-  redis:
-    urls:
-      - redis://redis-master.redis.svc.cluster.local:6379
-    timeout: 5ms # fast-fail on Redis hiccups; better to serve stale-from-origin than to hang
   subgraph:
     all:
       enabled: true
-      ttl: 5m
+      ttl: 5m            # required when response caching is enabled
+      redis:
+        urls:
+          - redis://redis-master.redis.svc.cluster.local:6379
+        # Realistic Redis round-trip budget — too aggressive a value will fail
+        # most lookups and fall back to origin, defeating the cache.
+        timeout: 200ms
     subgraphs:
       products:
         enabled: true
-        ttl: 1h # products rarely change, longer TTL is safe
+        ttl: 1h          # products rarely change, longer TTL is safe
       inventory:
         # Inventory is read-heavy but stale data is dangerous; keep TTL short
         # or disable entirely if eventual consistency is unacceptable.
@@ -43,7 +45,7 @@ preview_entity_cache:
         ttl: 30s
 ```
 
-The TTL is per-subgraph, not per-type. Within one subgraph you can scope tighter with `@cacheControl(maxAge: ...)` on individual types and fields in the subgraph SDL — the Router takes the minimum of the per-subgraph TTL and the directive.
+The TTL is per-subgraph, not per-type. Subgraphs that emit `Cache-Control` headers can override the fallback TTL per response — the Router takes the value the subgraph returned when present, otherwise the configured `subgraph.<name>.ttl`.
 
 ## Cache key composition
 
@@ -55,24 +57,34 @@ The Router keys entries on:
 
 What's _not_ in the key by default: the JWT, the client name, the originating IP, anything in `extensions`. If your authorization decisions depend on the viewer, you _must_ add the viewer claim to the cache key, otherwise users will see other users' cached responses.
 
-## Per-tenant / per-locale caching
+## Per-user / per-tenant caching
 
-```yaml title="router.yaml — extending the cache key"
-preview_entity_cache:
+For per-user caching, point `private_id` at a context field (typically the JWT `sub` or a tenant claim) — the Router segments cache entries by that value so two viewers don't see each other's data:
+
+```yaml title="router.yaml — segment cache per user/tenant"
+response_cache:
   subgraph:
     subgraphs:
       products:
-        invalidation:
-          private: true
-        # The cache key is composed of the JWT 'tenant' claim and an
-        # Accept-Language header. Two different tenants get two different
-        # cache buckets for the same product id.
-        cache_key_modifiers:
-          - context: $.jwt_claims.tenant
-          - header: accept-language
+        # Reference any field already in the request context. JWT claims are
+        # populated by the `authentication.router.jwt` plugin under
+        # `apollo::authentication::jwt_claims.<claim>`.
+        private_id: apollo::authentication::jwt_claims.sub
 ```
 
-Rule of thumb: every dimension that changes the response must be in the key. The fastest way to verify is to fetch the same entity twice with different viewers/locales and dump the cache key from the Router debug log.
+For dimensions that aren't a simple context field — for example combining a tenant claim with `Accept-Language` — set the cache key explicitly at runtime by writing the `apollo::response_cache::key` context entry from a Rhai script or coprocessor before the subgraph fetch:
+
+```rhai title="router.rhai — extend the cache key from request context"
+fn subgraph_service(service, _subgraph) {
+    service.map_request(|request| {
+        let tenant = request.context["apollo::authentication::jwt_claims"]?.tenant ?? "anon";
+        let locale = request.subgraph.headers["accept-language"] ?? "*";
+        request.context["apollo::response_cache::key"] = `tenant=${tenant};lang=${locale}`;
+    });
+}
+```
+
+Rule of thumb: every dimension that changes the response must be in the key. The fastest way to verify is to fetch the same entity twice with different viewers/locales and confirm the keys differ in the Router debug log.
 
 ## Invalidation
 
@@ -101,7 +113,7 @@ Each request emits a line per subgraph fetch with the cache key, the decision (h
 
 ## See also
 
-- [Apollo Router entity caching docs](https://www.apollographql.com/docs/router/configuration/entity-caching/)
-- [`@cacheControl` directive](https://www.apollographql.com/docs/router/configuration/entity-caching/#cachecontrol-directive)
+- [Apollo Router entity caching docs](https://www.apollographql.com/docs/graphos/routing/performance/caching/entity)
+- [Subgraph `Cache-Control` header behaviour](https://www.apollographql.com/docs/graphos/routing/performance/caching/entity#cache-control-header)
 - [Response caching guide](./response-caching-guide.md) — the sibling response-cache feature, scoped to entire operations rather than entities.
 - [TN0011 Response Cache Eviction](https://www.apollographql.com/docs/technotes/TN0011-response-cache-eviction/) — covers the older response cache; many invalidation lessons apply to entity caching too.
