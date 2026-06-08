@@ -12,7 +12,7 @@ The Router has two extension surfaces. They overlap in capability but diverge in
 | **Where it runs** | In-process inside Router | Separate service over HTTP |
 | **Latency added per hook** | ~10–100 µs | 1–10 ms (network + serialization) |
 | **External I/O** | Limited (built-in `fetch` only, blocking) | Anything the runtime can do (DB, cache, IDP, gRPC) |
-| **Failure mode** | Crash inside Router → 500 on the operation | Coprocessor down → configurable (fail-open or fail-closed per stage) |
+| **Failure mode** | Unhandled error inside Router → 500 on the operation | Coprocessor unreachable/non-2xx/timeout → 500 on the operation (fail-closed; no per-stage toggle) |
 | **Deployability** | One YAML pointer + a `.rhai` file | A separate service to deploy, scale, and observe |
 | **Hot reload** | Yes (Router watches the file) | No (coprocessor binary redeploys) |
 | **Test story** | `rhai-test` framework (from `apollosolutions/rhai-test`) | Standard HTTP service testing |
@@ -24,16 +24,20 @@ Rule of thumb: **stay in Rhai** until you need (a) a real DB / cache / IDP call,
 Header transformations, claim-based routing, simple request/response decorations, structured logging. The hot path stays in-process so the latency cost is negligible.
 
 ```rhai
-// router.rhai — strip a sensitive internal header before subgraph fetch
+// router.rhai — set a marker header on outbound subgraph requests
 fn subgraph_service(service, subgraph){
     service.map_request(|request|{
-        request.subgraph.headers.remove("x-internal-only");
-        if request.subgraph.headers.contains("authorization") {
-            request.subgraph.headers.set("x-request-from-router", "true");
+        // Header reads/writes use indexed access; `contains` requires a
+        // local binding inside subgraph_service or it throws "cannot mutate".
+        let headers = request.subgraph.headers;
+        if headers.contains("authorization") {
+            request.subgraph.headers["x-request-from-router"] = "true";
         }
     });
 }
 ```
+
+The Rhai header surface only exposes the indexed accessor (read via `headers["x"]`, write via assignment) and `contains()` / `values()` (multi-value reads). There is **no `.remove()` or `.set()` method**; for header removal use the YAML [`headers.remove`](https://www.apollographql.com/docs/graphos/routing/header-propagation) plugin rather than Rhai, since it's the documented removal path.
 
 When the rule changes you redeploy the file (or rely on file-watch hot reload). Customers love this for the iteration speed.
 
@@ -44,31 +48,61 @@ When the rule changes you redeploy the file (or rely on file-watch hot reload). 
 - **Audit logging** that ships structured events to Kafka / a SIEM with delivery guarantees.
 - **Multi-step transformation logic** that's easier to write and test in your team's primary language.
 
+A coprocessor is a plain HTTP server: the Router posts a JSON payload at each enabled stage and expects the same shape back, mutated. There is no Apollo SDK — the `reference-architecture` repo's own [`coprocessor/`](../coprocessor/) directory uses Express + `jose` and is the canonical example layout. A minimal claim-enrichment SupergraphRequest handler:
+
 ```javascript
 // coprocessor.js — claim enrichment from an internal directory
-import { ApolloRouterCoprocessor } from "@apollo/router-coprocessor";
+import express from "express";
 
-new ApolloRouterCoprocessor()
-  .onSupergraphRequest(async (req) => {
-    const user = await directory.lookupBySub(req.context.entries.jwt_claims.sub);
-    req.context.entries.user_groups = user.groups;
-    return req;
-  })
-  .listen(4001);
+const app = express();
+app.use(express.json({ limit: "5mb" }));
+
+app.post("/", async (req, res) => {
+  const payload = req.body;
+  if (payload.stage === "SupergraphRequest") {
+    const sub = payload.context?.entries?.["apollo::authentication::jwt_claims"]?.sub;
+    if (sub) {
+      const user = await directory.lookupBySub(sub);
+      payload.context.entries["user_groups"] = user.groups;
+    }
+  }
+  // Return the payload (mutated or unchanged) with the SAME shape and a 2xx —
+  // a non-2xx or a shape mismatch is a "failed response" and fails the request.
+  res.json(payload);
+});
+
+app.listen(4001);
 ```
 
-The coprocessor is deployed alongside Router (often as a sidecar in Kubernetes, or as an adjacent ECS service). The `reference-architecture` repo's `coprocessor/` directory is the canonical example layout.
+Wire it up in `router.yaml`:
+
+```yaml title="router.yaml — enable the coprocessor at SupergraphRequest"
+coprocessor:
+  url: http://127.0.0.1:4001
+  timeout: 1s          # see "Failure modes" below
+  supergraph:
+    request:
+      context: true
+```
+
+The coprocessor is deployed alongside Router (often as a sidecar in Kubernetes, or as an adjacent ECS service).
 
 ## Failure modes worth deciding upfront
 
-For coprocessors, every stage (RouterService, SupergraphService, ExecutionService, SubgraphService) can be configured **fail-open** (proceed on coprocessor error) or **fail-closed** (return 500). The defaults are fail-open. Default to **fail-closed for auth/authz** stages, **fail-open for logging/telemetry** stages — getting these reversed leads to either silent auth bypass or every subgraph failure cascading from coprocessor hiccups.
+For coprocessors, the Router treats any of the following as a [failed response](https://www.apollographql.com/docs/graphos/routing/customization/coprocessor) and **returns an error to the client** — i.e. fail-closed:
 
-For Rhai, there's no fail-open option: an unhandled error inside the script becomes a 500 response. Defensive coding (`try`/`catch`) matters.
+- The coprocessor doesn't respond inside the `coprocessor.timeout` window (defaults to **1 s**).
+- The coprocessor returns a non-`2xx` HTTP code.
+- The response body doesn't match the stage's JSON shape.
+
+There is no per-stage `fail_open`/`fail_closed` toggle — so for any stage you can't afford to take down the request path (logging, telemetry, claim-enrichment that's a "nice to have"), the coprocessor itself must never throw and never time out. Catch and return the inbound payload unchanged on internal errors, and keep external I/O short-circuited (cache, short timeout) so the per-stage budget never exceeds `coprocessor.timeout`.
+
+For Rhai, an unhandled error inside the script also fails the request. Defensive coding (`try`/`catch`) matters.
 
 ## See also
 
-- [Router Rhai docs](https://www.apollographql.com/docs/router/customizations/rhai)
-- [Router coprocessor docs](https://www.apollographql.com/docs/router/customizations/coprocessor)
+- [Router Rhai docs](https://www.apollographql.com/docs/graphos/routing/customization/rhai)
+- [Router coprocessor docs](https://www.apollographql.com/docs/graphos/routing/customization/coprocessor)
 - [`apollosolutions/rhai-test`](https://github.com/apollosolutions/rhai-test) — unit-test framework for Rhai scripts
 - [`apollosolutions/coprocessor-examples`](https://github.com/apollosolutions/coprocessor-examples) — coprocessor starters across languages
 - [`coprocessor/`](../coprocessor/) — the working coprocessor used by this reference architecture
