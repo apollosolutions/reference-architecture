@@ -7,43 +7,49 @@
 #     # tag derived from appVersion
 # OCI registries are tied to the chart version. Override here to point at a
 # mirrored registry that supports standard Docker pulls.
+#
+# Schema: https://github.com/apollographql/router/blob/main/helm/chart/router/values.yaml
+# All overrides below match the upstream chart's top-level layout. The `router:`
+# key is reserved for the Router YAML config (`router.configuration`, `router.args`)
+# and is intentionally not used in this example.
 
-router:
-  # The mirrored Router image. Replace registry.example.com with your registry
-  # (Docker Hub, ECR, GCR, Artifactory, Harbor, Nexus, etc.).
-  image:
-    repository: registry.example.com/apollo/router
-    tag: "v2.10.0" # pin explicitly; upstream chart uses appVersion as default
-    pullPolicy: IfNotPresent
+# The mirrored Router image. Replace registry.example.com with your registry
+# (Docker Hub, ECR, GCR, Artifactory, Harbor, Nexus, etc.).
+image:
+  repository: registry.example.com/apollo/router
+  tag: "v2.10.0" # pin explicitly; upstream chart uses appVersion as default
+  pullPolicy: IfNotPresent
 
-  # If your registry is private, reference an imagePullSecret. The secret
-  # itself must be created out-of-band (e.g. with `kubectl create secret
-  # docker-registry`). See pattern-b for an example.
-  # imagePullSecrets:
-  #   - name: regcred
+# If your registry is private, reference an imagePullSecret. The secret
+# itself must be created out-of-band (e.g. with `kubectl create secret
+# docker-registry`). See pattern-b for an example.
+# imagePullSecrets:
+#   - name: regcred
 
-  # GraphOS connection — unchanged from the OCI pattern. The router still
-  # pulls schema and config from Uplink over HTTPS, so this works in both
-  # environments without additional firewall rules.
-  managedFederation:
-    apolloGraphRef: my-graph@main
-    existingSecret: apollo-graphos-secret # contains APOLLO_KEY
+# GraphOS connection — unchanged from the OCI pattern. The router still
+# pulls schema and config from Uplink over HTTPS, so this works in both
+# environments without additional firewall rules.
+managedFederation:
+  graphRef: my-graph@main
+  existingSecret: apollo-graphos-secret # contains the graph API key
 
-  # Standard production hygiene — not specific to non-OCI but worth showing
-  # in a reference example.
-  replicaCount: 3
-  resources:
-    requests:
-      cpu: 500m
-      memory: 512Mi
-    limits:
-      cpu: "2"
-      memory: 2Gi
+# Standard production hygiene — not specific to non-OCI but worth showing
+# in a reference example.
+replicaCount: 3
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
 
-  service:
-    type: ClusterIP
-    port: 80
-    targetPort: 4000
+service:
+  type: ClusterIP
+  port: 80
+  # Chart default routes traffic to the named container port `http` (4000).
+  # Override only if you've remapped the Router listen port.
+  targetport: http
 
-  serviceMonitor:
-    enabled: false # set true if you run kube-prometheus-stack
+serviceMonitor:
+  enabled: false # set true if you run kube-prometheus-stack
