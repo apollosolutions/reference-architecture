@@ -24,7 +24,7 @@ Read fan-out is what federation handles cleanly. Write fan-out across federated 
 
 Federation increases the surface area where nullable becomes load-bearing. The two rules that prevent the most pain:
 
-1. **Non-null `@key` fields** are mandatory — entity resolution fails immediately on a null key.
+1. **`@key` values must be present at runtime.** Federation composes subgraphs whose key fields are SDL-nullable (the spec does not require `@key` fields to be declared non-null), and a missing key at runtime is treated as "entity not found" rather than a hard error. Declaring keys non-null in SDL is still strongly recommended — it documents the invariant, lets clients reason about response shape, and catches mistakes at composition rather than at request time.
 2. **Nullable scalar fields are not the default** — they should reflect a specific business meaning ("this user has not been onboarded yet"), not "this field might fail to fetch." Subgraphs returning errors should return `null` for the field and add an entry to `errors`, not return a `null` representing "we made it up."
 
 See TN0023 for the long version.
