@@ -60,7 +60,7 @@ For new customers without a strong existing preference, start with **ECS Fargate
 }
 ```
 
-Front it with an ALB on port 443 with an ACM cert, target group health-checks against `/health` on container port 8088 (the Router's [health-check endpoint](https://www.apollographql.com/docs/router/configuration/health-check)).
+Front it with an ALB on port 443 with an ACM cert, target group health-checks against `/health` on container port 8088 (the Router's [health-check endpoint](https://www.apollographql.com/docs/graphos/routing/self-hosted/health-checks)).
 
 ## EKS — operator-driven deploy
 
@@ -86,12 +86,31 @@ See companion tech note [`router-aws-jwt-sigv4.md`](./router-aws-jwt-sigv4.md) f
 Router emits OTel traces, metrics, and logs. Wire them up via:
 
 - **CloudWatch** — built-in via the awslogs log driver (ECS) or container stdout (EKS with the Fluent Bit DaemonSet). Captures logs only.
-- **Managed Prometheus + Grafana** (AMP/AMG) — scrape the Router's Prometheus endpoint on `:9090/metrics`. Use the [router-grafana-template](https://github.com/apollosolutions/router-grafana-template) dashboard.
+- **Managed Prometheus + Grafana** (AMP/AMG) — scrape the Router's Prometheus endpoint on `:9090/metrics`. The exporter is **disabled by default and binds `127.0.0.1`**; for AMP/sidecar scraping you must enable it and bind to the pod/task IP:
+
+  ```yaml title="router.yaml"
+  telemetry:
+    exporters:
+      metrics:
+        prometheus:
+          enabled: true
+          listen: 0.0.0.0:9090
+          path: /metrics
+  ```
+
+  Use the [router-grafana-template](https://github.com/apollosolutions/router-grafana-template) dashboard.
 - **ADOT collector** — if you already use AWS Distro for OpenTelemetry, point Router OTLP exporter at the collector and fan out to X-Ray / CloudWatch / Managed Prometheus from there.
 
 ## Common pitfalls
 
-- **Health checks** must hit `:8088/health`, not `:4000` — the Router serves graphql on 4000 and health on 8088 by default. ALB targeting 4000 with default settings will mark tasks unhealthy.
+- **Health checks** must hit `:8088/health`, not `:4000` — the Router serves graphql on 4000 and health on 8088 by default. ALB targeting 4000 with default settings will mark tasks unhealthy. The endpoint also binds `127.0.0.1` by default, so an external ALB or kubelet probe can't reach it — set `health_check.listen: 0.0.0.0:8088`:
+
+  ```yaml title="router.yaml"
+  health_check:
+    enabled: true
+    listen: 0.0.0.0:8088
+    path: /health
+  ```
 - **Uplink reachability** — Router needs outbound HTTPS to `uplink.api.apollographql.com`. Verify NAT/egress rules in private subnets.
 - **Memory** — set the task memory limit at least 1 GiB above `APOLLO_ROUTER_MAX_MEMORY` (or expect OOM on cold compilation of large schemas).
 - **Secrets** — never embed `APOLLO_KEY` in the task definition env block. Use Secrets Manager via `secrets.valueFrom`.
@@ -101,4 +120,4 @@ Router emits OTel traces, metrics, and logs. Wire them up via:
 - [Router on AWS JWT + SigV4](./router-aws-jwt-sigv4.md)
 - [Non-OCI Helm chart examples](../examples/router-helm-non-oci/)
 - [Apollo GraphOS Operator docs](https://www.apollographql.com/docs/apollo-operator/)
-- [Router self-hosted runtime](https://www.apollographql.com/docs/router/containerization/docker)
+- [Router self-hosted runtime](https://www.apollographql.com/docs/graphos/routing/self-hosted/containerization/docker)
