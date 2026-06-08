@@ -19,7 +19,7 @@ PR #142 push ──►  │ variant: pr-142   ◄──┐           │
        deploy subgraph services on pr-142.example    │
        comment PR with the env URL                   │
                                                      │
-PR merged / closed ──► tear down namespace ──► rover variant delete pr-142
+PR merged / closed ──► tear down namespace ──► rover graph delete my-graph@pr-142
 ```
 
 One variant per PR, one short-lived Router + subgraph deployment per PR, automatic cleanup on PR close.
@@ -40,10 +40,11 @@ rover subgraph publish my-graph@pr-${PR_NUMBER} \
 On `pull_request: [closed]`:
 
 ```bash
-# Delete the variant — wipes the composed supergraph, usage data, checks
-# history, and any contracts. Idempotent: safe to run if the variant was
-# never created.
-rover variant delete my-graph@pr-${PR_NUMBER} --confirm
+# Delete the variant and all its subgraphs — wipes the composed supergraph,
+# usage data, checks history, and any contracts. `rover graph delete` exits
+# non-zero if the variant doesn't exist, so guard the step with `|| true`
+# (or skip it if the variant was never created on this PR).
+rover graph delete my-graph@pr-${PR_NUMBER} --confirm || true
 ```
 
 The variant key (`pr-<number>`) is the contract between CI and infrastructure. Use the GitHub-provided `PR_NUMBER`, not a sha or branch name, so re-pushes still target the same variant.
