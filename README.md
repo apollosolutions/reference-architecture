@@ -2,6 +2,23 @@
 
 This repository contains a reference architecture utilizing [Kubernetes](https://kubernetes.io/docs/concepts/overview/) when using [Apollo Federation](https://www.apollographql.com/docs/federation/). It is designed to run locally on [Minikube](https://minikube.sigs.k8s.io/) for development and testing purposes.
 
+## Apollo Solutions toolboxes — where this fits
+
+The Solutions team maintains three public toolbox repos. Pick by what you need:
+
+| Need | Repo |
+| --- | --- |
+| **End-to-end working supergraph** — 8 subgraphs + Apollo Connector + GraphOS Operator on minikube, with auth and observability wired up. Use when you want to _show_ how everything fits together, not as a starter template. | **`reference-architecture`** _(you are here)_ |
+| **Drop-in utilities** — coprocessors (5 languages), router CORS snippets, schema linter, health-check questionnaire, packaging scripts. | [`apollosolutions/pse-toolbox`](https://github.com/apollosolutions/pse-toolbox) |
+| **Showcase one specific GraphOS feature** — small Client/Router/Server template optimised for narrow feature demos. | [`apollosolutions/graphos-feature-template`](https://github.com/apollosolutions/graphos-feature-template) |
+
+> ℹ️ `apollosolutions/supergraph-template-with-router` is **archived and private**;
+> external readers cannot access it and "Use this template" no longer works.
+> Use the three live repos above; if you previously forked the archived template,
+> the closest live equivalent is `graphos-feature-template`.
+
+Tracks [AS-289](https://apollographql.atlassian.net/browse/AS-289) — consistent cross-links across the four toolboxes.
+
 Once the architecture is fully stood up, you'll have: 
 
 - An Apollo Router running and managed by the [Apollo GraphOS Operator](https://www.apollographql.com/docs/apollo-operator/), utilizing:
