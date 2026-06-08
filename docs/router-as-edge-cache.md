@@ -27,29 +27,26 @@ Redis is the standard backing store for both layers. The Router talks to it over
 
 ## Configuration
 
-```yaml title="router.yaml"
-preview_response_cache:
-  enabled: true
-  redis:
-    urls:
-      - redis://redis-master.redis.svc.cluster.local:6379
-    timeout: 5ms # fail fast back to origin if Redis is slow
-  ttl: 30s
+Current Router (v2.6+) configures both whole-operation and entity-representation caching under a single `response_cache` block — there is no separate `preview_response_cache` or `preview_entity_cache`. TTL belongs under `subgraph.all.ttl` (required to start), and Redis settings live under `subgraph.all.redis`:
 
-preview_entity_cache:
+```yaml title="router.yaml"
+response_cache:
   enabled: true
-  redis:
-    urls:
-      - redis://redis-master.redis.svc.cluster.local:6379
   subgraph:
     all:
       enabled: true
-      ttl: 5m
+      ttl: 30s        # fallback TTL when no `Cache-Control` from subgraph; required
+      redis:
+        urls:
+          - redis://redis-master.redis.svc.cluster.local:6379
+        # Realistic Redis round-trip budget. Too aggressive a value (e.g.
+        # 5 ms) fails most lookups and defeats the cache; tune to your VPC.
+        timeout: 200ms
     subgraphs:
       products:
-        ttl: 1h # static-ish content, longer TTL safe
+        ttl: 1h       # static-ish content, longer TTL safe
       inventory:
-        ttl: 30s # changes frequently; keep short
+        ttl: 30s      # changes frequently; keep short
 
 telemetry:
   instrumentation:
@@ -64,7 +61,9 @@ telemetry:
               from_response_extensions: cache_hit
 ```
 
-The Router still hits Redis for both lookups even when Redis is down — what changes is the failure mode. Setting `timeout: 5ms` plus retry off (default) keeps the user-facing path fast: a Redis hiccup degrades to an origin fetch, not to a stalled request.
+Subgraph-level TTL overrides ride under `response_cache.subgraph.subgraphs.<name>.ttl`. Entity-representation caching is part of the unified `response_cache` config — there is no second cache block to maintain.
+
+A Redis timeout strikes the user-facing path with **fall-through to origin**, not a stall. The Router still issues lookups when Redis is down; what changes is the failure mode (fast fall-back vs. cache hit).
 
 ## Cache key composition — the critical rule
 
