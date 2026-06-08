@@ -83,4 +83,4 @@ When you're consolidating multiple subgraphs into one (or splitting one into man
 - [TN0012 Namespacing by separation of concern](https://www.apollographql.com/docs/technotes/TN0012-namespacing-by-separation-of-concern/)
 - [TN0036 Owner pattern](https://www.apollographql.com/docs/technotes/TN0036-owner-pattern/)
 - [Apollo Contracts](https://www.apollographql.com/docs/graphos/delivery/contracts/) — the right answer for the "by usage pattern" case
-- [Advanced schema design](./advanced-schema-design.md) (AS-323)
+<!-- Re-add once AS-323 lands: [Advanced schema design](./advanced-schema-design.md) -->
