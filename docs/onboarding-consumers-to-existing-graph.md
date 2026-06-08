@@ -103,7 +103,7 @@ The `client-name` and `client-version` headers become Studio filters for every m
 
 Three things change between "I got a query working" and "production traffic":
 
-1. **Persisted Queries.** The graph owners may require you to ship your operation list ahead of release (see [persisted-queries-vs-apqs.md](./persisted-queries-vs-apqs.md)). Plan for a build-time step that extracts your operations and publishes them. Don't ship an app that constructs queries dynamically — that's the fastest way to be blocked at deploy time.
+1. **Persisted Queries.** The graph owners may require you to ship your operation list ahead of release (see Apollo's [Persisted Queries](https://www.apollographql.com/docs/graphos/routing/security/persisted-queries) docs). Plan for a build-time step that extracts your operations and publishes them. Don't ship an app that constructs queries dynamically — that's the fastest way to be blocked at deploy time.
 2. **Rate limits and quotas.** Production graphs limit traffic per client. Ask what your budget is. If you're going to send 10 qps in production, run a load test against staging first.
 3. **Error handling.** GraphQL returns `200 OK` for most failures, with errors in the `errors[]` array. Don't assume `200` means "everything worked." Check both `data` and `errors`.
 
@@ -116,6 +116,6 @@ Three things change between "I got a query working" and "production traffic":
 ## See also
 
 - [Apollo Client docs](https://www.apollographql.com/docs/react/)
-- [Persisted Queries vs APQs](./persisted-queries-vs-apqs.md) (AS-315)
+- [Apollo Persisted Queries](https://www.apollographql.com/docs/graphos/routing/security/persisted-queries) and [Automatic Persisted Queries](https://www.apollographql.com/docs/graphos/routing/operations/apq)
 - [TN0038 Updating client schema](https://www.apollographql.com/docs/technotes/TN0038-updating-client-schema/)
 - [`apollosolutions/graphos-feature-template`](https://github.com/apollosolutions/graphos-feature-template) — clone-it-to-learn-it template
