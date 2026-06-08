@@ -70,7 +70,7 @@ LLMs treat `errors[0].message` as the only signal for "try again differently." A
 
 ### Cache aggressively
 
-Agents repeat themselves more than humans do — they often re-issue the same tool call to verify their own work. Entity caching (see [Entity caching best practices](./entity-caching-best-practices.md)) cuts a lot of redundant subgraph traffic when the consumer is an LLM.
+Agents repeat themselves more than humans do — they often re-issue the same tool call to verify their own work. The Router's response cache (see [Response caching guide](./response-caching-guide.md)) cuts a lot of redundant subgraph traffic when the consumer is an LLM.
 
 ## Authorization for agents
 
@@ -94,6 +94,6 @@ The Router emits the standard `graphql.operation.name` attribute on every operat
 - [`apollosolutions/apollo-mcp-server`](https://github.com/apollosolutions/apollo-mcp-server)
 - [`apollosolutions/agui-solutions-demo`](https://github.com/apollosolutions/agui-solutions-demo) — multi-vertical agentic UI demo
 - [`apollosolutions/lending-graph-ai-demo`](https://github.com/apollosolutions/lending-graph-ai-demo) — MCP + Calendar agentic example
-- [Entity caching best practices](./entity-caching-best-practices.md)
+- [Response caching guide](./response-caching-guide.md)
 - [MCP Production Guide](./mcp-production.md) — IdP, scopes, networking when you take the demo to prod
 - [`example-router-obo-flow`](https://github.com/apollosolutions/example-router-obo-flow) — on-behalf-of token exchange in a coprocessor
