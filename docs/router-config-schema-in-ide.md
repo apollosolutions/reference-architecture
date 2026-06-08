@@ -2,22 +2,24 @@
 
 > Five minutes of setup that catches half the config mistakes before the Router ever starts. Tracks [AS-333](https://apollographql.atlassian.net/browse/AS-333).
 
-Apollo Router publishes a JSON Schema for every release. Pointing your IDE at it gives you autocomplete on key paths, hover-help with the field descriptions from the Router source, and inline errors on typos or invalid values. Far cheaper than discovering the same problems at `router start`.
+Apollo Router can emit a JSON Schema of its config from the running binary. Pointing your IDE at the generated schema gives you autocomplete on key paths, hover-help with the field descriptions, and inline errors on typos or invalid values. Far cheaper than discovering the same problems at `router start`.
 
-## Where the schema lives
+## Generate the schema from your installed Router
 
-The schema is published per release at:
-
-```
-https://raw.githubusercontent.com/apollographql/router/v2.10.0/dev-docs/router_config.schema.json
-```
-
-Pin to a specific version tag. Tracking `main` will surface unreleased fields that your installed Router doesn't accept yet.
-
-For a quick check of the latest tag:
+The schema is **not published as a URL or release asset**. Generate it from the same Router binary you'll be running, so the schema matches your installed version exactly:
 
 ```bash
-gh release view --repo apollographql/router | head -3
+./router config schema > .apollo/router-config-schema.json
+```
+
+Commit `.apollo/router-config-schema.json` next to your `router.yaml` so the whole team gets the same hints, and regenerate it whenever you bump the Router version (a CI step works well — fail PRs if the generated file diverges from the committed copy).
+
+If you want to know which version you're targeting:
+
+```bash
+./router --version                                              # local binary
+gh release list --repo apollographql/router --limit 1           # latest published tag
+gh release view --repo apollographql/router --json tagName -q .tagName   # just the tag string
 ```
 
 ## VS Code
@@ -27,7 +29,7 @@ Install the [`redhat.vscode-yaml`](https://marketplace.visualstudio.com/items?it
 ```jsonc
 {
   "yaml.schemas": {
-    "https://raw.githubusercontent.com/apollographql/router/v2.10.0/dev-docs/router_config.schema.json": [
+    "./.apollo/router-config-schema.json": [
       "router.yaml",
       "router/*.yaml",
       "deploy/**/router*.yaml"
@@ -38,7 +40,7 @@ Install the [`redhat.vscode-yaml`](https://marketplace.visualstudio.com/items?it
 
 Save, open `router.yaml`, and start typing — you'll get completion on top-level keys (`authentication`, `traffic_shaping`, `telemetry`, …) and on nested ones once you've committed to a section.
 
-For a workspace-wide setup that everyone gets without per-clone fiddling, commit that block.
+For a workspace-wide setup that everyone gets without per-clone fiddling, commit both the schema file and the `.vscode/settings.json` block.
 
 ## JetBrains (IntelliJ, GoLand, PyCharm, RustRover)
 
@@ -47,7 +49,7 @@ JetBrains IDEs ship YAML schema support natively.
 1. **Preferences → Languages & Frameworks → Schemas and DTDs → JSON Schema Mappings**.
 2. **+** to add a new mapping.
 3. **Name**: `Apollo Router`.
-4. **Schema file or URL**: paste the same URL as above.
+4. **Schema file or URL**: point at `./.apollo/router-config-schema.json` in your repo.
 5. **Schema version**: JSON Schema 7 (the default works).
 6. **File path patterns**: add `router.yaml`, `router/*.yaml`, and any other globs that match your layout.
 
@@ -60,7 +62,7 @@ If you're running `coc-yaml`, add to `:CocConfig`:
 ```jsonc
 {
   "yaml.schemas": {
-    "https://raw.githubusercontent.com/apollographql/router/v2.10.0/dev-docs/router_config.schema.json": [
+    "./.apollo/router-config-schema.json": [
       "router.yaml",
       "router/*.yaml"
     ]
@@ -75,7 +77,7 @@ Direct `yaml-language-server` via `lspconfig` honours the same `yaml.schemas` bl
 If you can't change project settings (e.g. you're editing someone else's repo on a quick fix), the schema directive at the top of the file is also supported by `yaml-language-server`:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/apollographql/router/v2.10.0/dev-docs/router_config.schema.json
+# yaml-language-server: $schema=./.apollo/router-config-schema.json
 authentication:
   router:
     jwt:
@@ -97,6 +99,7 @@ If nothing shows up:
 
 ## See also
 
-- [Apollo Router YAML config reference](https://www.apollographql.com/docs/router/configuration/overview)
+- [Apollo Router YAML configuration reference](https://www.apollographql.com/docs/graphos/routing/configuration/yaml)
+- [Router CLI reference](https://www.apollographql.com/docs/graphos/routing/configuration/cli) — `router config schema` and related commands
 - [yaml-language-server schema directive docs](https://github.com/redhat-developer/yaml-language-server#using-inlined-schema)
 - [Router releases](https://github.com/apollographql/router/releases) — get the right tag for your installed version
