@@ -70,7 +70,7 @@ The reference architecture in this repo (`apollosolutions/reference-architecture
 2. Installing the [Apollo GraphOS Operator](https://www.apollographql.com/docs/apollo-operator/installation/).
 3. Applying the `Supergraph` CRD with `spec.routerConfig` inlined — see [`deploy/operator-resources/supergraph-prod.yaml`](../deploy/operator-resources/supergraph-prod.yaml).
 
-Use the [non-OCI Helm patterns](../examples/router-helm-non-oci/) if the cluster can't reach `oci://ghcr.io/...`.
+Use non-OCI Helm patterns if the cluster can't reach `oci://ghcr.io/...` — see AS-239 for examples (pending merge into this repo).
 
 ## EC2 / App Runner
 
@@ -79,7 +79,7 @@ Use the [non-OCI Helm patterns](../examples/router-helm-non-oci/) if the cluster
 
 ## Auth on AWS
 
-See companion tech note [`router-aws-jwt-sigv4.md`](./router-aws-jwt-sigv4.md) for the JWT + SigV4 combination — the most common authentication shape on AWS deployments.
+See companion tech note `router-aws-jwt-sigv4.md` (AS-184, pending merge) for the JWT + SigV4 combination — the most common authentication shape on AWS deployments.
 
 ## Observability
 
@@ -117,7 +117,7 @@ Router emits OTel traces, metrics, and logs. Wire them up via:
 
 ## See also
 
-- [Router on AWS JWT + SigV4](./router-aws-jwt-sigv4.md)
-- [Non-OCI Helm chart examples](../examples/router-helm-non-oci/)
+- Router on AWS JWT + SigV4 — `router-aws-jwt-sigv4.md` (AS-184, pending merge)
+- Non-OCI Helm chart examples — AS-239 (pending merge)
 - [Apollo GraphOS Operator docs](https://www.apollographql.com/docs/apollo-operator/)
 - [Router self-hosted runtime](https://www.apollographql.com/docs/graphos/routing/self-hosted/containerization/docker)
