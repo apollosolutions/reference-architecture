@@ -1,0 +1,92 @@
+name: Validate non-OCI Helm examples
+
+# Renders the examples/router-helm-non-oci values files against the upstream
+# Apollo Router chart and asserts they are correct. Template-only render (no
+# cluster needed); catches schema/nesting regressions like the image override
+# silently falling back to the upstream default.
+
+on:
+  pull_request:
+    paths:
+      - "examples/router-helm-non-oci/**"
+      - ".github/workflows/validate-non-oci-helm.yml"
+  workflow_dispatch: {}
+
+jobs:
+  helm-template:
+    runs-on: ubuntu-latest
+    env:
+      # Expected mirrored image after the override is applied.
+      EXPECTED_IMAGE: "registry.example.com/apollo/router:v2.10.0"
+      # Upstream default that must NOT survive the override.
+      UPSTREAM_IMAGE: "ghcr.io/apollographql/router"
+      # Leave empty to pull the latest chart; pin a version here if desired.
+      CHART_VERSION: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Install kubeconform
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz -o /tmp/kc.tgz
+          tar -xzf /tmp/kc.tgz -C /tmp kubeconform
+          sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
+          kubeconform -v
+
+      - name: Pull Apollo Router chart
+        id: chart
+        run: |
+          set -euo pipefail
+          if [ -n "${CHART_VERSION}" ]; then
+            helm pull oci://ghcr.io/apollographql/helm-charts/router --version "${CHART_VERSION}"
+          else
+            helm pull oci://ghcr.io/apollographql/helm-charts/router
+          fi
+          CHART_TGZ="$(ls router-*.tgz | head -n1)"
+          echo "tgz=${CHART_TGZ}" >> "${GITHUB_OUTPUT}"
+          echo "Pulled chart: ${CHART_TGZ}"
+
+      - name: Render and validate each pattern
+        env:
+          CHART_TGZ: ${{ steps.chart.outputs.tgz }}
+        run: |
+          set -euo pipefail
+          base="examples/router-helm-non-oci"
+          fail=0
+          for pattern in pattern-a-local-chart pattern-b-private-registry; do
+            values="${base}/${pattern}/values.yaml"
+            out="/tmp/${pattern}.rendered.yaml"
+            echo "::group::helm template ${pattern}"
+            helm template router "${CHART_TGZ}" -f "${values}" | tee "${out}"
+            echo "::endgroup::"
+
+            if ! grep -q "${EXPECTED_IMAGE}" "${out}"; then
+              echo "::error file=${values}::rendered manifests do not reference the mirrored image ${EXPECTED_IMAGE}"
+              fail=1
+            fi
+            if grep -q "${UPSTREAM_IMAGE}" "${out}"; then
+              echo "::error file=${values}::rendered manifests still reference the upstream image ${UPSTREAM_IMAGE}; the override did not fully apply"
+              fail=1
+            fi
+
+            echo "::group::kubeconform ${pattern}"
+            kubeconform -ignore-missing-schemas -summary "${out}"
+            echo "::endgroup::"
+          done
+
+          # pattern-b must wire the imagePullSecret into the pod spec.
+          if ! grep -q "regcred" "/tmp/pattern-b-private-registry.rendered.yaml"; then
+            echo "::error file=${base}/pattern-b-private-registry/values.yaml::rendered manifests do not reference the regcred imagePullSecret"
+            fail=1
+          fi
+
+          if [ "${fail}" -ne 0 ]; then
+            echo "Helm example validation failed."
+            exit 1
+          fi
+          echo "All non-OCI Helm examples rendered and validated successfully."

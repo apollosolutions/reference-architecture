@@ -1,0 +1,40 @@
+# Pattern B — non-OCI Router Helm values, private registry with credentials.
+#
+# Schema: https://github.com/apollographql/router/blob/main/helm/chart/router/values.yaml
+# All overrides below match the upstream chart's top-level layout. The `router:`
+# key is reserved for the Router YAML config and is intentionally not used here.
+
+image:
+  # Replace with your mirrored image location.
+  repository: registry.example.com/apollo/router
+  tag: "v2.10.0"
+  pullPolicy: IfNotPresent
+
+# Reference the docker-registry secret created with `kubectl create secret
+# docker-registry regcred`. The chart wires this into the pod spec.
+imagePullSecrets:
+  - name: regcred
+
+managedFederation:
+  graphRef: my-graph@main
+  existingSecret: apollo-graphos-secret # contains the graph API key
+
+replicaCount: 3
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+service:
+  type: ClusterIP
+  port: 80
+  targetport: http
+
+podAnnotations:
+  # Adding the registry secret reference to pod annotations is helpful when
+  # tools like external-secrets or sealed-secrets manage the underlying
+  # credential rotation — drop if not applicable to your environment.
+  apollo.example.com/registry: registry.example.com
