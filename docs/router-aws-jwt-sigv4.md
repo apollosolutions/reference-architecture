@@ -9,6 +9,22 @@ This tech note covers two complementary patterns for running GraphOS Router on A
 
 Both patterns can run independently or together. End-to-end, the inbound JWT proves _who_ the caller is, and SigV4 proves to AWS that _Router_ is the authorized service hop.
 
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Router as Apollo Router
+    participant IdP as Cognito / OIDC IdP
+    participant Subgraph as AWS-backed Subgraph (API GW / Lambda / AppSync)
+
+    Client->>Router: GraphQL request + Bearer token
+    Router->>IdP: Fetch JWKS (cached; refreshed periodically)
+    Router-->>Router: Validate JWT — reject 401 if invalid or missing
+    Note over Router: JWT claims written to request context<br/>(@requiresScopes / @policy enforced here)
+    Router->>Subgraph: Subgraph fetch signed with SigV4<br/>(Authorization header stripped before signing)
+    Subgraph-->>Router: Subgraph response
+    Router-->>Client: GraphQL response
+```
+
 ## Pattern 1 — Validate inbound JWTs at the Router
 
 The Router's [JWT authentication plugin](https://www.apollographql.com/docs/graphos/routing/security/jwt) validates a `Bearer` token against one or more JWKS endpoints and rejects unauthenticated traffic before composition. With AWS-hosted IdPs the JWKS URL is fully managed for you.
