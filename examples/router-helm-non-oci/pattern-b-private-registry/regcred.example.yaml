@@ -13,4 +13,4 @@ metadata:
 type: kubernetes.io/dockerconfigjson
 data:
   # base64({"auths":{"registry.example.com":{"username":"...","password":"...","auth":"..."}}})
-  .dockerconfigjson: eyJhdXRocyI6e319
+  .dockerconfigjson: eyJhdXRocyI6e319 # gitleaks:allow

@@ -14,3 +14,13 @@ paths = [
   "docs/mcp-production.md",
   "docs/mcp-auth0-claude-desktop.md",
 ]
+
+# Allowlist the kubernetes dockerconfigjson placeholder in the non-OCI Helm
+# example. The .dockerconfigjson value is base64 of {"auths":{}} (an empty
+# placeholder), not a real credential. See AS-239 / PR #35.
+[[rules]]
+  id = "kubernetes-secret-yaml"
+  [rules.allowlist]
+    paths = [
+      '''examples/router-helm-non-oci/pattern-b-private-registry/regcred\.example\.yaml$''',
+    ]
