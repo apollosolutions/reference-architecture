@@ -66,10 +66,12 @@ response_cache:
   subgraph:
     subgraphs:
       products:
-        # Reference any field already in the request context. JWT claims are
-        # populated by the `authentication.router.jwt` plugin under
-        # `apollo::authentication::jwt_claims.<claim>`.
-        private_id: apollo::authentication::jwt_claims.sub
+        # Point private_id at a flat context key you populate from the JWT sub
+        # claim via a Rhai supergraph_service hook. Using a nested dotted path
+        # directly (e.g. apollo::authentication::jwt_claims.sub) is not reliably
+        # resolved; populate an intermediate key first:
+        #   request.context["user:sub"] = claims?.sub ?? ""  (in Rhai)
+        private_id: "user:sub"
 ```
 
 For dimensions that aren't a simple context field — for example combining a tenant claim with `Accept-Language` — set the cache key explicitly at runtime by writing the `apollo::response_cache::key` context entry from a Rhai script or coprocessor before the subgraph fetch:
@@ -79,7 +81,11 @@ fn subgraph_service(service, _subgraph) {
     service.map_request(|request| {
         let tenant = request.context["apollo::authentication::jwt_claims"]?.tenant ?? "anon";
         let locale = request.subgraph.headers["accept-language"] ?? "*";
-        request.context["apollo::response_cache::key"] = `tenant=${tenant};lang=${locale}`;
+        // The cache key entry takes a JSON object keyed by scope ("all",
+        // "subgraphs.<name>", or an operation name). A bare string is ignored.
+        request.context["apollo::response_cache::key"] = #{
+            "all": `tenant=${tenant};lang=${locale}`
+        };
     });
 }
 ```
