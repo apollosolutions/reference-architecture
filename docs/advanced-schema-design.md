@@ -53,7 +53,7 @@ The crime is using (1) for expected failures. Clients then have to parse `errors
 
 - `@shareable` — explicit opt-in for "this field can be resolved by more than one subgraph." Without it, federation refuses to compose two subgraphs that both define the same field. Use it only on fields where the value is identical regardless of which subgraph resolves it (e.g. `Product.id`, computed totals).
 
-- `@override(from: "old-subgraph")` — explicit migration directive. Lets the new subgraph claim ownership of a field while the old subgraph still defines it, allowing for a smooth cutover. Always paired with deletion of the field from the old subgraph in a follow-up release.
+- `@override(from: "old-subgraph")` — explicit migration directive. Lets the new subgraph claim ownership of a field while the old subgraph still defines it, allowing for a smooth cutover. Typically followed by deletion of the field from the old subgraph in a follow-up release, though [progressive `@override`](https://www.apollographql.com/docs/federation/entities-advanced/#incremental-migration-with-override) (percentage-based traffic rollout) is also supported as an intermediate step before full cutover.
 
 - `@inaccessible` — hides a field from the public API surface without removing it from subgraph internals. Useful during deprecation or for fields that exist for federation-internal reasons (e.g. join keys that aren't meant to be queried directly).
 
