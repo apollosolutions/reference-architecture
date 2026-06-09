@@ -22,7 +22,7 @@ If you only remember one thing: **PQs are an allowlist. APQs are a cache.** Mixi
 
 PQs scale linearly with the operations you ship per release. Build a CI step that:
 1. Extracts operations from the client codebase at build time.
-2. Pushes them to a [PQ manifest](https://www.apollographql.com/docs/graphos/operations/persisted-queries) under a client name + version.
+2. Pushes them to a [PQ manifest](https://www.apollographql.com/docs/graphos/platform/security/persisted-queries) under a client name + version.
 3. Configures the Router to require PQs and enforce per-client-version allowlists.
 
 Audit-mode posture (collect unmatched ids without rejecting them):
@@ -37,6 +37,11 @@ persisted_queries:
 Once the unknown rate hits zero in production, flip on enforcement:
 
 ```yaml title="router.yaml — PQ enforcement"
+# APQ and PQ safelist enforcement are mutually exclusive — APQs let clients
+# register arbitrary operations at runtime, which defeats the allowlist.
+apq:
+  enabled: false
+
 persisted_queries:
   enabled: true
   safelist:
@@ -71,6 +76,9 @@ You don't have to pick. The pattern that gives both security and bandwidth savin
 
 The Router can apply different rules per client name (set via `apollographql-client-name` header), so first-party traffic gets the allowlist while monitoring/ad-hoc traffic falls through to the standard enforcement.
 
+> [!IMPORTANT]
+> PQ safelist enforcement (`safelist.enabled: true`) and global APQs (`apq.enabled: true`) are mutually exclusive — APQs allow any client to register arbitrary operations at runtime, defeating the allowlist. If you enable APQs for specific first-party client names as an optimization, ensure those same client names are also in the PQ manifest; do not set `apq.enabled: true` globally alongside `safelist.enabled: true`.
+
 ## Migration order matters
 
 If you're moving from no enforcement to PQs:
@@ -84,7 +92,7 @@ Most production outages from PQ rollouts come from skipping step 1.
 
 ## See also
 
-- [Apollo Persisted Queries](https://www.apollographql.com/docs/graphos/operations/persisted-queries)
+- [Apollo Persisted Queries](https://www.apollographql.com/docs/graphos/platform/security/persisted-queries)
 - [Automatic Persisted Queries](https://www.apollographql.com/docs/graphos/routing/operations/apq)
 - [TN0024 Schema Deprecations](https://www.apollographql.com/docs/technotes/TN0024-deprecations/) — PQ manifests are also the cleanest way to know whether deprecating a field is safe.
 - [Apollo Client PQ link](https://www.apollographql.com/docs/react/api/link/persisted-queries/)
