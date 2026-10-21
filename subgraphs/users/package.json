@@ -25,6 +25,7 @@
     "dev": "nodemon --watch \"src/**\" --ext \"ts,json,graphql\" --exec \"npm run build && npm run start\" --ignore ./src/__generated__/ --ignore ./src/lib.ts"
   },
   "dependencies": {
+    "uuid": "14.0.3",
     "@apollo/server": "^4.12.0",
     "@apollo/subgraph": "^2.12.0",
     "@opentelemetry/api": "^1.9.0",
