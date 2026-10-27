@@ -96,7 +96,7 @@ async function main() {
     })
   );
   const server = new ApolloServer({
-    schema: buildSubgraphSchema({ typeDefs, resolvers }),
+    schema: buildSubgraphSchema([{ typeDefs, resolvers }]),
   });
   const { url } = await startStandaloneServer(server, {
     context,
